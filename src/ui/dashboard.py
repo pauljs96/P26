@@ -25,6 +25,9 @@ from src.ml.backtest import backtest_baselines_1step
 from src.ml.ets_model import ETSForecaster
 from src.ml.backtest_ets import backtest_ets_1step
 import numpy as np
+from src.ml.rf_model import RFForecaster
+from src.ml.backtest_rf import backtest_rf_1step
+
 
 
 def _normalize_text(s: pd.Series) -> pd.Series:
@@ -101,30 +104,23 @@ def build_monthly_components(movements: pd.DataFrame, codigo: str) -> pd.DataFra
     return out.sort_values("Mes").reset_index(drop=True)
 
 
-def compare_models_metrics(bt_baselines, bt_ets, sort_by: str = "MAE") -> pd.DataFrame:
+def compare_models_metrics(*metrics_dfs: pd.DataFrame, sort_by: str = "MAE") -> pd.DataFrame:
     """
-    Une métricas de baselines + ETS en una sola tabla y ordena por sort_by.
-    Espera:
-      - bt_baselines.metrics con columnas: Modelo, MAE, RMSE, sMAPE_%, MAPE_safe_%, N
-      - bt_ets.metrics con columnas: Modelo, MAE, RMSE, sMAPE_%, MAPE_safe_%, N
+    Une métricas de N modelos en una sola tabla y ordena por sort_by (default MAE).
+    Cada metrics_df debe tener columnas: Modelo, MAE, RMSE, sMAPE_%, MAPE_safe_%, N
     """
-    m1 = bt_baselines.metrics.copy()
-    m2 = bt_ets.metrics.copy()
+    allm = pd.concat([d for d in metrics_dfs if d is not None and not d.empty], ignore_index=True)
 
-    # Normalizar nombre de columna (por si en baselines es "Modelo" ya ok)
-    for df in (m1, m2):
-        if "Modelo" not in df.columns and "Model" in df.columns:
-            df.rename(columns={"Model": "Modelo"}, inplace=True)
+    if allm.empty:
+        return allm
 
-    allm = pd.concat([m1, m2], ignore_index=True)
+    if sort_by not in allm.columns:
+        sort_by = "MAE"
 
     # Asegurar numéricos
     for col in ["MAE", "RMSE", "sMAPE_%", "MAPE_safe_%"]:
         if col in allm.columns:
             allm[col] = pd.to_numeric(allm[col], errors="coerce")
-
-    if sort_by not in allm.columns:
-        sort_by = "MAE"
 
     allm = allm.sort_values(sort_by, ascending=True).reset_index(drop=True)
     allm.insert(0, "Rank", range(1, len(allm) + 1))
@@ -174,23 +170,6 @@ def build_abc_from_demand(demand_monthly: pd.DataFrame) -> pd.DataFrame:
     return tot
 
 
-def compare_models_metrics(bt_baselines, bt_ets, sort_by: str = "MAE") -> pd.DataFrame:
-    m1 = bt_baselines.metrics.copy()
-    m2 = bt_ets.metrics.copy()
-
-    allm = pd.concat([m1, m2], ignore_index=True)
-
-    for col in ["MAE", "RMSE", "sMAPE_%", "MAPE_safe_%"]:
-        if col in allm.columns:
-            allm[col] = pd.to_numeric(allm[col], errors="coerce")
-
-    if sort_by not in allm.columns:
-        sort_by = "MAE"
-
-    allm = allm.sort_values(sort_by, ascending=True).reset_index(drop=True)
-    allm.insert(0, "Rank", range(1, len(allm) + 1))
-    return allm
-
 
 @st.cache_data(show_spinner=False)
 def run_portfolio_comparison(
@@ -228,10 +207,20 @@ def run_portfolio_comparison(
         if hist.empty:
             continue
 
-        bt_base = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=test_months, ma_window=int(ma_window))
-        bt_ets = backtest_ets_1step(hist, y_col="Demanda_Unid", test_months=test_months, ets=ets)
+        bt_base = backtest_baselines_1step(
+            hist, y_col="Demanda_Unid", test_months=test_months, ma_window=int(ma_window)
+        )
+        bt_ets = backtest_ets_1step(
+            hist, y_col="Demanda_Unid", test_months=test_months, ets=ets
+        )
 
-        cmp = compare_models_metrics(bt_base, bt_ets, sort_by=sort_metric)
+        rf = RFForecaster(n_estimators=400, min_obs=24, min_samples_leaf=1, random_state=42)
+        bt_rf = backtest_rf_1step(
+            hist, y_col="Demanda_Unid", test_months=test_months, rf=rf
+        )
+
+        cmp = compare_models_metrics(bt_base.metrics, bt_ets.metrics, bt_rf.metrics, sort_by=sort_metric)
+
         if cmp.empty:
             continue
 
@@ -317,14 +306,21 @@ class Dashboard:
         productos = sorted(res.movements["Codigo"].dropna().unique().tolist())
         prod_sel = st.sidebar.selectbox("Producto (Código)", options=productos)
 
+        # Defaults para evitar UnboundLocalError entre tabs / reruns
+        if "ets_test_months" not in st.session_state:
+            st.session_state["ets_test_months"] = 12
+        if "global_test_months" not in st.session_state:
+            st.session_state["global_test_months"] = 12
+
         # ------------------------------
         # TABS
         # ------------------------------
-        tab_demanda, tab_baselines, tab_ets,Tab_Comparativa,ResumenComparativa ,tab_stock_diag = st.tabs([
+        tab_demanda, tab_baselines, tab_ets,tab_ml,Tab_Comparativa,ResumenComparativa ,tab_stock_diag = st.tabs([
             "🧩 Demanda y Componentes",
             "🔮 Baselines y Backtest",
             "📈 Holt–Winters (ETS)",
-            "🏆 Comparativa ETS vs Baselines",
+            "🤖 Random Forest (RF)",
+            "🏆 Comparativa ETS vs Baselines vs RF",
             "📊 Resumen Comparativa",
             "🏢 Stock y Diagnóstico"
         ])
@@ -520,66 +516,138 @@ class Dashboard:
                 )
                 st.plotly_chart(fig_ets, use_container_width=True)
 
-
         # ==========================================================
-        # TAB 4: COMPARATIVA ETS VS BASELINES
+        # TAB 4: ML-RANDOM FOREST
         # ==========================================================
-        with Tab_Comparativa:
 
-                st.divider()
-                st.subheader("🏆 Comparador: Baselines vs ETS (Backtest t+1)")
+        with tab_ml:
+            st.subheader("🤖 Random Forest (Backtest t+1)")
 
-                # Reutilizamos el mismo hist y el mismo horizonte (test_months_ets)
-                # Para que la comparación sea justa:
-                ma_window_cmp = st.selectbox("Ventana MA para comparación", options=[3, 6], index=0, key="ma_cmp")
+            dm = res.demand_monthly.copy()
+            dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
+            hist = (dm[dm["Codigo"] == str(prod_sel)][["Mes", "Demanda_Unid"]].copy().sort_values("Mes"))
 
-                bt_base_cmp = backtest_baselines_1step(
-                    hist, y_col="Demanda_Unid",
-                    test_months=test_months_ets,
-                    ma_window=int(ma_window_cmp)
+
+            if hist.empty:
+                st.info("No hay serie mensual para este producto.")
+            else:
+                test_months_rf = st.slider(
+                    "Meses a evaluar RF (últimos)",
+                    min_value=6, max_value=24, value=12, step=1,
+                    key="rf_test_months"
                 )
 
-                # bt_ets ya está calculado arriba
+                # Parámetros RF (mínimos y estables)
+                n_estimators = st.slider("Árboles (n_estimators)", 200, 800, 400, 50)
+                min_obs = st.slider("Mínimo de meses para entrenar", 12, 36, 24, 1)
+                min_leaf = st.slider("min_samples_leaf", 1, 10, 1, 1)
+
+                rf = RFForecaster(
+                    n_estimators=int(n_estimators),
+                    min_obs=int(min_obs),
+                    min_samples_leaf=int(min_leaf),
+                    random_state=42
+                )
+
+                bt_rf = backtest_rf_1step(hist, y_col="Demanda_Unid", test_months=int(test_months_rf), rf=rf)
+
+                st.markdown("**Métricas RF**")
+                st.dataframe(bt_rf.metrics, use_container_width=True)
+
+                st.markdown("**Predicciones RF (detalle)**")
+                st.dataframe(bt_rf.predictions.tail(min(24, len(bt_rf.predictions))), use_container_width=True, height=280)
+
+                fig_rf = px.line(
+                    bt_rf.predictions, x="Mes_target", y=["y_true", "RF"], markers=True,
+                    title=f"RF vs Real (Backtest) - Producto {prod_sel}"
+                )
+                st.plotly_chart(fig_rf, use_container_width=True)
+
+
+
+        # ==========================================================
+        # TAB 5: COMPARATIVA ETS VS BASELINES VS RF
+        # ==========================================================
+        with Tab_Comparativa:
+            st.subheader("🏆 Comparador final: Baselines vs ETS vs RF (Backtest t+1)")
+
+            dm = res.demand_monthly.copy()
+            dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
+            hist_cmp = dm[dm["Codigo"] == str(prod_sel)][["Mes", "Demanda_Unid"]].copy().sort_values("Mes")
+
+            if hist_cmp.empty:
+                st.info("No hay serie mensual para este producto.")
+            else:
+                # Parámetros de evaluación (tab independiente)
+                test_months_cmp = st.slider(
+                    "Meses a evaluar (últimos)",
+                    min_value=6, max_value=24, value=int(st.session_state.get("ets_test_months", 12)), step=1,
+                    key="cmp_test_months"
+                )
+                st.session_state["ets_test_months"] = int(test_months_cmp)  # mantiene consistencia
+
+                ma_window_cmp = st.selectbox("Ventana MA", options=[3, 6], index=0, key="cmp_ma_window")
+
+                # métrica para ordenar (default MAE)
                 metric_to_sort = st.selectbox(
                     "Ordenar ganador por",
                     options=["MAE", "RMSE", "sMAPE_%", "MAPE_safe_%"],
-                    index=0,
-                    key="sort_metric"
+                    index=0,  # MAE
+                    key="cmp_sort_metric"
                 )
 
-                cmp = compare_models_metrics(bt_base_cmp, bt_ets, sort_by=metric_to_sort)
+                # 1) Baselines
+                bt_base_cmp = backtest_baselines_1step(
+                    hist_cmp,
+                    y_col="Demanda_Unid",
+                    test_months=int(test_months_cmp),
+                    ma_window=int(ma_window_cmp)
+                )
 
-                # Ganador
-                winner = cmp.iloc[0]["Modelo"] if not cmp.empty else "N/A"
-                c1, c2 = st.columns([1, 2])
-                with c1:
-                    st.metric("Modelo ganador", str(winner))
-                with c2:
-                    st.caption("Ganador = menor métrica seleccionada en el backtest (t+1), usando el mismo tramo de evaluación.")
+                # 2) ETS
+                ets = ETSForecaster(seasonal_periods=12, trend="add", seasonal="add", damped_trend=False, min_obs=24)
+                bt_ets_cmp = backtest_ets_1step(
+                    hist_cmp,
+                    y_col="Demanda_Unid",
+                    test_months=int(test_months_cmp),
+                    ets=ets
+                )
 
+                # 3) RF
+                rf = RFForecaster(n_estimators=400, min_obs=24, min_samples_leaf=1, random_state=42)
+                bt_rf_cmp = backtest_rf_1step(
+                    hist_cmp,
+                    y_col="Demanda_Unid",
+                    test_months=int(test_months_cmp),
+                    rf=rf
+                )
+
+                # Unir métricas
+                cmp = compare_models_metrics(bt_base_cmp.metrics, bt_ets_cmp.metrics, bt_rf_cmp.metrics, sort_by=metric_to_sort)
+
+                winner = str(cmp.iloc[0]["Modelo"]) if not cmp.empty else "N/A"
+                st.metric("Modelo ganador (default MAE)", winner)
                 st.dataframe(cmp, use_container_width=True)
 
-
-    ######GRAFICA COMPARACIÓN VISUAL-GANADOR BSL VS ETS######
-                # Plot: real vs ganador
+                # Plot ganador vs real
                 if not cmp.empty:
-                    best = cmp.iloc[0]["Modelo"]
-
-                    if best == "ETS(Holt-Winters)":
-                        pred_best = bt_ets.predictions[["Mes_target", "y_true", "ETS"]].rename(columns={"ETS": "y_pred"})
+                    if winner == "ETS(Holt-Winters)":
+                        pred_best = bt_ets_cmp.predictions[["Mes_target", "y_true", "ETS"]].rename(columns={"ETS": "y_pred"})
+                    elif winner == "RandomForest":
+                        pred_best = bt_rf_cmp.predictions[["Mes_target", "y_true", "RF"]].rename(columns={"RF": "y_pred"})
                     else:
-                        # best será: "Naive", "Seasonal12" o "MA3"/"MA6"
-                        pred_best = bt_base_cmp.predictions[["Mes_target", "y_true", best]].rename(columns={best: "y_pred"})
+                        pred_best = bt_base_cmp.predictions[["Mes_target", "y_true", winner]].rename(columns={winner: "y_pred"})
 
                     fig_best = px.line(
                         pred_best, x="Mes_target", y=["y_true", "y_pred"], markers=True,
-                        title=f"Ganador vs Real (Backtest) - {best} - Producto {prod_sel}"
+                        title=f"Ganador vs Real (Backtest) - {winner} - Producto {prod_sel}"
                     )
                     st.plotly_chart(fig_best, use_container_width=True)
 
 
+
         # ==========================================================
-        # TAB 5: COMPARATIVA GLOBAL ETS VS BASELINES
+        # TAB 6: COMPARATIVA GLOBAL ETS VS BASELINES VS RF
         # ==========================================================
         with ResumenComparativa:
 
