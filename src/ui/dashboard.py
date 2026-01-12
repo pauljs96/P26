@@ -87,7 +87,10 @@ def build_monthly_components(movements: pd.DataFrame, codigo: str) -> pd.DataFra
 
     # Debug (solo dentro del tab de demanda, se controla desde el caller)
     # Unir y completar meses faltantes (base completa)
-    months = pd.DataFrame({"Mes": pd.date_range("2021-01-01", "2025-05-01", freq="MS")})
+ 
+    min_mes = df["Mes"].min()
+    max_mes = df["Mes"].max()
+    months = pd.DataFrame({"Mes": pd.date_range(min_mes, max_mes, freq="MS")})
 
     out = (
         months.merge(venta, on="Mes", how="left")
@@ -1469,6 +1472,29 @@ class Dashboard:
                     sort_metric="MAE",  # ganador por defecto MAE
                 )
 
+
+                st.markdown("### 🗓️ Línea de tiempo de la decisión de producción")
+
+                st.markdown(f"""
+                **Producto:** `{prod_sel}`  
+
+                | Etapa | Mes | Qué sucede |
+                |---|---|---|
+                | 📊 Datos históricos | **{hist['Mes'].max().strftime('%Y-%m')}** | Último mes cerrado usado para el modelo |
+                | 🏭 Producción | **Mes intermedio** | Se ejecuta la producción recomendada |
+                | 📦 Demanda objetivo | **Mes siguiente** | Se atiende la demanda pronosticada |
+                """)
+
+                st.info(
+                    "ℹ️ La producción recomendada **no se realiza en un solo día**. "
+                    "Corresponde a una **planificación mensual agregada**, que puede ejecutarse "
+                    "de forma distribuida durante el mes previo al mes de demanda."
+                )
+
+
+
+
+
                 if cmp.empty or winner == "N/A" or np.isnan(winner_mae):
                     st.warning("No se pudo seleccionar un modelo ganador (revisa longitud de serie).")
                 else:
@@ -1882,9 +1908,21 @@ class Dashboard:
                     st.markdown("### 🔝 Top productos (mayor ahorro)")
                     st.dataframe(detalleA.head(30), use_container_width=True, height=420)
 
+                    with st.expander("⬇️ Exportar detalle portafolio (CSV)", expanded=False):
+                        csv_det = detalleA.to_csv(index=False).encode("utf-8-sig")  # utf-8-sig para Excel
+                        st.download_button(
+                            "Descargar detalle_portafolio_ABC_A.csv",
+                            data=csv_det,
+                            file_name="detalle_portafolio_ABC_A.csv",
+                            mime="text/csv",
+                            key="dl_detalle_portafolio_A"
+                        )
+
                     fig_cost_port = px.bar(
                         resumenA,
                         x=["CostoTotal_Base", "CostoTotal_Sistema"],
                         title="Costo total portafolio ABC A: Base vs Sistema"
                     )
                     st.plotly_chart(fig_cost_port, use_container_width=True)
+
+
