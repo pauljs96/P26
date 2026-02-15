@@ -29,6 +29,9 @@ from src.ml.rf_model import RFForecaster
 from src.ml.backtest_rf import backtest_rf_1step
 
 
+#1. FUNCIONES AUXILIARES (Modular)
+
+#A. Normalizacion y Construcción
 
 def _normalize_text(s: pd.Series) -> pd.Series:
     return s.astype(str).str.strip()
@@ -107,32 +110,6 @@ def build_monthly_components(movements: pd.DataFrame, codigo: str) -> pd.DataFra
     return out.sort_values("Mes").reset_index(drop=True)
 
 
-def compare_models_metrics(*metrics_dfs: pd.DataFrame, sort_by: str = "MAE") -> pd.DataFrame:
-    """
-    Une métricas de N modelos en una sola tabla y ordena por sort_by (default MAE).
-    Cada metrics_df debe tener columnas: Modelo, MAE, RMSE, sMAPE_%, MAPE_safe_%, N
-    """
-    allm = pd.concat([d for d in metrics_dfs if d is not None and not d.empty], ignore_index=True)
-
-    if allm.empty:
-        return allm
-
-    if sort_by not in allm.columns:
-        sort_by = "MAE"
-
-    # Asegurar numéricos
-    for col in ["MAE", "RMSE", "sMAPE_%", "MAPE_safe_%"]:
-        if col in allm.columns:
-            allm[col] = pd.to_numeric(allm[col], errors="coerce")
-
-    allm = allm.sort_values(sort_by, ascending=True).reset_index(drop=True)
-    allm.insert(0, "Rank", range(1, len(allm) + 1))
-    return allm
-
-
-
-
-
 def build_abc_from_demand(demand_monthly: pd.DataFrame) -> pd.DataFrame:
     """
     ABC por demanda total (unidades) en todo el horizonte.
@@ -173,132 +150,30 @@ def build_abc_from_demand(demand_monthly: pd.DataFrame) -> pd.DataFrame:
     return tot
 
 
+#B. Comparación de Modelos
 
-@st.cache_data(show_spinner=False)
-def run_portfolio_comparison(
-    demand_monthly: pd.DataFrame,
-    sort_metric: str,
-    test_months: int,
-    ma_window: int,
-    ets_params: dict,
-    max_products: int | None = None,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def compare_models_metrics(*metrics_dfs: pd.DataFrame, sort_by: str = "MAE") -> pd.DataFrame:
     """
-    Corre comparación por SKU y devuelve:
-      - per_sku: ganador y métricas por producto
-      - summary_wins: conteo ganadores por ABC
-      - summary_errors: promedio de error por modelo (normal y ponderado)
+    Une métricas de N modelos en una sola tabla y ordena por sort_by (default MAE).
+    Cada metrics_df debe tener columnas: Modelo, MAE, RMSE, sMAPE_%, MAPE_safe_%, N
     """
-    dm = demand_monthly.copy()
-    dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
-    dm["Mes"] = pd.to_datetime(dm["Mes"]).dt.to_period("M").dt.to_timestamp()
-    dm = dm.sort_values(["Codigo", "Mes"])
-    dm["Demanda_Unid"] = pd.to_numeric(dm["Demanda_Unid"], errors="coerce").fillna(0.0).astype(float)
+    allm = pd.concat([d for d in metrics_dfs if d is not None and not d.empty], ignore_index=True)
 
-    abc = build_abc_from_demand(dm)[["Codigo", "ABC", "Demanda_Total"]].copy()
+    if allm.empty:
+        return allm
 
-    # limitar productos si se quiere (por performance)
-    codigos = abc["Codigo"].tolist()
-    if max_products is not None:
-        codigos = codigos[: int(max_products)]
+    if sort_by not in allm.columns:
+        sort_by = "MAE"
 
-    ets = ETSForecaster(**ets_params)
+    # Asegurar numéricos
+    for col in ["MAE", "RMSE", "sMAPE_%", "MAPE_safe_%"]:
+        if col in allm.columns:
+            allm[col] = pd.to_numeric(allm[col], errors="coerce")
 
-    rows = []
-    for cod in codigos:
-        hist = dm[dm["Codigo"] == str(cod)][["Mes", "Demanda_Unid"]].copy()
-        if hist.empty:
-            continue
+    allm = allm.sort_values(sort_by, ascending=True).reset_index(drop=True)
+    allm.insert(0, "Rank", range(1, len(allm) + 1))
+    return allm
 
-        bt_base = backtest_baselines_1step(
-            hist, y_col="Demanda_Unid", test_months=test_months, ma_window=int(ma_window)
-        )
-        bt_ets = backtest_ets_1step(
-            hist, y_col="Demanda_Unid", test_months=test_months, ets=ets
-        )
-
-        rf = RFForecaster(n_estimators=400, min_obs=24, min_samples_leaf=1, random_state=42)
-        bt_rf = backtest_rf_1step(
-            hist, y_col="Demanda_Unid", test_months=test_months, rf=rf
-        )
-
-        cmp = compare_models_metrics(bt_base.metrics, bt_ets.metrics, bt_rf.metrics, sort_by=sort_metric)
-
-        if cmp.empty:
-            continue
-
-        winner = str(cmp.iloc[0]["Modelo"])
-        # Guardamos métricas del ganador
-        win_row = cmp.iloc[0].to_dict()
-        win_row.update({"Codigo": cod, "Winner": winner})
-        rows.append(win_row)
-
-    per_sku = pd.DataFrame(rows)
-    if per_sku.empty:
-        return per_sku, pd.DataFrame(), pd.DataFrame()
-
-    # unir ABC
-    per_sku = per_sku.merge(abc, on="Codigo", how="left")
-
-    # Conteo de ganadores por ABC
-    summary_wins = (
-        per_sku.groupby(["ABC", "Winner"], as_index=False)
-               .size()
-               .rename(columns={"size": "N_Productos"})
-               .sort_values(["ABC", "N_Productos"], ascending=[True, False])
-    )
-
-    # Errores promedio por modelo (normal y ponderado por demanda total)
-    # Nota: per_sku contiene solo el ganador por SKU; para error por modelo “global” completo
-    # deberíamos guardar métricas de TODOS los modelos por SKU. Para tesis suele bastar:
-    # - promedio del error del ganador, y
-    # - distribución de ganadores por ABC.
-    # Si quieres error por modelo completo, te lo armo después.
-    per_sku["Weight"] = per_sku["Demanda_Total"].fillna(0.0).astype(float)
-
-    def wavg(x, w):
-        den = float(w.sum())
-        if den <= 0:
-            return float(x.mean())
-        return float((x * w).sum() / den)
-
-    summary_errors = (
-        per_sku.groupby(["ABC"], as_index=False)
-               .apply(lambda g: pd.Series({
-                   "N_Productos": int(len(g)),
-                   f"{sort_metric}_Promedio": float(g[sort_metric].mean()),
-                   f"{sort_metric}_Ponderado": wavg(g[sort_metric], g["Weight"]),
-               }))
-               .reset_index(drop=True)
-    )
-
-    return per_sku, summary_wins, summary_errors
-
-
-
-def z_from_service_level(service_level: float) -> float:
-    """Convierte nivel de servicio (0-1) a Z aproximado (normal estándar)."""
-    # Valores típicos (suficiente para tesis y operación)
-    mapping = {
-        0.85: 1.04,
-        0.90: 1.28,
-        0.95: 1.65,
-        0.975: 1.96,
-        0.99: 2.33
-    }
-    # si no está exacto, aproximamos al más cercano
-    closest = min(mapping.keys(), key=lambda k: abs(k - service_level))
-    return mapping[closest]
-
-
-def policy_service_level_by_abc(abc: str) -> float:
-    """Define nivel de servicio por ABC (política)."""
-    abc = (abc or "C").strip().upper()
-    if abc == "A":
-        return 0.95
-    if abc == "B":
-        return 0.90
-    return 0.85
 
 
 def select_winner_and_backtests_for_product(
@@ -343,6 +218,38 @@ def select_winner_and_backtests_for_product(
     return cmp, winner, pred_best, winner_mae
 
 
+
+
+#C. Política de Inventario
+
+def z_from_service_level(service_level: float) -> float:
+    """Convierte nivel de servicio (0-1) a Z aproximado (normal estándar)."""
+    # Valores típicos (suficiente para tesis y operación)
+    mapping = {
+        0.85: 1.04,
+        0.90: 1.28,
+        0.95: 1.65,
+        0.975: 1.96,
+        0.99: 2.33
+    }
+    # si no está exacto, aproximamos al más cercano
+    closest = min(mapping.keys(), key=lambda k: abs(k - service_level))
+    return mapping[closest]
+
+
+def policy_service_level_by_abc(abc: str) -> float:
+    """Define nivel de servicio por ABC (política)."""
+    abc = (abc or "C").strip().upper()
+    if abc == "A":
+        return 0.95
+    if abc == "B":
+        return 0.90
+    return 0.85
+
+
+
+#D. Pronóstico y Stock de Seguridad
+
 def forecast_next_month_with_winner(hist: pd.DataFrame, winner: str, ma_window: int, ets_params: dict, rf_params: dict) -> float:
     """Pronostica t+1 usando el modelo ganador."""
     if hist.empty:
@@ -376,8 +283,11 @@ def forecast_next_month_with_winner(hist: pd.DataFrame, winner: str, ma_window: 
     # fallback
     return float(max(0.0, naive_last(hist)))
 
+#--------------------------------------
 
+#2. SIMULACIÓN DE POLÍTICAS (Avanzado)
 
+#A. Single Backtest (1 producto)
 
 def simulate_policy_backtest_1step(
     hist: pd.DataFrame,
@@ -528,6 +438,8 @@ def simulate_policy_backtest_1step(
         "Produccion_total": float(df_sim["Produccion_Q"].sum()) if not df_sim.empty else 0.0,
     }
     return df_sim, kpis
+
+#B. Comparativa Sin Sistema vs Con Sistema
 
 def simulate_compare_policy_vs_baseline(
     hist: pd.DataFrame,
@@ -725,7 +637,7 @@ def simulate_compare_policy_vs_baseline(
     }
     return df, summary
 
-
+#C. Portafolio ABC A (Masivo)
 @st.cache_data(show_spinner=False)
 def run_portfolio_cost_comparison_abcA(
     demand_monthly: pd.DataFrame,
@@ -903,6 +815,111 @@ def run_portfolio_cost_comparison_abcA(
 
     detalle = detalle.sort_values("Ahorro", ascending=False).reset_index(drop=True)
     return resumen, detalle
+
+
+
+@st.cache_data(show_spinner=False)
+def run_portfolio_comparison(
+    demand_monthly: pd.DataFrame,
+    sort_metric: str,
+    test_months: int,
+    ma_window: int,
+    ets_params: dict,
+    max_products: int | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """
+    Corre comparación por SKU y devuelve:
+      - per_sku: ganador y métricas por producto
+      - summary_wins: conteo ganadores por ABC
+      - summary_errors: promedio de error por modelo (normal y ponderado)
+    """
+    dm = demand_monthly.copy()
+    dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
+    dm["Mes"] = pd.to_datetime(dm["Mes"]).dt.to_period("M").dt.to_timestamp()
+    dm = dm.sort_values(["Codigo", "Mes"])
+    dm["Demanda_Unid"] = pd.to_numeric(dm["Demanda_Unid"], errors="coerce").fillna(0.0).astype(float)
+
+    abc = build_abc_from_demand(dm)[["Codigo", "ABC", "Demanda_Total"]].copy()
+
+    # limitar productos si se quiere (por performance)
+    codigos = abc["Codigo"].tolist()
+    if max_products is not None:
+        codigos = codigos[: int(max_products)]
+
+    ets = ETSForecaster(**ets_params)
+
+    rows = []
+    for cod in codigos:
+        hist = dm[dm["Codigo"] == str(cod)][["Mes", "Demanda_Unid"]].copy()
+        if hist.empty:
+            continue
+
+        bt_base = backtest_baselines_1step(
+            hist, y_col="Demanda_Unid", test_months=test_months, ma_window=int(ma_window)
+        )
+        bt_ets = backtest_ets_1step(
+            hist, y_col="Demanda_Unid", test_months=test_months, ets=ets
+        )
+
+        rf = RFForecaster(n_estimators=400, min_obs=24, min_samples_leaf=1, random_state=42)
+        bt_rf = backtest_rf_1step(
+            hist, y_col="Demanda_Unid", test_months=test_months, rf=rf
+        )
+
+        cmp = compare_models_metrics(bt_base.metrics, bt_ets.metrics, bt_rf.metrics, sort_by=sort_metric)
+
+        if cmp.empty:
+            continue
+
+        winner = str(cmp.iloc[0]["Modelo"])
+        # Guardamos métricas del ganador
+        win_row = cmp.iloc[0].to_dict()
+        win_row.update({"Codigo": cod, "Winner": winner})
+        rows.append(win_row)
+
+    per_sku = pd.DataFrame(rows)
+    if per_sku.empty:
+        return per_sku, pd.DataFrame(), pd.DataFrame()
+
+    # unir ABC
+    per_sku = per_sku.merge(abc, on="Codigo", how="left")
+
+    # Conteo de ganadores por ABC
+    summary_wins = (
+        per_sku.groupby(["ABC", "Winner"], as_index=False)
+               .size()
+               .rename(columns={"size": "N_Productos"})
+               .sort_values(["ABC", "N_Productos"], ascending=[True, False])
+    )
+
+    # Errores promedio por modelo (normal y ponderado por demanda total)
+    # Nota: per_sku contiene solo el ganador por SKU; para error por modelo “global” completo
+    # deberíamos guardar métricas de TODOS los modelos por SKU. Para tesis suele bastar:
+    # - promedio del error del ganador, y
+    # - distribución de ganadores por ABC.
+    # Si quieres error por modelo completo, te lo armo después.
+    per_sku["Weight"] = per_sku["Demanda_Total"].fillna(0.0).astype(float)
+
+    def wavg(x, w):
+        den = float(w.sum())
+        if den <= 0:
+            return float(x.mean())
+        return float((x * w).sum() / den)
+
+    summary_errors = (
+        per_sku.groupby(["ABC"], as_index=False)
+               .apply(lambda g: pd.Series({
+                   "N_Productos": int(len(g)),
+                   f"{sort_metric}_Promedio": float(g[sort_metric].mean()),
+                   f"{sort_metric}_Ponderado": wavg(g[sort_metric], g["Weight"]),
+               }))
+               .reset_index(drop=True)
+    )
+
+    return per_sku, summary_wins, summary_errors
+
+
+
 
 
 class Dashboard:
