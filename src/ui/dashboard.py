@@ -33,6 +33,7 @@ import numpy as np
 from src.ml.rf_model import RFForecaster
 from src.ml.backtest_rf import backtest_rf_1step
 from src.db import get_db
+from src.storage import get_storage_manager
 
 
 #1. FUNCIONES AUXILIARES (Modular)
@@ -1086,10 +1087,53 @@ class Dashboard:
             st.info("👆 Sube los CSV para comenzar.")
             return
 
+        # ==================== S3 UPLOAD ====================
+        storage = get_storage_manager()
+        db = get_db()
+        
+        with st.spinner("📤 Procesando archivos..."):
+            # Guardar archivos temporalmente y subirlos a S3
+            saved_files = []
+            for file in files:
+                try:
+                    # Guardar en session memory
+                    file_contents = file.read()
+                    file.seek(0)  # Reset para lectura posterior
+                    
+                    # Upload a S3 (con fallback a session si S3 no está configurado)
+                    result = storage.upload_file_bytes(
+                        file_contents,
+                        file.name,
+                        user_id=st.session_state.get("user_id", "demo"),
+                        project_id=st.session_state.get("current_project_id", "default")
+                    )
+                    
+                    if result["success"]:
+                        # Guardar metadata en Supabase
+                        if result.get("s3_url") and result.get("presigned_url"):
+                            db.save_upload(
+                                user_id=st.session_state.get("user_id"),
+                                project_id=st.session_state.get("current_project_id"),
+                                filename=file.name,
+                                s3_key=result["s3_key"],
+                                s3_url=result["s3_url"],
+                                presigned_url=result["presigned_url"],
+                                file_size=len(file_contents)
+                            )
+                        saved_files.append(file)
+                    else:
+                        st.warning(f"⚠️ {file.name}: {result.get('error', 'Error desconocido')}")
+                except Exception as e:
+                    st.warning(f"⚠️ {file.name}: {str(e)}")
+
+        if not saved_files:
+            st.error("No se han podido procesar los archivos")
+            return
+
         pipeline = DataPipeline()
 
-        with st.spinner("Procesando archivos..."):
-            res = pipeline.run(files)
+        with st.spinner("⚙️ Ejecutando pipeline de datos..."):
+            res = pipeline.run(saved_files)
 
         if res.movements.empty:
             st.error("No se detectaron columnas mínimas o la data quedó vacía tras limpieza.")

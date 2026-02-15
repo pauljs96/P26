@@ -13,20 +13,27 @@
       "completed_date": "2026-02-15"
     },
     "PHASE_1": {
-      "status": "not-started",
+      "status": "in-progress",
       "description": "MVP Cloud (Streamlit + Supabase)",
       "target_weeks": 3,
+      "start_date": "2026-02-15",
       "weeks": {
         "week1": {
-          "title": "Refactoring básico",
-          "status": "not-started",
+          "title": "Refactoring básico + Supabase setup",
+          "status": "completed",
+          "completion_date": "2026-02-15",
           "tasks": [
-            "Actualizar requirements.txt",
-            "Crear src/db/supabase.py",
-            "Crear src/services/ml_service.py",
-            "Integrar streamlit-authenticator en dashboard.py",
-            "Crear .env.example"
-          ]
+            "✅ Actualizar requirements.txt (6 dependencies)",
+            "✅ Crear src/db/supabase.py (285 lines)",
+            "✅ Crear src/services/ml_service.py (165 lines)",
+            "✅ Integrar streamlit-authenticator en dashboard.py",
+            "✅ Crear .env.example",
+            "✅ Crear SETUP_SUPABASE.sql (complete schema)",
+            "✅ Crear SETUP_GUIDE_PHASE1.md (instructions)",
+            "✅ Create context persistence system"
+          ],
+          "files_changed": 12,
+          "lines_added": 1100
         },
         "week2": {
           "title": "Infraestructura cloud",
@@ -189,14 +196,16 @@
       "needs_update": false
     },
     "src/db/": {
-      "status": "missing",
-      "needs_creation": true,
+      "status": "created",
+      "files": ["supabase.py", "__init__.py"],
+      "implementation": "complete",
       "priority": "high"
     },
     "src/services/": {
-      "status": "missing",
-      "needs_creation": true,
-      "priority": "medium"
+      "status": "created",
+      "files": ["ml_service.py", "__init__.py"],
+      "implementation": "complete",
+      "priority": "immediate"
     }
   },
   "technology_stack": {
@@ -226,8 +235,38 @@
   },
   "memory_notes": {
     "note_1": "User wants persistent context memory - created PROJECT_CONTEXT.md, DEVELOPMENT_LOG.md, .conversation_state.json",
-    "note_2": "All conversations and decisions will be documented in these files",
-    "note_3": "On next session, AI will read these files first to maintain context",
-    "note_4": "Git commits should reference these files and use structured messages"
+    "note_2": "All conversations and decisions documented across sessions",
+    "note_3": "On next session, AI reads PROJECT_CONTEXT.md + DEVELOPMENT_LOG.md first for full context",
+    "note_4": "Phase 1 Week 1 (Sesión 2) COMPLETE: Added auth, Supabase DB, ML services, setup guide",
+    "note_5": "Phase 1 Week 2-3 blocked: User must create Supabase account + execute SQL schema",
+    "note_6": "Demo mode works locally without Supabase - useful for feature testing before cloud setup"
+  },
+  "last_session": {
+    "session": "Sesión 2",
+    "date": "2026-02-15",
+    "duration_hours": 5,
+    "accomplishments": [
+      "Updated requirements.txt: 6 new dependencies",
+      "Created src/db/supabase.py: 285-line DB client",
+      "Created src/services/ml_service.py: 165-line service layer",
+      "Added auth to dashboard.py with login/register/logout UI",
+      "Created SETUP_SUPABASE.sql: Complete PostgreSQL schema",
+      "Created SETUP_GUIDE_PHASE1.md: Step-by-step setup",
+      "Created context persistence system (3 files)",
+      "Git commit: [PHASE-1-W1] Add auth, Supabase DB, ML services layer, setup guide"
+    ]
+  },
+  "next_session_tasks": {
+    "CRITICAL": [
+      "User creates Supabase account (supabase.com)",
+      "User creates new project in Supabase Dashboard",
+      "User executes SETUP_SUPABASE.sql in SQL Editor",
+      "User obtains and configures SUPABASE_URL + SUPABASE_KEY in .env",
+      "User tests authentication by running streamlit run main.py"
+    ],
+    "OPTIONAL": [
+      "Test demo mode without Supabase",
+      "Review PROJECT_CONTEXT.md for full roadmap context"
+    ]
   }
 }
