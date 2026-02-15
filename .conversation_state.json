@@ -1,0 +1,233 @@
+{
+  "project": {
+    "name": "Sistema_Tesis",
+    "description": "Planificación de producción e inventario con ML",
+    "github_url": "https://github.com/user/Sistema_Tesis"
+  },
+  "current_phase": "MVP_LOCAL",
+  "phases": {
+    "MVP_LOCAL": {
+      "status": "complete",
+      "description": "Prototipo funcional en local",
+      "completion": "100%",
+      "completed_date": "2026-02-15"
+    },
+    "PHASE_1": {
+      "status": "not-started",
+      "description": "MVP Cloud (Streamlit + Supabase)",
+      "target_weeks": 3,
+      "weeks": {
+        "week1": {
+          "title": "Refactoring básico",
+          "status": "not-started",
+          "tasks": [
+            "Actualizar requirements.txt",
+            "Crear src/db/supabase.py",
+            "Crear src/services/ml_service.py",
+            "Integrar streamlit-authenticator en dashboard.py",
+            "Crear .env.example"
+          ]
+        },
+        "week2": {
+          "title": "Infraestructura cloud",
+          "status": "not-started",
+          "tasks": [
+            "Crear proyecto Supabase",
+            "Crear schema DB (5 tablas)",
+            "Configurar GitHub Actions CI/CD",
+            "AWS S3 bucket para CSVs"
+          ]
+        },
+        "week3": {
+          "title": "Deploy MVP",
+          "status": "not-started",
+          "tasks": [
+            "Docker image",
+            "Deploy Streamlit Cloud",
+            "Testing multi-usuario",
+            "Documentación usuarios"
+          ]
+        }
+      },
+      "estimated_cost_per_month": 100
+    },
+    "PHASE_2": {
+      "status": "not-started",
+      "description": "Backend separado (FastAPI + background jobs)",
+      "target_weeks": 8,
+      "estimated_cost_per_month": 400
+    }
+  },
+  "current_session": {
+    "session_number": 1,
+    "date": "2026-02-15",
+    "duration_hours": 4,
+    "objectives_achieved": [
+      "Analyzed complete project architecture",
+      "Documented ML module in detail",
+      "Documented Data module in detail",
+      "Documented UI module in detail",
+      "Identified cloud architecture needs",
+      "Created PROJECT_CONTEXT.md",
+      "Created DEVELOPMENT_LOG.md",
+      "Created .conversation_state.json"
+    ],
+    "blockers_found": [
+      "RF backtest is slow for 1000+ SKUs",
+      "No auth system",
+      "No persistent database",
+      "No multi-tenant support"
+    ],
+    "next_session_plan": {
+      "focus": "PHASE_1 Week 1",
+      "tasks": [
+        "Install new dependencies",
+        "Create Supabase module",
+        "Create services module",
+        "Add Streamlit auth"
+      ],
+      "estimated_duration": "5-6 hours"
+    }
+  },
+  "key_decisions": {
+    "decision_1": {
+      "title": "Not Streamlit Cloud only",
+      "rationale": "No multi-tenant, shared session state issues",
+      "chosen_alternative": "Supabase Phase 1 + FastAPI Phase 2",
+      "date": "2026-02-15"
+    },
+    "decision_2": {
+      "title": "Keep ML models as-is (Phase 1)",
+      "rationale": "Robust fallbacks, handles edge cases well",
+      "deferred_to": "Phase 2 (Celery background jobs)"
+    },
+    "decision_3": {
+      "title": "Split into 2 phases",
+      "phase_1": "3 weeks - quick MVP with auth",
+      "phase_2": "8 weeks total - production backend"
+    }
+  },
+  "architecture_summary": {
+    "frontend": "Streamlit",
+    "data_pipeline": "Python (Pandas, NumPy)",
+    "ml_models": {
+      "baselines": "Naive, Seasonal Naive 12, Moving Average",
+      "ets": "Holt-Winters (exponential smoothing)",
+      "rf": "Random Forest 400 trees + engineered features"
+    },
+    "visualization": "Plotly Express",
+    "current_storage": "In-memory (session)",
+    "future_storage": "PostgreSQL (Supabase)"
+  },
+  "risks": {
+    "risk_1": {
+      "title": "RF slow for large portfolios",
+      "severity": "medium",
+      "mitigation": "Redis cache, limit SKUs per session, Celery in Phase 2"
+    },
+    "risk_2": {
+      "title": "No authentication",
+      "severity": "high",
+      "mitigation": "Add streamlit-authenticator in Phase 1 Week 1"
+    },
+    "risk_3": {
+      "title": "No persistent data",
+      "severity": "high",
+      "mitigation": "Add Supabase in Phase 1"
+    },
+    "risk_4": {
+      "title": "Not multi-tenant",
+      "severity": "high",
+      "mitigation": "Architecture with org/tenant separation in Phase 1"
+    }
+  },
+  "open_questions": {
+    "q1": "Use AWS S3 or Supabase Storage for CSV uploads?",
+    "q2": "OAuth (Google/GitHub) or simple user/password?",
+    "q3": "Final SaaS pricing model?",
+    "q4": "How many companies target for Phase 1?"
+  },
+  "files_status": {
+    "main.py": {
+      "status": "ok",
+      "lines": 8,
+      "needs_update": false
+    },
+    "README.md": {
+      "status": "outdated",
+      "needs_update": true,
+      "priority": "medium"
+    },
+    "requirements.txt": {
+      "status": "incomplete",
+      "needs_update": true,
+      "priority": "high",
+      "missing": [
+        "scikit-learn>=1.3",
+        "streamlit-authenticator>=0.2.0",
+        "supabase>=1.0",
+        "python-dotenv>=1.0"
+      ]
+    },
+    "src/ui/dashboard.py": {
+      "status": "functional",
+      "lines": 1929,
+      "tabs": 11,
+      "needs_refactor": true,
+      "priority": "high"
+    },
+    "src/ml/": {
+      "status": "functional",
+      "files": 8,
+      "robust": true,
+      "needs_update": false
+    },
+    "src/data/": {
+      "status": "functional",
+      "files": 7,
+      "robust": true,
+      "needs_update": false
+    },
+    "src/db/": {
+      "status": "missing",
+      "needs_creation": true,
+      "priority": "high"
+    },
+    "src/services/": {
+      "status": "missing",
+      "needs_creation": true,
+      "priority": "medium"
+    }
+  },
+  "technology_stack": {
+    "python": "3.12.5",
+    "virtual_env": "venv (local)",
+    "data_processing": [
+      "pandas>=2.0",
+      "numpy>=1.24"
+    ],
+    "ml": [
+      "scikit-learn>=1.3",
+      "statsmodels"
+    ],
+    "frontend": [
+      "streamlit>=1.36",
+      "plotly>=5.18"
+    ],
+    "cloud_ready": [
+      "streamlit-authenticator>=0.2.0",
+      "supabase>=1.0",
+      "boto3>=1.26"
+    ],
+    "utility": [
+      "python-dateutil>=2.8",
+      "python-dotenv>=1.0"
+    ]
+  },
+  "memory_notes": {
+    "note_1": "User wants persistent context memory - created PROJECT_CONTEXT.md, DEVELOPMENT_LOG.md, .conversation_state.json",
+    "note_2": "All conversations and decisions will be documented in these files",
+    "note_3": "On next session, AI will read these files first to maintain context",
+    "note_4": "Git commits should reference these files and use structured messages"
+  }
+}
