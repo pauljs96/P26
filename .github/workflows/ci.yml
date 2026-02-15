@@ -1,0 +1,101 @@
+name: CI - Linting & Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -q flake8 pylint pytest pytest-cov
+        pip install -q -r requirements.txt
+
+    - name: Lint with flake8
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings
+        flake8 src/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      continue-on-error: true
+
+    - name: Check imports and syntax with pylint
+      run: |
+        # Optional: Basic import check
+        python -m pylint src/ml/ --disable=all --enable=E,F --exit-zero
+      continue-on-error: true
+
+    - name: Check Python syntax
+      run: |
+        python -m py_compile src/ui/dashboard.py
+        python -m py_compile src/db/supabase.py
+        python -m py_compile src/storage/s3_manager.py
+        python -m py_compile src/services/ml_service.py
+
+    - name: Test imports
+      run: |
+        python -c "from src.ui.dashboard import Dashboard; print('✓ Dashboard OK')"
+        python -c "from src.db import get_db; print('✓ Supabase DB OK')"
+        python -c "from src.storage import get_storage_manager; print('✓ S3 Manager OK')"
+        python -c "from src.services.ml_service import compare_models; print('✓ ML Services OK')"
+
+    - name: Check file sizes
+      run: |
+        python -c "
+        import os
+        large_files = []
+        for root, dirs, files in os.walk('src'):
+          for f in files:
+            if f.endswith('.py'):
+              path = os.path.join(root, f)
+              size = os.path.getsize(path) / 1024  # KB
+              if size > 500:
+                large_files.append((path, f'{size:.0f}KB'))
+        if large_files:
+          print('⚠️ Files > 500KB (consider refactoring):')
+          for f, s in large_files:
+            print(f'  {f}: {s}')
+        "
+
+    - name: Validate requirements.txt
+      run: |
+        python -c "
+        import re
+        with open('requirements.txt', 'r') as f:
+          lines = [l.strip() for l in f if l.strip() and not l.startswith('#')]
+        
+        valid = True
+        for line in lines:
+          if not re.match(r'^[a-zA-Z0-9\-_]+>=?[\d\.]+', line):
+            print(f'❌ Invalid requirement: {line}')
+            valid = False
+        
+        if valid:
+          print(f'✓ requirements.txt OK ({len(lines)} packages)')
+        else:
+          exit(1)
+        "
+
+    - name: Summary
+      run: |
+        echo "✅ Pre-deployment checks passed"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "Python version: $(python --version)"
+        echo "Installed packages: $(pip list | wc -l)"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

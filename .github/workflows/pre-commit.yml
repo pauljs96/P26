@@ -1,0 +1,78 @@
+name: Pre-commit Checks
+
+on:
+  pull_request:
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+
+    - name: Check for large files
+      run: |
+        MAX_SIZE=1000  # KB
+        echo "⏳ Checking file sizes..."
+        for file in $(git ls-files); do
+          if [ -f "$file" ]; then
+            size=$(( $(stat -f%z "$file" 2>/dev/null || stat -c%s "$file") / 1024 ))
+            if [ $size -gt $MAX_SIZE ]; then
+              echo "❌ File too large: $file ($size KB)"
+              exit 1
+            fi
+          fi
+        done
+        echo "✓ All files within size limits"
+
+    - name: Check for secrets
+      run: |
+        echo "⏳ Scanning for potential secrets..."
+        if grep -r "SUPABASE_KEY=" --include="*.py" --include="*.md" .; then
+          echo "❌ Found hardcoded credential"
+          exit 1
+        fi
+        echo "✓ No hardcoded secrets detected"
+
+    - name: Verify .env not committed
+      run: |
+        if [ -f ".env" ]; then
+          echo "⚠️ Warning: .env file should not be committed"
+          echo "Make sure .gitignore includes: .env"
+        fi
+        if git ls-files | grep -q "^\.env$"; then
+          echo "❌ .env accidentally committed!"
+          exit 1
+        fi
+        echo "✓ .env properly ignored"
+
+    - name: Check requirements.txt format
+      run: |
+        python -c "
+        # Verify all required packages are present
+        required = {
+          'streamlit', 'pandas', 'numpy', 'plotly',
+          'scikit-learn', 'statsmodels', 'python-dotenv',
+          'streamlit-authenticator', 'supabase', 'requests', 'boto3'
+        }
+        
+        with open('requirements.txt', 'r') as f:
+          installed = {line.split('>=')[0].split('==')[0] for line in f if line.strip() and not line.startswith('#')}
+        
+        missing = required - installed
+        if missing:
+          print(f'❌ Missing packages: {missing}')
+          exit(1)
+        print('✓ All required packages present')
+        "
+
+    - name: Summary
+      run: |
+        echo "✅ Pre-commit checks passed"

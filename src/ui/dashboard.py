@@ -935,117 +935,79 @@ class Dashboard:
         Verifica autenticación. Retorna True si usuario está autenticado.
         Si no, muestra pantalla de login/registro.
         """
-        # Mode can be "login" or "register"
-        if "auth_mode" not in st.session_state:
-            st.session_state.auth_mode = "login"
-
-        col1, col2 = st.columns([1, 1])
+        # Verificar si ya está autenticado
+        if st.session_state.get("authenticated", False):
+            return True
         
-        with col1:
-            if st.button("Iniciar Sesión", use_container_width=True):
-                st.session_state.auth_mode = "login"
+        # Mostrar formulario de autenticación
+        st.title("🔐 Sistema de Planificación")
+        st.write("Inicia sesión o registrate para continuar")
+        
+        # Tab selector
+        tab1, tab2 = st.tabs(["Iniciar Sesión", "Registrarse"])
+        
+        with tab1:
+            st.subheader("🔐 Iniciar Sesión")
+            email = st.text_input("Email:", placeholder="usuario@empresa.com", key="login_email_v2")
+            password = st.text_input("Contraseña:", type="password", key="login_password_v2")
             
-        with col2:
-            if st.button("Registrarse", use_container_width=True):
-                st.session_state.auth_mode = "register"
-
-        st.divider()
-
-        if st.session_state.auth_mode == "login":
-            return self._login_form()
-        else:
-            return self._register_form()
-
-    def _login_form(self) -> bool:
-        """Form para login. Retorna True si autenticación exitosa."""
-        st.title("🔐 Iniciar Sesión")
-        
-        email = st.text_input("Email:", placeholder="usuario@empresa.com")
-        password = st.text_input("Contraseña:", type="password")
-        
-        if st.button("Entrar", type="primary", use_container_width=True):
-            if not email or not password:
-                st.error("Por favor completa todos los campos")
-                return False
-            
-            try:
-                db = get_db()
-                result = db.login_user(email, password)
-                
-                if result["success"]:
-                    st.session_state.authenticated = True
-                    st.session_state.user_id = result["user_id"]
-                    st.session_state.email = result["email"]
-                    st.success("¡Bienvenido!")
-                    st.rerun()
-                    return True
+            if st.button("Entrar", type="primary", use_container_width=True, key="login_btn"):
+                if not email or not password:
+                    st.error("Por favor completa todos los campos")
                 else:
-                    st.error(f"Error: {result['error']}")
-                    return False
-            except Exception as e:
-                st.warning(
-                    "⚠️ Modo demo: sin conexión a Supabase.\n"
-                    f"Error: {str(e)}\n\n"
-                    "Para producción, configura SUPABASE_URL y SUPABASE_KEY en .env"
-                )
-                # Demo mode: fake authentication
-                st.session_state.authenticated = True
-                st.session_state.user_id = "demo-user-id"
-                st.session_state.email = email
-                st.success("Modo Demo: Acceso sin BD")
-                st.rerun()
-                return True
+                    # Intentar Supabase primero
+                    try:
+                        db = get_db()
+                        result = db.login_user(email, password)
+                        if result["success"]:
+                            st.session_state.authenticated = True
+                            st.session_state.user_id = result["user_id"]
+                            st.session_state.email = result["email"]
+                            st.rerun()
+                        else:
+                            st.error(f"Error: {result['error']}")
+                    except Exception as e:
+                        # Demo mode fallback
+                        st.session_state.authenticated = True
+                        st.session_state.user_id = "demo-user-id"
+                        st.session_state.email = email
+                        st.session_state.company = "Demo Company"
+                        st.success("✅ Modo Demo: Sesión iniciada (datos no persistentes)")
+                        st.info("💡 Para usar BD real, configura SUPABASE_URL y SUPABASE_KEY en .env")
+                        st.rerun()
         
-        return False
-
-    def _register_form(self) -> bool:
-        """Form para registro. Retorna True si registro exitoso."""
-        st.title("📝 Registrarse")
-        
-        company_name = st.text_input("Nombre de Empresa:", placeholder="Mi Empresa SPA")
-        email = st.text_input("Email:", placeholder="usuario@empresa.com")
-        password = st.text_input("Contraseña:", type="password")
-        password_confirm = st.text_input("Confirmar Contraseña:", type="password")
-        
-        if st.button("Registrarse", type="primary", use_container_width=True):
-            if not all([company_name, email, password, password_confirm]):
-                st.error("Por favor completa todos los campos")
-                return False
+        with tab2:
+            st.subheader("📝 Registrarse")
+            company_name = st.text_input("Nombre de Empresa:", placeholder="Mi Empresa SPA", key="reg_company_v2")
+            email_reg = st.text_input("Email:", placeholder="usuario@empresa.com", key="reg_email_v2")
+            password_reg = st.text_input("Contraseña:", type="password", key="reg_password_v2")
+            password_confirm = st.text_input("Confirmar Contraseña:", type="password", key="reg_password_confirm_v2")
             
-            if password != password_confirm:
-                st.error("Las contraseñas no coinciden")
-                return False
-            
-            if len(password) < 6:
-                st.error("La contraseña debe tener al menos 6 caracteres")
-                return False
-            
-            try:
-                db = get_db()
-                result = db.register_user(email, password, company_name)
-                
-                if result["success"]:
-                    st.success("¡Registro exitoso! Inicia sesión para continuar.")
-                    st.session_state.auth_mode = "login"
-                    st.rerun()
-                    return False
+            if st.button("Registrarse", type="primary", use_container_width=True, key="register_btn"):
+                if not all([company_name, email_reg, password_reg, password_confirm]):
+                    st.error("Por favor completa todos los campos")
+                elif password_reg != password_confirm:
+                    st.error("Las contraseñas no coinciden")
+                elif len(password_reg) < 6:
+                    st.error("La contraseña debe tener al menos 6 caracteres")
                 else:
-                    st.error(f"Error: {result['error']}")
-                    return False
-            except Exception as e:
-                st.warning(
-                    "⚠️ Modo demo: sin conexión a Supabase.\n"
-                    f"Error: {str(e)}\n\n"
-                    "Para producción, configura SUPABASE_URL y SUPABASE_KEY en .env"
-                )
-                # Demo mode: fake authentication
-                st.session_state.authenticated = True
-                st.session_state.user_id = "demo-user-id"
-                st.session_state.email = email
-                st.session_state.company = company_name
-                st.success("Modo Demo: Registro sin BD")
-                st.rerun()
-                return True
+                    # Intentar Supabase primero
+                    try:
+                        db = get_db()
+                        result = db.register_user(email_reg, password_reg, company_name)
+                        if result["success"]:
+                            st.success("✅ Registro exitoso en Supabase. Inicia sesión.")
+                        else:
+                            st.error(f"Error: {result['error']}")
+                    except Exception as e:
+                        # Demo mode fallback
+                        st.session_state.authenticated = True
+                        st.session_state.user_id = "demo-user-id"
+                        st.session_state.email = email_reg
+                        st.session_state.company = company_name
+                        st.success("✅ Modo Demo: Registro completado (datos no persistentes)")
+                        st.info("💡 Para usar BD real, configura SUPABASE_URL y SUPABASE_KEY en .env")
+                        st.rerun()
         
         return False
 
@@ -1089,7 +1051,13 @@ class Dashboard:
 
         # ==================== S3 UPLOAD ====================
         storage = get_storage_manager()
-        db = get_db()
+        
+        # Intentar obtener DB, pero continuar sin él en demo mode
+        db = None
+        try:
+            db = get_db()
+        except Exception:
+            st.info("💡 Modo demo: sin persistencia de metadata (Supabase no configurado)")
         
         with st.spinner("📤 Procesando archivos..."):
             # Guardar archivos temporalmente y subirlos a S3
@@ -1109,17 +1077,20 @@ class Dashboard:
                     )
                     
                     if result["success"]:
-                        # Guardar metadata en Supabase
-                        if result.get("s3_url") and result.get("presigned_url"):
-                            db.save_upload(
-                                user_id=st.session_state.get("user_id"),
-                                project_id=st.session_state.get("current_project_id"),
-                                filename=file.name,
-                                s3_key=result["s3_key"],
-                                s3_url=result["s3_url"],
-                                presigned_url=result["presigned_url"],
-                                file_size=len(file_contents)
-                            )
+                        # Guardar metadata en Supabase (solo si está disponible)
+                        if db and result.get("s3_url") and result.get("presigned_url"):
+                            try:
+                                db.save_upload(
+                                    user_id=st.session_state.get("user_id"),
+                                    project_id=st.session_state.get("current_project_id"),
+                                    filename=file.name,
+                                    s3_key=result["s3_key"],
+                                    s3_url=result["s3_url"],
+                                    presigned_url=result["presigned_url"],
+                                    file_size=len(file_contents)
+                                )
+                            except Exception as db_error:
+                                st.warning(f"⚠️ No se guardó metadata en BD: {str(db_error)}")
                         saved_files.append(file)
                     else:
                         st.warning(f"⚠️ {file.name}: {result.get('error', 'Error desconocido')}")
