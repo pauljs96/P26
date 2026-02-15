@@ -17,6 +17,11 @@ from __future__ import annotations
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import os
+from dotenv import load_dotenv
+
+# Cargar variables de entorno
+load_dotenv()
 
 from src.data.pipeline import DataPipeline
 from src.utils import config
@@ -27,6 +32,7 @@ from src.ml.backtest_ets import backtest_ets_1step
 import numpy as np
 from src.ml.rf_model import RFForecaster
 from src.ml.backtest_rf import backtest_rf_1step
+from src.db import get_db
 
 
 #1. FUNCIONES AUXILIARES (Modular)
@@ -923,14 +929,151 @@ def run_portfolio_comparison(
 
 
 class Dashboard:
+    def _check_authentication(self) -> bool:
+        """
+        Verifica autenticación. Retorna True si usuario está autenticado.
+        Si no, muestra pantalla de login/registro.
+        """
+        # Mode can be "login" or "register"
+        if "auth_mode" not in st.session_state:
+            st.session_state.auth_mode = "login"
+
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            if st.button("Iniciar Sesión", use_container_width=True):
+                st.session_state.auth_mode = "login"
+            
+        with col2:
+            if st.button("Registrarse", use_container_width=True):
+                st.session_state.auth_mode = "register"
+
+        st.divider()
+
+        if st.session_state.auth_mode == "login":
+            return self._login_form()
+        else:
+            return self._register_form()
+
+    def _login_form(self) -> bool:
+        """Form para login. Retorna True si autenticación exitosa."""
+        st.title("🔐 Iniciar Sesión")
+        
+        email = st.text_input("Email:", placeholder="usuario@empresa.com")
+        password = st.text_input("Contraseña:", type="password")
+        
+        if st.button("Entrar", type="primary", use_container_width=True):
+            if not email or not password:
+                st.error("Por favor completa todos los campos")
+                return False
+            
+            try:
+                db = get_db()
+                result = db.login_user(email, password)
+                
+                if result["success"]:
+                    st.session_state.authenticated = True
+                    st.session_state.user_id = result["user_id"]
+                    st.session_state.email = result["email"]
+                    st.success("¡Bienvenido!")
+                    st.rerun()
+                    return True
+                else:
+                    st.error(f"Error: {result['error']}")
+                    return False
+            except Exception as e:
+                st.warning(
+                    "⚠️ Modo demo: sin conexión a Supabase.\n"
+                    f"Error: {str(e)}\n\n"
+                    "Para producción, configura SUPABASE_URL y SUPABASE_KEY en .env"
+                )
+                # Demo mode: fake authentication
+                st.session_state.authenticated = True
+                st.session_state.user_id = "demo-user-id"
+                st.session_state.email = email
+                st.success("Modo Demo: Acceso sin BD")
+                st.rerun()
+                return True
+        
+        return False
+
+    def _register_form(self) -> bool:
+        """Form para registro. Retorna True si registro exitoso."""
+        st.title("📝 Registrarse")
+        
+        company_name = st.text_input("Nombre de Empresa:", placeholder="Mi Empresa SPA")
+        email = st.text_input("Email:", placeholder="usuario@empresa.com")
+        password = st.text_input("Contraseña:", type="password")
+        password_confirm = st.text_input("Confirmar Contraseña:", type="password")
+        
+        if st.button("Registrarse", type="primary", use_container_width=True):
+            if not all([company_name, email, password, password_confirm]):
+                st.error("Por favor completa todos los campos")
+                return False
+            
+            if password != password_confirm:
+                st.error("Las contraseñas no coinciden")
+                return False
+            
+            if len(password) < 6:
+                st.error("La contraseña debe tener al menos 6 caracteres")
+                return False
+            
+            try:
+                db = get_db()
+                result = db.register_user(email, password, company_name)
+                
+                if result["success"]:
+                    st.success("¡Registro exitoso! Inicia sesión para continuar.")
+                    st.session_state.auth_mode = "login"
+                    st.rerun()
+                    return False
+                else:
+                    st.error(f"Error: {result['error']}")
+                    return False
+            except Exception as e:
+                st.warning(
+                    "⚠️ Modo demo: sin conexión a Supabase.\n"
+                    f"Error: {str(e)}\n\n"
+                    "Para producción, configura SUPABASE_URL y SUPABASE_KEY en .env"
+                )
+                # Demo mode: fake authentication
+                st.session_state.authenticated = True
+                st.session_state.user_id = "demo-user-id"
+                st.session_state.email = email
+                st.session_state.company = company_name
+                st.success("Modo Demo: Registro sin BD")
+                st.rerun()
+                return True
+        
+        return False
+
     def render(self):
+
         st.set_page_config(page_title="Planificación - MVP", layout="wide")
+        
+        # ==================== AUTENTICACIÓN ====================
+        if not self._check_authentication():
+            return  # Muestra login screen y retorna
+        
+        # ==================== DASHBOARD PRINCIPAL ====================
         st.title("📦 Sistema de Planificación (MVP)")
 
         st.write(
             "Sube tus archivos CSV (2021–2025). "
             "Luego selecciona un producto para ver demanda, pronósticos y diagnósticos."
         )
+
+        # Logout button en sidebar
+        st.sidebar.divider()
+        st.sidebar.write(f"👤 **{st.session_state.email}**")
+        if st.sidebar.button("🚪 Cerrar Sesión", use_container_width=True):
+            st.session_state.authenticated = False
+            st.session_state.user_id = None
+            st.session_state.email = None
+            st.success("Sesión cerrada. Recargando...")
+            st.rerun()
+        st.sidebar.divider()
 
         st.sidebar.header("Datos")
         files = st.sidebar.file_uploader(
