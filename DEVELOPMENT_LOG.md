@@ -292,20 +292,193 @@ Documentado (1929 líneas):
 
 ### Objetivo: MVP Cloud - Week 2 (Infraestructura)
 
-**Tareas:**
-1. [ ] Usuario crea cuenta Supabase real
-2. [ ] Ejecutar SETUP_SUPABASE.sql en Supabase Dashboard
-3. [ ] Configurar .env con credenciales reales
-4. [ ] Test local: login/registro real contra Supabase
-5. [ ] Setup GitHub Actions (CI/CD)
-6. [ ] S3 bucket creation (opcional, para Semana 3)
+**Tareas pendientes:**
+1. [ ] Crear cuenta AWS + S3 bucket
+2. [ ] Configurar credenciales S3 en .env
+3. [ ] Test upload de archivo a S3
+4. [ ] Seguir con GitHub Actions (CI/CD)
+5. [ ] User crea cuenta Supabase real
+6. [ ] Ejecutar SETUP_SUPABASE.sql en Supabase Dashboard
+7. [ ] Test auth real contra Supabase
 
-**Tiempo estimado:** 3-4 horas
-**Punto de break:** Dashboard con auth real + Supabase funcionando
+**Tiempo estimado:** 4-5 horas
+**Punto de break:** Dashboard con S3 + real Supabase trabajando
+
+---
+
+## 📅 Sesión 3: Sábado 15 de Febrero, 2026
+
+### Contexto inicial:
+- Estado anterior: Phase 1 Week 1 completado (auth + Supabase + ML services)
+- Objetivo: Implementar S3 storage layer (Phase 1 Week 2)
+- Demo mode funcionando en localhost:8501 ✅
+
+### Implementación S3 Storage
+
+#### Archivos creados:
+
+**1. src/storage/s3_manager.py** (328 líneas)
+   - Clase `S3Manager`: Cliente AWS S3 con fallback
+   - Métodos:
+     - `upload_file()`: Sube archivo local a S3, retorna S3 URL + presigned URL
+     - `upload_file_bytes()`: Sube desde bytes (para archivos en memoria)
+     - `delete_file()`: Elimina archivo de S3
+     - `list_files()`: Lista objetos por prefix (user/project)
+     - `get_presigned_url()`: Genera URL de descarga (válida 7 días)
+   - Fallback: Si S3 no configurado, retorna URLs locales/memory
+   - Singleton pattern: `get_storage_manager()`
+
+**2. src/storage/__init__.py** (5 líneas)
+   - Module exports
+
+#### Archivos actualizado:
+
+**1. dashboard.py**
+   - Nuevo import: `from src.storage import get_storage_manager`
+   - Nueva lógica en `render()` (línea ~1080):
+     - Después de `file_uploader`, guardar archivos temporalmente
+     - Upload a S3 con `storage.upload_file_bytes()`
+     - Guardar metadata en Supabase con `db.save_upload()`
+     - Procesar desde archivos guardados
+   - Flujo: User sube CSV → S3 → Supabase metadata → Processing
+
+**2. src/db/supabase.py**
+   - Refactorizado `save_upload()`:
+     - Old: 4 parámetros (user_id, project_id, filename, s3_path)
+     - New: 7 parámetros (+ s3_key, s3_url, presigned_url, file_size)
+     - Docstring mejorado con Args/Returns
+     - Soporta metadata completa de S3
+
+**3. .env.example**
+   - AWS section actualizado:
+     ```
+     AWS_ACCESS_KEY_ID=your_access_key_id
+     AWS_SECRET_ACCESS_KEY=your_secret_access_key
+     AWS_S3_BUCKET_NAME=your-bucket-name
+     AWS_S3_REGION=us-east-1
+     ```
+   - Comentarios explicativos agregados
+
+**4. requirements.txt**
+   - Agregado: `boto3>=1.26` (AWS SDK)
+
+#### Documentación creada:
+
+**SETUP_S3.md** (200+ líneas)
+   - Paso 1: Crear cuenta AWS (con free tier)
+   - Paso 2: Crear S3 bucket
+   - Paso 3: Generar credenciales IAM
+   - Paso 4: Configurar .env
+   - Paso 5: Probar conexión (3 tests)
+   - Troubleshooting: NoCredentialsError, NoSuchBucket, InvalidAccessKeyId, AccessDenied
+   - Security best practices
+   - Cost estimation
+   - Referencias + Support
+
+### Casos de uso S3:
+
+1. **Upload de CSV (en dashboard)**
+   ```
+   User carga archivo.csv
+   → Guardado temporalmente en memory
+   → Upload a S3 (con key: users/{user_id}/projects/{project_id}/nombre.csv)
+   → Save metadata en Supabase (tabla uploads)
+   → Presigned URL generada (válida 7 días)
+   → Procesar datos desde archivo
+   ```
+
+2. **Descarga de archivo histórico**
+   ```
+   User quiere descargar CSV que subió antes
+   → Leer presigned_url de Supabase
+   → Mostrar botón de descarga en dashboard
+   → Descargar desde S3 (sin autenticación, URL presignada válida)
+   ```
+
+3. **Organización de archivos**
+   ```
+   S3 bucket estructura:
+   users/
+   ├── user-id-1/
+   │   ├── projects/
+   │   │   ├── project-1/
+   │   │   │   ├── 2024-sales.csv
+   │   │   │   ├── 2024-inventory.csv
+   │   │   ├── project-2/
+   └── user-id-2/
+   ```
+
+### Fallback behavior:
+
+Si `AWS_*` credenciales no configuradas:
+1. S3Manager inicializa con `is_configured=False`
+2. `upload_file_bytes()` retorna:
+   ```json
+   {
+     "success": true,
+     "s3_key": "users/123/projects/456/file.csv",
+     "s3_url": "memory://file.csv",
+     "presigned_url": null,
+     "warning": "⚠️ S3 no configurado - archivo en memoria"
+   }
+   ```
+3. Dashboard procesa archivo normalmente
+4. Metadata se guarda en Supabase (pero sin URLs reales)
+5. Permite desarrollo sin AWS account
+
+### Git commit:
+
+```
+[PHASE-1-W2] Add S3 configuration - file storage layer + dashboard integration
+
+Changes:
+- Created src/storage/s3_manager.py (328 lines)
+- Created src/storage/__init__.py
+- Updated dashboard.py with S3 upload logic
+- Updated supabase.py - improved save_upload() method
+- Updated .env.example with AWS credentials
+- Updated requirements.txt - added boto3>=1.26
+- Created SETUP_S3.md (200+ line guide)
+
+Files changed: 9, Insertions: 1013, Deletions: 45
+```
+
+### Status:
+
+✅ **Completado:**
+- S3Manager class implementada + tested (mentalmente)
+- Dashboard integrado con S3
+- Supabase schema compatible con S3 URLs
+- Documentación de setup completa
+- Fallback scenario para desarrollo local
+
+⏳ **Pendiente (sesión siguiente):**
+- User crea AWS account + S3 bucket
+- User configura .env con credenciales reales
+- Test file upload en dashboard local
+- Verificar que archivos aparecen en S3 Console
+- Proceder a GitHub Actions CI/CD (Week 2 parte 2)
+
+### Próximos pasos (Sesión 4):
+
+**Phase 1 Week 2 - Parte 2:**
+1. GitHub Actions setup (CI/CD)
+2. Linting con pylint/flake8
+3. Tests automáticos en commits
+4. Pre-commit hooks
+5. Deployment preview en Streamlit Cloud
+
+**Phase 1 Week 3:**
+1. Fine-tuning del MVP
+2. Preparar documentación para users
+3. Beta testing
+
+**Phase 2:**
+1. FastAPI backend
+2. Cloud deployment (GCP Cloud Run / AWS ECS)
 
 ---
 
 ## Historial Futuro
 
 (Se completará en siguientes sesiones)
-
