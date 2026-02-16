@@ -94,6 +94,9 @@ ALTER TABLE simulations ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view own data" ON users
   FOR SELECT USING (auth.uid() = id);
 
+CREATE POLICY "Users can insert own record" ON users
+  FOR INSERT WITH CHECK (auth.uid() = id);
+
 CREATE POLICY "Users can view own projects" ON projects
   FOR SELECT USING (auth.uid() = user_id);
 

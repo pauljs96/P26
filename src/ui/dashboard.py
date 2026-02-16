@@ -1052,12 +1052,13 @@ class Dashboard:
         # ==================== S3 UPLOAD ====================
         storage = get_storage_manager()
         
-        # Intentar obtener DB, pero continuar sin él en demo mode
+        # Intentar obtener DB
         db = None
         try:
             db = get_db()
-        except Exception:
-            st.info("💡 Modo demo: sin persistencia de metadata (Supabase no configurado)")
+        except Exception as e:
+            st.warning(f"⚠️ Supabase no disponible: {str(e)}")
+            db = None
         
         with st.spinner("📤 Procesando archivos..."):
             # Guardar archivos temporalmente y subirlos a S3
@@ -1068,7 +1069,7 @@ class Dashboard:
                     file_contents = file.read()
                     file.seek(0)  # Reset para lectura posterior
                     
-                    # Upload a S3 (con fallback a session si S3 no está configurado)
+                    # Upload a S3
                     result = storage.upload_file_bytes(
                         file_contents,
                         file.name,
@@ -1095,7 +1096,7 @@ class Dashboard:
                     else:
                         st.warning(f"⚠️ {file.name}: {result.get('error', 'Error desconocido')}")
                 except Exception as e:
-                    st.warning(f"⚠️ {file.name}: {str(e)}")
+                    st.error(f"❌ {file.name}: {str(e)}")
 
         if not saved_files:
             st.error("No se han podido procesar los archivos")
