@@ -114,9 +114,7 @@ class SupabaseDB:
         user_id: str, 
         project_id: str, 
         filename: str, 
-        s3_key: str = None,
-        s3_url: str = None,
-        presigned_url: str = None,
+        s3_path: str = None,
         file_size: int = 0
     ) -> Dict[str, Any]:
         """
@@ -126,27 +124,30 @@ class SupabaseDB:
             user_id: ID del usuario
             project_id: ID del proyecto
             filename: Nombre del archivo
-            s3_key: Clave en S3 (ej: users/123/projects/456/file.csv)
-            s3_url: URL de S3 (ej: s3://bucket/...)
-            presigned_url: URL presignada para descargar el archivo
+            s3_path: Ruta en S3 (ej: users/123/projects/456/file.csv)
             file_size: Tamaño del archivo en bytes
         
         Returns:
             {"success": bool, "upload_id": str, "error": str (si falla)}
         """
         try:
-            response = self.client.table("uploads").insert({
+            print(f"[DEBUG] Insertando en uploads: user_id={user_id}, project_id={project_id}, filename={filename}, s3_path={s3_path}")
+            # Build insert dict con las columnas correctas según schema de Supabase
+            insert_dict = {
                 "user_id": user_id,
                 "project_id": project_id,
                 "filename": filename,
-                "s3_key": s3_key,
-                "s3_url": s3_url,
-                "presigned_url": presigned_url,
+                "s3_path": s3_path,
                 "file_size": file_size,
-                "uploaded_at": "now()"
-            }).execute()
+                "status": "pending"
+            }
+            response = self.client.table("uploads").insert(insert_dict).execute()
+            print(f"[DEBUG] Insert exitoso: {response.data}")
             return {"success": True, "upload_id": response.data[0]["id"]}
         except Exception as e:
+            print(f"[DEBUG ERROR] save_upload falló: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return {"success": False, "error": str(e)}
 
     def get_uploads(self, project_id: str) -> List[Dict]:

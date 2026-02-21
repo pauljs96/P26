@@ -10,5 +10,10 @@ env/
 .vscode/
 .idea/
 
+# Archivos de ambiente (credenciales)
+.env
+.env.local
+.env.*.local
+
 # Otros
 *.log

@@ -930,6 +930,32 @@ def run_portfolio_comparison(
 
 
 class Dashboard:
+    def _ensure_project_created(self):
+        """Auto-crear proyecto 'Default' si el usuario no tiene ninguno"""
+        user_id = st.session_state.get("user_id")
+        if not user_id or user_id == "demo-user-id":
+            st.session_state.current_project_id = "demo-project"
+            return
+        
+        try:
+            db = get_db()
+            # Obtener proyectos del usuario
+            projects = db.get_projects(user_id)
+            
+            if not projects:
+                # Crear proyecto Default automáticamente
+                result = db.create_project(user_id, "Default", "Proyecto de planificación por defecto")
+                if result["success"]:
+                    st.session_state.current_project_id = result["project_id"]
+                else:
+                    st.warning(f"⚠️ No se pudo crear proyecto: {result['error']}")
+                    st.session_state.current_project_id = "default"
+            else:
+                # Usar primer proyecto existente
+                st.session_state.current_project_id = projects[0]["id"]
+        except Exception as e:
+            st.session_state.current_project_id = "demo-project"
+
     def _check_authentication(self) -> bool:
         """
         Verifica autenticación. Retorna True si usuario está autenticado.
@@ -937,6 +963,8 @@ class Dashboard:
         """
         # Verificar si ya está autenticado
         if st.session_state.get("authenticated", False):
+            # Auto-crear proyecto por defecto si no existe
+            self._ensure_project_created()
             return True
         
         # Mostrar formulario de autenticación
@@ -1052,12 +1080,14 @@ class Dashboard:
         # ==================== S3 UPLOAD ====================
         storage = get_storage_manager()
         
+        user_id = st.session_state.get("user_id")
+        project_id = st.session_state.get("current_project_id")
+        
         # Intentar obtener DB
         db = None
         try:
             db = get_db()
         except Exception as e:
-            st.warning(f"⚠️ Supabase no disponible: {str(e)}")
             db = None
         
         with st.spinner("📤 Procesando archivos..."):
@@ -1079,19 +1109,29 @@ class Dashboard:
                     
                     if result["success"]:
                         # Guardar metadata en Supabase (solo si está disponible)
-                        if db and result.get("s3_url") and result.get("presigned_url"):
+                        if db and result.get("s3_url"):
                             try:
-                                db.save_upload(
-                                    user_id=st.session_state.get("user_id"),
-                                    project_id=st.session_state.get("current_project_id"),
+                                save_result = db.save_upload(
+                                    user_id=user_id,
+                                    project_id=project_id,
                                     filename=file.name,
-                                    s3_key=result["s3_key"],
-                                    s3_url=result["s3_url"],
-                                    presigned_url=result["presigned_url"],
+                                    s3_path=result.get("s3_url"),
                                     file_size=len(file_contents)
                                 )
+                                
+                                if save_result.get("success"):
+                                    st.success(f"✅ {file.name} - Metadata guardada")
                             except Exception as db_error:
-                                st.warning(f"⚠️ No se guardó metadata en BD: {str(db_error)}")
+                                pass  # Silencio si falla Supabase
+                        else:
+                            msg = []
+                            if not db:
+                                msg.append("DB null")
+                            if not result.get("s3_url"):
+                                msg.append("S3 URL null")
+                            if not result.get("presigned_url"):
+                                msg.append("Presigned null")
+                            st.write(f"DEBUG: Saltando insert: {', '.join(msg)}")
                         saved_files.append(file)
                     else:
                         st.warning(f"⚠️ {file.name}: {result.get('error', 'Error desconocido')}")
