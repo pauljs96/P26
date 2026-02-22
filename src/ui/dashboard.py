@@ -1065,94 +1065,159 @@ class Dashboard:
             st.rerun()
         st.sidebar.divider()
 
-        st.sidebar.header("Datos")
-        files = st.sidebar.file_uploader(
-            "Sube CSV (2021–2025)",
-            type=["csv"],
-            accept_multiple_files=True
-        )
-
-        if not files:
-            st.info("👆 Sube los CSV para comenzar.")
-            return
-
-        # ==================== S3 UPLOAD ====================
-        storage = get_storage_manager()
-        
+        # ==================== DATA LOADING: CACHE FIRST ====================
+        org_id = st.session_state.get("organization_id")
         user_id = st.session_state.get("user_id")
-        project_id = st.session_state.get("current_project_id")
+        is_admin = st.session_state.get("is_admin", False)
         
-        # Intentar obtener DB
+        # Obtener DB
         db = None
         try:
             db = get_db()
         except Exception as e:
             db = None
         
-        with st.spinner("📤 Procesando archivos..."):
-            # Guardar archivos temporalmente y subirlos a S3
-            saved_files = []
-            for file in files:
-                try:
-                    # Guardar en session memory
-                    file_contents = file.read()
-                    file.seek(0)  # Reset para lectura posterior
-                    
-                    # Upload a S3
-                    result = storage.upload_file_bytes(
-                        file_contents,
-                        file.name,
-                        user_id=st.session_state.get("user_id", "demo"),
-                        project_id=st.session_state.get("current_project_id", "default")
+        # Verificar si hay data cacheada
+        from src.services.cache_service import check_and_load_org_cache, save_org_cache
+        
+        has_cache, cached_data = False, None
+        if db and org_id:
+            has_cache, cached_data = check_and_load_org_cache(db, org_id)
+        
+        if has_cache and cached_data:
+            # ==================== CARGAR DESDE CACHE ====================
+            st.sidebar.success("✅ **Datos Cacheados**")
+            st.sidebar.info(f"📅 Actualizado: {cached_data.get('updated_at', 'N/A')[:10]}")
+            st.sidebar.write(f"📄 CSVs: {cached_data.get('csv_files_count', 0)}")
+            
+            # Usar datos del cache
+            res_movements = cached_data.get("movements")
+            res_demand = cached_data.get("demand_monthly")
+            res_stock = cached_data.get("stock_monthly")
+            
+            # Guardar en session_state para que las tabs puedan acceder
+            st.session_state.pipeline_movements = res_movements
+            st.session_state.pipeline_demand = res_demand
+            st.session_state.pipeline_stock = res_stock
+            
+            st.sidebar.write("✨ Los datos están listos para análisis")
+        
+        else:
+            # ==================== NO HAY CACHE ====================
+            st.sidebar.warning("⚠️ **Sin Datos Cacheados**")
+            
+            if is_admin:
+                # Admin puede subir
+                st.sidebar.header("📤 Subir Datos")
+                files = st.sidebar.file_uploader(
+                    "Sube CSV (2021–2025)",
+                    type=["csv"],
+                    accept_multiple_files=True
+                )
+                
+                if not files:
+                    st.info("👆 Admin: Sube los CSV para procesar")
+                    return
+                
+                # ==================== S3 UPLOAD ====================
+                storage = get_storage_manager()
+                project_id = st.session_state.get("current_project_id")
+                
+                with st.spinner("📤 Procesando archivos..."):
+                    saved_files = []
+                    for file in files:
+                        try:
+                            file_contents = file.read()
+                            file.seek(0)
+                            
+                            result = storage.upload_file_bytes(
+                                file_contents,
+                                file.name,
+                                user_id=user_id,
+                                project_id=project_id
+                            )
+                            
+                            if result["success"]:
+                                if db and result.get("s3_url"):
+                                    try:
+                                        save_result = db.save_upload(
+                                            user_id=user_id,
+                                            project_id=project_id,
+                                            filename=file.name,
+                                            s3_path=result.get("s3_url"),
+                                            file_size=len(file_contents),
+                                            organization_id=org_id  # NUEVO: guardar org_id
+                                        )
+                                        if save_result.get("success"):
+                                            st.success(f"✅ {file.name} - Guardado")
+                                    except Exception as db_error:
+                                        pass
+                                saved_files.append(file)
+                            else:
+                                st.warning(f"⚠️ {file.name}: {result.get('error', 'Error desconocido')}")
+                        except Exception as e:
+                            st.error(f"❌ {file.name}: {str(e)}")
+                
+                if not saved_files:
+                    st.error("No se han podido procesar los archivos")
+                    return
+                
+                # ==================== PIPELINE ====================
+                pipeline = DataPipeline()
+                
+                with st.spinner("⚙️ Ejecutando pipeline de datos..."):
+                    res = pipeline.run(saved_files)
+                
+                if res.movements.empty:
+                    st.error("No se detectaron columnas mínimas o la data quedó vacía tras limpieza.")
+                    return
+                
+                # ==================== GUARDAR EN CACHE ====================
+                st.info("💾 Guardando datos en cache...")
+                if db:
+                    cache_saved = save_org_cache(
+                        db=db,
+                        org_id=org_id,
+                        movements=res.movements,
+                        demand_monthly=res.demand_monthly,
+                        stock_monthly=res.stock_monthly,
+                        processed_by=user_id,
+                        csv_files_count=len(saved_files)
                     )
                     
-                    if result["success"]:
-                        # Guardar metadata en Supabase (solo si está disponible)
-                        if db and result.get("s3_url"):
-                            try:
-                                save_result = db.save_upload(
-                                    user_id=user_id,
-                                    project_id=project_id,
-                                    filename=file.name,
-                                    s3_path=result.get("s3_url"),
-                                    file_size=len(file_contents)
-                                )
-                                
-                                if save_result.get("success"):
-                                    st.success(f"✅ {file.name} - Metadata guardada")
-                            except Exception as db_error:
-                                pass  # Silencio si falla Supabase
-                        else:
-                            msg = []
-                            if not db:
-                                msg.append("DB null")
-                            if not result.get("s3_url"):
-                                msg.append("S3 URL null")
-                            if not result.get("presigned_url"):
-                                msg.append("Presigned null")
-                            st.write(f"DEBUG: Saltando insert: {', '.join(msg)}")
-                        saved_files.append(file)
+                    if cache_saved:
+                        st.success("✅ Datos guardados en cache")
+                        st.balloons()
                     else:
-                        st.warning(f"⚠️ {file.name}: {result.get('error', 'Error desconocido')}")
-                except Exception as e:
-                    st.error(f"❌ {file.name}: {str(e)}")
+                        st.warning("⚠️ Error saving cache (pero data está lista para análisis)")
+                
+                # Usar los datos procesados
+                res_movements = res.movements
+                res_demand = res.demand_monthly
+                res_stock = res.stock_monthly
+                
+                st.session_state.pipeline_movements = res_movements
+                st.session_state.pipeline_demand = res_demand
+                st.session_state.pipeline_stock = res_stock
+            
+            else:
+                # Viewer esperando
+                st.warning("⏳ Los datos aún no han sido cargados")
+                st.info("Por favor espera a que el administrador cargue los archivos CSV")
+                return
+        
+        # ==================== CONTINUAR CON ANÁLISIS ====================
+        # En este punto, tenemos data (ya sea de cache o recién procesada)
+        res_movements = st.session_state.get("pipeline_movements")
+        res_demand = st.session_state.get("pipeline_demand")
+        res_stock = st.session_state.get("pipeline_stock")
 
-        if not saved_files:
-            st.error("No se han podido procesar los archivos")
+        if res_movements is None or res_demand is None or res_stock is None:
+            st.error("❌ No hay data disponible para análisis")
             return
 
-        pipeline = DataPipeline()
-
-        with st.spinner("⚙️ Ejecutando pipeline de datos..."):
-            res = pipeline.run(saved_files)
-
-        if res.movements.empty:
-            st.error("No se detectaron columnas mínimas o la data quedó vacía tras limpieza.")
-            st.stop()
-
-
         # --- ABC (una vez) ---
-        dm_abc = res.demand_monthly.copy()
+        dm_abc = res_demand.copy()
         dm_abc["Codigo"] = dm_abc["Codigo"].astype(str).str.strip()
         abc_df = build_abc_from_demand(dm_abc)  # columnas: Codigo, Demanda_Total, Share, CumShare, ABC
 
@@ -1165,7 +1230,7 @@ class Dashboard:
 
         # 2) Productos filtrados por ABC
         if abc_sel == "Todos":
-            productos = sorted(res.movements["Codigo"].dropna().astype(str).str.strip().unique().tolist())
+            productos = sorted(res_movements["Codigo"].dropna().astype(str).str.strip().unique().tolist())
         else:
             productos = (
                 abc_df[abc_df["ABC"] == abc_sel]["Codigo"]
@@ -1241,7 +1306,7 @@ class Dashboard:
         # ==========================================================
         with tab_demanda:
             st.subheader("🧩 Componentes de demanda por mes (producto seleccionado)")
-            comp = build_monthly_components(res.movements, prod_sel)
+            comp = build_monthly_components(res_movements, prod_sel)
 
             cA, cB = st.columns([1, 1])
             with cA:
@@ -1268,7 +1333,7 @@ class Dashboard:
             st.plotly_chart(fig_comp, use_container_width=True)
 
             with st.expander("🔍 Debug: detalle de guías externas por mes", expanded=False):
-                dfp = res.movements[res.movements["Codigo"] == str(prod_sel)].copy()
+                dfp = res_movements[res_movements["Codigo"] == str(prod_sel)].copy()
                 if not dfp.empty:
                     dfp["Documento"] = _normalize_text(dfp["Documento"])
                     dfp["Numero"] = _normalize_text(dfp["Numero"])
@@ -1289,7 +1354,7 @@ class Dashboard:
         with tab_baselines:
             st.subheader("🔮 Pronóstico baseline (t+1) - Demanda mensual")
 
-            dm = res.demand_monthly.copy()
+            dm = res_demand.copy()
             dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
             hist = dm[dm["Codigo"] == str(prod_sel)].copy().sort_values("Mes")
 
@@ -1334,7 +1399,7 @@ class Dashboard:
             st.divider()
 
             st.subheader("🧪 Backtest de baselines (t+1)")
-            dm = res.demand_monthly.copy()
+            dm = res_demand.copy()
             dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
             hist = dm[dm["Codigo"] == str(prod_sel)].copy().sort_values("Mes")
 
@@ -1385,7 +1450,7 @@ class Dashboard:
         with tab_ets:
             st.subheader("📈 ETS (Holt–Winters) (Backtest t+1)")
 
-            dm = res.demand_monthly.copy()
+            dm = res_demand.copy()
             dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
             hist = dm[dm["Codigo"] == str(prod_sel)].copy().sort_values("Mes")
 
@@ -1434,7 +1499,7 @@ class Dashboard:
         with tab_ml:
             st.subheader("🤖 Random Forest (Backtest t+1)")
 
-            dm = res.demand_monthly.copy()
+            dm = res_demand.copy()
             dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
             hist = (dm[dm["Codigo"] == str(prod_sel)][["Mes", "Demanda_Unid"]].copy().sort_values("Mes"))
 
@@ -1482,7 +1547,7 @@ class Dashboard:
         with Tab_Comparativa:
             st.subheader("🏆 Comparador final: Baselines vs ETS vs RF (Backtest t+1)")
 
-            dm = res.demand_monthly.copy()
+            dm = res_demand.copy()
             dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
             hist_cmp = dm[dm["Codigo"] == str(prod_sel)][["Mes", "Demanda_Unid"]].copy().sort_values("Mes")
 
@@ -1595,7 +1660,7 @@ class Dashboard:
             if run_btn:
                 with st.spinner("Corriendo comparación global (puede tardar según la cantidad de productos)..."):
                     per_sku, summary_wins, summary_errors = run_portfolio_comparison(
-                        res.demand_monthly,
+                        res_demand,
                         sort_metric=sort_metric,
                         test_months=int(test_months_global),
                         ma_window=int(ma_window_global),
@@ -1632,7 +1697,7 @@ class Dashboard:
         with tab_stock_diag:
             st.subheader("🏢 Stock mensual del producto (empresa consolidada)")
 
-            stock = res.stock_monthly
+            stock = res_stock
             if stock is None or stock.empty:
                 st.warning("No se generó stock mensual (revisa columna Saldo_unid).")
             else:
@@ -1649,7 +1714,7 @@ class Dashboard:
             st.divider()
 
             st.subheader("🧾 Diagnóstico: Guías de remisión")
-            guia = res.movements[res.movements["Documento"].astype(str).str.strip() == config.GUIDE_DOC].copy()
+            guia = res_movements[res_movements["Documento"].astype(str).str.strip() == config.GUIDE_DOC].copy()
             if guia.empty:
                 st.info("No se encontraron guías de remisión en los archivos cargados.")
                 return
@@ -1670,7 +1735,7 @@ class Dashboard:
             st.subheader("🧾 Recomendación de producción (t+1)")
 
             # Data mensual para el producto
-            dm = res.demand_monthly.copy()
+            dm = res_demand.copy()
             dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
             hist = dm[dm["Codigo"] == str(prod_sel)][["Mes", "Demanda_Unid"]].copy().sort_values("Mes")
 
@@ -1678,7 +1743,7 @@ class Dashboard:
                 st.info("No hay serie mensual para este producto.")
             else:
                 # Stock actual (último mes disponible)
-                stock = res.stock_monthly.copy() if res.stock_monthly is not None else pd.DataFrame()
+                stock = res_stock.copy() if res_stock is not None else pd.DataFrame()
                 stock_actual = 0.0
                 if not stock.empty:
                     stock["Codigo"] = stock["Codigo"].astype(str).str.strip()
@@ -1796,7 +1861,7 @@ class Dashboard:
         with Reco_Masiva:
             st.subheader("📋 Recomendación masiva (según ABC seleccionado)")
 
-            dm = res.demand_monthly.copy()
+            dm = res_demand.copy()
             dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
             dm = dm.sort_values(["Codigo", "Mes"])
 
@@ -1850,7 +1915,7 @@ class Dashboard:
                         rf_params = dict(n_estimators=400, min_obs=24, min_samples_leaf=1, random_state=42)
 
                         # Stock mensual
-                        stock = res.stock_monthly.copy() if res.stock_monthly is not None else pd.DataFrame()
+                        stock = res_stock.copy() if res_stock is not None else pd.DataFrame()
                         if not stock.empty:
                             stock["Codigo"] = stock["Codigo"].astype(str).str.strip()
                             stock = stock.sort_values(["Codigo", "Mes"])
@@ -1961,7 +2026,7 @@ class Dashboard:
         with Valida_Retro:
             st.subheader("🧪 Validación retrospectiva de la política (simulación)")
 
-            dm = res.demand_monthly.copy()
+            dm = res_demand.copy()
             dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
             hist = dm[dm["Codigo"] == str(prod_sel)][["Mes", "Demanda_Unid"]].copy().sort_values("Mes")
 
@@ -1970,8 +2035,8 @@ class Dashboard:
             else:
                 # Stock mensual del producto (empresa)
                 stock_p = pd.DataFrame()
-                if res.stock_monthly is not None and not res.stock_monthly.empty:
-                    stock_p = res.stock_monthly.copy()
+                if res_stock is not None and not res_stock.empty:
+                    stock_p = res_stock.copy()
                     stock_p["Codigo"] = stock_p["Codigo"].astype(str).str.strip()
                     stock_p = stock_p[stock_p["Codigo"] == str(prod_sel)][["Mes", "Stock_Unid"]].copy().sort_values("Mes")
 
@@ -2046,14 +2111,14 @@ class Dashboard:
         with ComparaRetroEntreSistema:
             st.subheader("⚖️ Comparativa retrospectiva: Sin sistema vs Con sistema (costos)")
 
-            dm = res.demand_monthly.copy()
+            dm = res_demand.copy()
             dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
             hist = dm[dm["Codigo"] == str(prod_sel)][["Mes", "Demanda_Unid"]].copy().sort_values("Mes")
 
             # stock mensual producto
             stock_p = pd.DataFrame()
-            if res.stock_monthly is not None and not res.stock_monthly.empty:
-                stock_p = res.stock_monthly.copy()
+            if res_stock is not None and not res_stock.empty:
+                stock_p = res_stock.copy()
                 stock_p["Codigo"] = stock_p["Codigo"].astype(str).str.strip()
                 stock_p = stock_p[stock_p["Codigo"] == str(prod_sel)][["Mes", "Stock_Unid"]].copy().sort_values("Mes")
 
