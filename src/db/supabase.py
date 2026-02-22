@@ -84,6 +84,225 @@ class SupabaseDB:
         except Exception:
             return None
 
+    # ==================== ORGANIZATIONS (MULTI-TENANT) ====================
+    
+    def create_organization(self, nombre: str, admin_user_id: str, description: str = "") -> Dict[str, Any]:
+        """Crea nueva organización (solo admin system)"""
+        try:
+            response = self.client.table("organizations").insert({
+                "nombre": nombre,
+                "admin_user_id": admin_user_id,
+                "description": description,
+                "data_loaded": False
+            }).execute()
+            org_id = response.data[0]["id"]
+            # Actualizar admin_user_id para que pertenezca a la org
+            self.client.table("users").update({
+                "organization_id": org_id,
+                "is_admin": True
+            }).eq("id", admin_user_id).execute()
+            return {"success": True, "organization_id": org_id}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def get_organization(self, org_id: str) -> Optional[Dict]:
+        """Obtiene info de organización"""
+        try:
+            response = self.client.table("organizations").select("*").eq("id", org_id).execute()
+            return response.data[0] if response.data else None
+        except Exception:
+            return None
+
+    def get_user_organization(self, user_id: str) -> Optional[Dict]:
+        """Obtiene la organización del usuario actual"""
+        try:
+            user = self.get_user(user_id)
+            if not user or not user.get("organization_id"):
+                return None
+            return self.get_organization(user["organization_id"])
+        except Exception:
+            return None
+
+    def create_user_in_organization(
+        self, 
+        org_id: str, 
+        email: str, 
+        password: str, 
+        is_admin: bool = False,
+        created_by: str = None
+    ) -> Dict[str, Any]:
+        """Admin crea usuario nuevo en su org"""
+        try:
+            # 1. Crear auth user en Supabase Auth
+            response = self.client.auth.sign_up({
+                "email": email,
+                "password": password,
+            })
+            user_id = response.user.id
+            
+            # 2. Insertar en tabla users con org_id
+            self.client.table("users").insert({
+                "id": user_id,
+                "email": email,
+                "organization_id": org_id,
+                "is_admin": is_admin,
+                "created_by": created_by,
+                "status": "invited",
+                "created_at": "now()"
+            }).execute()
+            
+            return {"success": True, "user_id": user_id, "email": email}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def get_organization_users(self, org_id: str) -> List[Dict]:
+        """Lista usuarios de una organización"""
+        try:
+            response = self.client.table("users").select("*").eq("organization_id", org_id).execute()
+            return response.data or []
+        except Exception:
+            return []
+
+    # ==================== ORG CACHE (RESULTADOS PROCESADOS) ====================
+    
+    def save_org_data(
+        self, 
+        org_id: str, 
+        demand_monthly_json: str,
+        stock_monthly_json: str,
+        movements_json: str = None,
+        processed_by: str = None,
+        csv_files_count: int = 0
+    ) -> Dict[str, Any]:
+        """
+        Guarda resultados procesados en org_cache
+        
+        Args:
+            org_id: ID de la organización
+            demand_monthly_json: DataFrame serializado a JSON (demanda mensual)
+            stock_monthly_json: DataFrame serializado a JSON (stock mensual)
+            movements_json: Movimientos originales (opcional)
+            processed_by: ID del usuario que procesó
+            csv_files_count: Cuántos CSVs fueron usados
+        
+        Returns:
+            {"success": bool, "error": str (si falla)}
+        """
+        try:
+            # Si el cache existe, UPDATE; si no, INSERT
+            existing = self.client.table("org_cache").select("organization_id").eq("organization_id", org_id).execute()
+            
+            data = {
+                "demand_monthly": demand_monthly_json,
+                "stock_monthly": stock_monthly_json,
+                "movements": movements_json,
+                "processed_by": processed_by,
+                "csv_files_count": csv_files_count,
+                "updated_at": "now()"
+            }
+            
+            if existing.data:
+                # UPDATE
+                self.client.table("org_cache").update(data).eq("organization_id", org_id).execute()
+            else:
+                # INSERT
+                data["organization_id"] = org_id
+                self.client.table("org_cache").insert(data).execute()
+            
+            # Marcar org como data_loaded
+            self.client.table("organizations").update({"data_loaded": True}).eq("id", org_id).execute()
+            
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def load_org_data(self, org_id: str) -> Dict[str, Any]:
+        """
+        Carga resultados procesados del cache
+        
+        Returns:
+            {
+                "success": bool,
+                "demand_monthly": str (JSON),
+                "stock_monthly": str (JSON),
+                "movements": str (JSON),
+                "updated_at": timestamp,
+                "csv_files_count": int
+            }
+        """
+        try:
+            response = self.client.table("org_cache").select("*").eq("organization_id", org_id).execute()
+            if response.data:
+                cache = response.data[0]
+                return {
+                    "success": True,
+                    "demand_monthly": cache.get("demand_monthly"),
+                    "stock_monthly": cache.get("stock_monthly"),
+                    "movements": cache.get("movements"),
+                    "updated_at": cache.get("updated_at"),
+                    "csv_files_count": cache.get("csv_files_count")
+                }
+            return {"success": False, "error": "No cache encontrado para esta organización"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def is_data_loaded(self, org_id: str) -> bool:
+        """Verifica si una org ya tiene data cacheada"""
+        try:
+            response = self.client.table("organizations").select("data_loaded").eq("id", org_id).execute()
+            if response.data:
+                return response.data[0].get("data_loaded", False)
+            return False
+        except Exception:
+            return False
+
+    # ==================== ORG CSV SCHEMA ====================
+    
+    def save_csv_schema(
+        self, 
+        org_id: str, 
+        separator: str = ",",
+        encoding: str = "utf-8",
+        column_mapping: Dict[str, str] = None,
+        updated_by: str = None
+    ) -> Dict[str, Any]:
+        """Guarda configuración de CSV para la org"""
+        try:
+            data = {
+                "organization_id": org_id,
+                "csv_separator": separator,
+                "csv_encoding": encoding,
+                "column_mapping": json.dumps(column_mapping or {}),
+                "updated_by": updated_by
+            }
+            
+            # Verificar si existe
+            existing = self.client.table("org_csv_schema").select("organization_id").eq("organization_id", org_id).execute()
+            
+            if existing.data:
+                self.client.table("org_csv_schema").update(data).eq("organization_id", org_id).execute()
+            else:
+                self.client.table("org_csv_schema").insert(data).execute()
+            
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def get_csv_schema(self, org_id: str) -> Optional[Dict]:
+        """Obtiene configuración de CSV para la org"""
+        try:
+            response = self.client.table("org_csv_schema").select("*").eq("organization_id", org_id).execute()
+            if response.data:
+                schema = response.data[0]
+                return {
+                    "separator": schema.get("csv_separator", ","),
+                    "encoding": schema.get("csv_encoding", "utf-8"),
+                    "column_mapping": json.loads(schema.get("column_mapping", "{}"))
+                }
+            return None
+        except Exception:
+            return None
+
     # ==================== PROYECTOS ====================
     
     def create_project(self, user_id: str, project_name: str, description: str = "") -> Dict[str, Any]:

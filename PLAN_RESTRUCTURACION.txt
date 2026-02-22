@@ -1,0 +1,184 @@
+PLAN DE RESTRUCTURACION - ANTES DE FASE 2
+
+========================================================================
+OBJETIVO FINAL
+========================================================================
+
+Dashboard local (Streamlit)  ←→  API cloud (FastAPI)  ←→  Cloud Storage (S3)
+
+- Dashboard: Sin cambios, usa logica local
+- FastAPI: Expone MISMA logica que dashboard (via HTTP)
+- No duplicar nada, solo exponer
+
+========================================================================
+PASO 1: LIMPIAR CODIGO QUE NO SIRVE
+========================================================================
+
+ELIMINAR (no reutilizable, duplica logica):
+  ❌ src/api/utils/csv_processor.py
+     Razon: Duplica DataLoader/DataCleaner que ya existen
+
+  ❌ src/api/utils/ml_service.py (la del API)
+     Razon: Versión simplificada del original en src/services/ml_service.py
+
+MANTENER (son la base):
+  ✅ src/data/ (DataPipeline completa)
+  ✅ src/ml/ (ETS, RF, Baselines, Backtesting)
+  ✅ src/services/ml_service.py (Orquestador)
+  ✅ src/db/supabase.py (Base de datos)
+  ✅ src/storage/s3_manager.py (S3)
+  ✅ src/ui/dashboard.py (Dashboard)
+
+========================================================================
+PASO 2: CREAR ADAPTADORES (NO LOGICA NUEVA)
+========================================================================
+
+CREAR:
+  ✅ src/api/utils/pipeline_adapter.py
+     Proposito: Adaptar DataPipeline para trabajar con bytes desde S3
+     Contenido:
+       - BytesFile: Simula UploadedFile para DataPipeline
+       - process_csv_bytes(): Ejecuta DataPipeline con bytes
+       - extract_product_demand(): Lee demanda de un producto
+       
+       NO CREA LOGICA NUEVA, solo adapta interfaz
+
+========================================================================
+PASO 3: FASTAPI - ENDPOINTS SIMPLES (SIN LOGICA)
+========================================================================
+
+ENDPOINT 1: POST /uploads/process
+  Entrada: { upload_id, s3_path, filename }
+  Acciones:
+    1. Descargar CSV de S3
+    2. Ejecutar pipeline_adapter.process_csv_bytes()
+         ↑ Esto ejecuta DataPipeline.run() sin cambios
+    3. Actualizar status en Supabase
+  Salida: { status: "completed", message: "..." }
+  
+  Codigo: src/api/routers/uploads.py
+  Status: YA EXISTE (simplificar)
+
+ENDPOINT 2: POST /forecasts/generate
+  Entrada: { upload_id, product, model_type, forecast_periods }
+  Acciones:
+    1. Obtener upload_id de Supabase
+    2. Descargar CSV de S3
+    3. Ejecutar pipeline_adapter.process_csv_bytes()
+         ↑ Obtiene demand_monthly
+    4. Ejecutar src/services/ml_service.compare_models()
+         ↑ Selecciona mejor modelo sin cambios
+    5. Ejecutar src/services/ml_service.forecast_next_month()
+         ↑ Genera pronóstico iterativamente sin cambios
+    6. Retornar pronóstico
+  Salida: { forecast_values: [...], model: "ETS", mape: 0.15 }
+  
+  Codigo: src/api/routers/forecasts.py
+  Status: YA EXISTE (simplificar)
+
+========================================================================
+PASO 4: VALIDAR INTEGRACION
+========================================================================
+
+Test 1: Pipeline adapter funciona con bytes
+  Input: bytes de CSV
+  Output: {demand_monthly, stock_monthly, movements}
+  Status: [ ] TODO
+
+Test 2: API uploads endpoint funciona
+  Input: upload_id + s3_path
+  Output: status=completed
+  Status: [ ] TODO
+
+Test 3: API forecasts endpoint funciona
+  Input: upload_id + product + periods
+  Output: pronóstico correcto
+  Status: [ ] TODO
+
+Test 4: Resultado de API = Resultado de Dashboard
+  Validar que forecast del API = forecast del dashboard
+  Status: [ ] TODO
+
+========================================================================
+ESTRUCTURA FINAL
+========================================================================
+
+src/
+  ├─ data/              ← MANTENIDO: Pipeline completa
+  │   ├─ data_loader.py
+  │   ├─ data_cleaner.py
+  │   ├─ pipeline.py
+  │   └─ ...
+  │
+  ├─ ml/                ← MANTENIDO: Modelos
+  │   ├─ ets_model.py
+  │   ├─ rf_model.py
+  │   ├─ baselines.py
+  │   └─ backtest*.py
+  │
+  ├─ services/          ← MANTENIDO: Orquestador
+  │   └─ ml_service.py
+  │
+  ├─ ui/                ← MANTENIDO: Dashboard
+  │   ├─ dashboard.py
+  │   └─ forecast_tab.py
+  │
+  ├─ db/                ← MANTENIDO: Database
+  │   └─ supabase.py
+  │
+  ├─ storage/           ← MANTENIDO: S3
+  │   └─ s3_manager.py
+  │
+  └─ api/               ← NUEVO: API sin logica nueva
+      ├─ main.py                      (FastAPI app)
+      ├─ models.py                    (Pydantic schemas)
+      ├─ dependencies.py              (inyección dependencias)
+      ├─ client.py                    (Cliente del API)
+      │
+      ├─ routers/
+      │   ├─ uploads.py               (POST /uploads/process)
+      │   └─ forecasts.py             (POST /forecasts/generate)
+      │
+      └─ utils/
+          └─ pipeline_adapter.py      ← NUEVO: Adapta pipeline
+
+========================================================================
+ORDEN DE TRABAJO
+========================================================================
+
+1. ✅ ELIMINAR archivos duplicados:
+     - src/api/utils/csv_processor.py
+     - src/api/utils/ml_service.py
+
+2. ✅ VERIFICAR pipeline_adapter.py (ya existe)
+     - Revisar que no tenga logica nueva
+
+3. TODO: SIMPLIFICAR routers/uploads.py
+     - Remover validaciones duplicadas
+     - Usar solo pipeline_adapter.process_csv_bytes()
+
+4. TODO: SIMPLIFICAR routers/forecasts.py
+     - Remover logica ML duplicada
+     - Usar src/services/ml_service original
+     
+5. TODO: CREAR TESTS de integración
+
+6. TODO: Verificar que API = Dashboard
+
+========================================================================
+¿PREGUNTAS SOBRE EL PLAN?
+========================================================================
+
+- Qué módulos NO se tocan? 
+  → data/, ml/, services/, ui/, db/, storage/
+
+- Qué se crea nuevo?
+  → Solo pipeline_adapter.py (adaptador, no logica)
+  → Routers simples que orquestan lo existente
+
+- Qué se elimina?
+  → csv_processor.py (duplica DataPipeline)
+  → ml_service.py del API (duplica src/services/ml_service.py)
+
+¿Vamos a restructurar siguiendo este plan?
+
