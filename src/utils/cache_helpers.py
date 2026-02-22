@@ -11,33 +11,21 @@ from datetime import datetime
 
 def dataframe_to_json(df: pd.DataFrame) -> str:
     """
-    Convierte DataFrame a JSON string (preserva tipos de datos)
+    Convierte DataFrame a JSON string (preserva tipos de datos usando orient='split')
     
     Args:
         df: DataFrame a serializar
     
     Returns:
-        JSON string con estructura: {"columns": [...], "index": [...], "data": [...]}
+        JSON string con estructura preservada
     """
     if df is None or df.empty:
-        return json.dumps({"columns": [], "index": [], "data": []})
+        return json.dumps({})
     
     try:
-        # Convertir índice a lista (puede ser DatetimeIndex, etc)
-        index_data = df.index.tolist() if hasattr(df.index, 'tolist') else list(df.index)
-        
-        # Convertir a ISO format si es DatetimeIndex
-        if isinstance(df.index, pd.DatetimeIndex):
-            index_data = [d.isoformat() if isinstance(d, datetime) else str(d) for d in index_data]
-        
-        # Serializar valores
-        data = {
-            "columns": df.columns.tolist(),
-            "index": index_data,
-            "data": df.fillna('null').astype(str).values.tolist()
-        }
-        
-        return json.dumps(data, default=str)
+        # orient='split' preserva índices, columnas y tipos de datos
+        # date_format='iso' convierte datetimes a ISO strings
+        return df.to_json(orient='split', date_format='iso')
     
     except Exception as e:
         raise ValueError(f"Error serializando DataFrame: {str(e)}")
@@ -45,55 +33,30 @@ def dataframe_to_json(df: pd.DataFrame) -> str:
 
 def json_to_dataframe(json_str: str) -> pd.DataFrame:
     """
-    Convierte JSON string de vuelta a DataFrame
+    Convierte JSON string de vuelta a DataFrame (preserva tipos de datos)
     
     Args:
         json_str: JSON string generado por dataframe_to_json()
     
     Returns:
-        DataFrame reconstruido
+        DataFrame reconstruido with proper dtypes
     """
     if not json_str or json_str == '{}':
         return pd.DataFrame()
     
     try:
-        data = json.loads(json_str)
+        # read_json con orient='split' restaura preserva índices y tipos automáticamente
+        df = pd.read_json(json_str, orient='split')
         
-        if not data.get("columns"):
-            return pd.DataFrame()
-        
-        # Reconstruir DataFrame
-        df = pd.DataFrame(
-            data=data["data"],
-            columns=data["columns"],
-            index=data.get("index")
-        )
-        
-        # Intentar convertir index a datetime si parece una fecha
-        try:
-            df.index = pd.to_datetime(df.index)
-        except:
-            pass  # Si no, dejar como está
-        
-        # Procesar cada columna
+        # Asegurar que columnas con 'Fecha' sean datetime (por si acaso)
         for col in df.columns:
-            # Reemplazar 'null' con NaN
-            df[col] = df[col].replace('null', None)
-            
-            # Detectar columnas de fecha por nombre
             col_lower = col.lower()
-            if any(date_col in col_lower for date_col in ['fecha', 'date', 'fecha_', 'date_', 'time', 'timestamp']):
-                try:
-                    df[col] = pd.to_datetime(df[col], errors='coerce')
-                    continue  # Pasar a siguiente columna
-                except:
-                    pass
-            
-            # Intentar conversión numérica para otras columnas
-            try:
-                df[col] = pd.to_numeric(df[col], errors='ignore')
-            except:
-                pass
+            if any(date_col in col_lower for date_col in ['fecha', 'date', 'time', 'timestamp', 'mes']):
+                if not pd.api.types.is_datetime64_any_dtype(df[col]):
+                    try:
+                        df[col] = pd.to_datetime(df[col], errors='coerce')
+                    except:
+                        pass
         
         return df
     
