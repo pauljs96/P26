@@ -1002,6 +1002,10 @@ class Dashboard:
                                 org = db.get_organization(st.session_state.organization_id)
                                 st.session_state.organization_name = org.get("nombre") if org else "Unknown"
                             
+                            # CLEAR CACHE para evitar conflictos multi-usuario
+                            st.cache_data.clear()
+                            st.cache_resource.clear()
+                            
                             st.rerun()
                         else:
                             st.error(f"Error: {result['error']}")
@@ -1014,6 +1018,11 @@ class Dashboard:
                         st.session_state.organization_id = "demo-org-id"
                         st.session_state.is_admin = True
                         st.session_state.organization_name = "Demo Organization"
+                        
+                        # CLEAR CACHE for demo mode
+                        st.cache_data.clear()
+                        st.cache_resource.clear()
+                        
                         st.success("✅ Modo Demo: Sesión iniciada (datos no persistentes)")
                         st.info("💡 Para usar BD real, configura SUPABASE_URL y SUPABASE_KEY en .env")
                         st.rerun()
@@ -1061,6 +1070,11 @@ class Dashboard:
             st.session_state.organization_id = None
             st.session_state.is_admin = False
             st.session_state.organization_name = None
+            
+            # CLEAR CACHE on logout
+            st.cache_data.clear()
+            st.cache_resource.clear()
+            
             st.success("Sesión cerrada. Recargando...")
             st.rerun()
         st.sidebar.divider()
