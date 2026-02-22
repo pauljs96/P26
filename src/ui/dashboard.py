@@ -928,6 +928,14 @@ def run_portfolio_comparison(
 
 
 
+class EmptyTab:
+    """Context manager que no renderiza nada - usado para tabs de admin-only cuando el usuario es viewer"""
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, *args):
+        pass
+
 
 class Dashboard:
     def _ensure_project_created(self):
@@ -1306,7 +1314,7 @@ class Dashboard:
             ])
             
             # Variables dummy para las otras tabs para evitar errores
-            tab_admin = tab_demanda = tab_baselines = tab_ets = tab_ml = Tab_Comparativa = ResumenComparativa = tab_stock_diag = Reco_Masiva = Valida_Retro = ComparaRetroEntreSistema = None
+            tab_admin = tab_demanda = tab_baselines = tab_ets = tab_ml = Tab_Comparativa = ResumenComparativa = tab_stock_diag = Reco_Masiva = Valida_Retro = ComparaRetroEntreSistema = EmptyTab()
 
         # ==========================================================
         if is_admin:
