@@ -988,9 +988,20 @@ class Dashboard:
                         db = get_db()
                         result = db.login_user(email, password)
                         if result["success"]:
+                            # Obtener info completa del usuario (org_id, is_admin)
+                            user_info = db.get_user(result["user_id"])
+                            
                             st.session_state.authenticated = True
                             st.session_state.user_id = result["user_id"]
                             st.session_state.email = result["email"]
+                            st.session_state.organization_id = user_info.get("organization_id") if user_info else None
+                            st.session_state.is_admin = user_info.get("is_admin", False) if user_info else False
+                            
+                            # Obtener nombre de organización
+                            if st.session_state.organization_id:
+                                org = db.get_organization(st.session_state.organization_id)
+                                st.session_state.organization_name = org.get("nombre") if org else "Unknown"
+                            
                             st.rerun()
                         else:
                             st.error(f"Error: {result['error']}")
@@ -1000,42 +1011,16 @@ class Dashboard:
                         st.session_state.user_id = "demo-user-id"
                         st.session_state.email = email
                         st.session_state.company = "Demo Company"
+                        st.session_state.organization_id = "demo-org-id"
+                        st.session_state.is_admin = True
+                        st.session_state.organization_name = "Demo Organization"
                         st.success("✅ Modo Demo: Sesión iniciada (datos no persistentes)")
                         st.info("💡 Para usar BD real, configura SUPABASE_URL y SUPABASE_KEY en .env")
                         st.rerun()
         
         with tab2:
             st.subheader("📝 Registrarse")
-            company_name = st.text_input("Nombre de Empresa:", placeholder="Mi Empresa SPA", key="reg_company_v2")
-            email_reg = st.text_input("Email:", placeholder="usuario@empresa.com", key="reg_email_v2")
-            password_reg = st.text_input("Contraseña:", type="password", key="reg_password_v2")
-            password_confirm = st.text_input("Confirmar Contraseña:", type="password", key="reg_password_confirm_v2")
-            
-            if st.button("Registrarse", type="primary", use_container_width=True, key="register_btn"):
-                if not all([company_name, email_reg, password_reg, password_confirm]):
-                    st.error("Por favor completa todos los campos")
-                elif password_reg != password_confirm:
-                    st.error("Las contraseñas no coinciden")
-                elif len(password_reg) < 6:
-                    st.error("La contraseña debe tener al menos 6 caracteres")
-                else:
-                    # Intentar Supabase primero
-                    try:
-                        db = get_db()
-                        result = db.register_user(email_reg, password_reg, company_name)
-                        if result["success"]:
-                            st.success("✅ Registro exitoso en Supabase. Inicia sesión.")
-                        else:
-                            st.error(f"Error: {result['error']}")
-                    except Exception as e:
-                        # Demo mode fallback
-                        st.session_state.authenticated = True
-                        st.session_state.user_id = "demo-user-id"
-                        st.session_state.email = email_reg
-                        st.session_state.company = company_name
-                        st.success("✅ Modo Demo: Registro completado (datos no persistentes)")
-                        st.info("💡 Para usar BD real, configura SUPABASE_URL y SUPABASE_KEY en .env")
-                        st.rerun()
+            st.warning("⚠️ El registro automático está deshabilitado. Contacta al administrador de tu organización para crear una cuenta.")
         
         return False
 
@@ -1055,13 +1040,27 @@ class Dashboard:
             "Luego selecciona un producto para ver demanda, pronósticos y diagnósticos."
         )
 
-        # Logout button en sidebar
+        # Información de usuario y organización en sidebar
         st.sidebar.divider()
-        st.sidebar.write(f"👤 **{st.session_state.email}**")
+        st.sidebar.write("**👤 Información de Sesión**")
+        st.sidebar.write(f"Email: {st.session_state.email}")
+        
+        org_name = st.session_state.get("organization_name", "N/A")
+        st.sidebar.write(f"🏢 Org: {org_name}")
+        
+        if st.session_state.get("is_admin"):
+            st.sidebar.write("👑 **Rol:** Admin")
+        else:
+            st.sidebar.write("👤 **Rol:** Viewer")
+        
+        st.sidebar.divider()
         if st.sidebar.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.authenticated = False
             st.session_state.user_id = None
             st.session_state.email = None
+            st.session_state.organization_id = None
+            st.session_state.is_admin = False
+            st.session_state.organization_name = None
             st.success("Sesión cerrada. Recargando...")
             st.rerun()
         st.sidebar.divider()
@@ -1192,22 +1191,50 @@ class Dashboard:
         if "global_test_months" not in st.session_state:
             st.session_state["global_test_months"] = 12
 
+        # Verificar si es admin para mostrar tab de administración
+        is_admin = st.session_state.get("is_admin", False)
+
         # ------------------------------
-        # TABS
+        # TABS (Con admin panel si aplica)
         # ------------------------------
-        tab_demanda, tab_baselines, tab_ets,tab_ml,Tab_Comparativa,ResumenComparativa ,tab_stock_diag,tab_reco,Reco_Masiva,Valida_Retro,ComparaRetroEntreSistema = st.tabs([
-            "🧩 Demanda y Componentes",
-            "🔮 Baselines y Backtest",
-            "📈 Holt–Winters (ETS)",
-            "🤖 Random Forest (RF)",
-            "🏆 Comparativa ETS vs Baselines vs RF",
-            "📊 Resumen Comparativa",
-            "🏢 Stock y Diagnóstico",
-            "🔄 Recomendación de Producción",
-            "📑 Recomendación Masiva",
-            "✅ Validación Retrospectiva",
-            "📉 Comparativa Retrospectiva entre Sistemas",
-        ])
+        if is_admin:
+            # Admin ve todas las tabs más la de administración
+            tab_admin, tab_demanda, tab_baselines, tab_ets,tab_ml,Tab_Comparativa,ResumenComparativa ,tab_stock_diag,tab_reco,Reco_Masiva,Valida_Retro,ComparaRetroEntreSistema = st.tabs([
+                "⚙️ Panel Admin",
+                "🧩 Demanda y Componentes",
+                "🔮 Baselines y Backtest",
+                "📈 Holt–Winters (ETS)",
+                "🤖 Random Forest (RF)",
+                "🏆 Comparativa ETS vs Baselines vs RF",
+                "📊 Resumen Comparativa",
+                "🏢 Stock y Diagnóstico",
+                "🔄 Recomendación de Producción",
+                "📑 Recomendación Masiva",
+                "✅ Validación Retrospectiva",
+                "📉 Comparativa Retrospectiva entre Sistemas",
+            ])
+            
+            # Renderizar admin panel
+            with tab_admin:
+                from src.ui.admin_panel import AdminPanel
+                admin = AdminPanel(get_db())
+                admin.render()
+        
+        else:
+            # Usuario normal (viewer) ve solo las tabs de análisis
+            tab_demanda, tab_baselines, tab_ets,tab_ml,Tab_Comparativa,ResumenComparativa ,tab_stock_diag,tab_reco,Reco_Masiva,Valida_Retro,ComparaRetroEntreSistema = st.tabs([
+                "🧩 Demanda y Componentes",
+                "🔮 Baselines y Backtest",
+                "📈 Holt–Winters (ETS)",
+                "🤖 Random Forest (RF)",
+                "🏆 Comparativa ETS vs Baselines vs RF",
+                "📊 Resumen Comparativa",
+                "🏢 Stock y Diagnóstico",
+                "🔄 Recomendación de Producción",
+                "📑 Recomendación Masiva",
+                "✅ Validación Retrospectiva",
+                "📉 Comparativa Retrospectiva entre Sistemas",
+            ])
 
         # ==========================================================
         # TAB 1: DEMANDA Y COMPONENTES
