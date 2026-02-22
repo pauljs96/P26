@@ -133,6 +133,12 @@ class SupabaseDB:
     ) -> Dict[str, Any]:
         """Admin crea usuario nuevo en su org"""
         try:
+            # 0. Obtener nombre de la organización
+            org = self.get_organization(org_id)
+            if not org:
+                return {"success": False, "error": "Organización no encontrada"}
+            company_name = org.get("nombre", "Unknown")
+            
             # 1. Crear auth user en Supabase Auth
             response = self.client.auth.sign_up({
                 "email": email,
@@ -140,10 +146,11 @@ class SupabaseDB:
             })
             user_id = response.user.id
             
-            # 2. Insertar en tabla users con org_id
+            # 2. Insertar en tabla users con org_id y company_name
             self.client.table("users").insert({
                 "id": user_id,
                 "email": email,
+                "company_name": company_name,
                 "organization_id": org_id,
                 "is_admin": is_admin,
                 "created_by": created_by,
