@@ -1874,164 +1874,165 @@ class Dashboard:
         # ==========================================================
 
 
-        with Reco_Masiva:
-            st.subheader("📋 Recomendación masiva (según ABC seleccionado)")
+        if is_admin:
+            with Reco_Masiva:
+                st.subheader("📋 Recomendación masiva (según ABC seleccionado)")
 
-            dm = res_demand.copy()
-            dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
-            dm = dm.sort_values(["Codigo", "Mes"])
+                dm = res_demand.copy()
+                dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
+                dm = dm.sort_values(["Codigo", "Mes"])
 
-            # --- Productos a evaluar según ABC seleccionado ---
-            if abc_sel == "Todos":
-                codigos_eval = abc_df["Codigo"].dropna().astype(str).str.strip().unique().tolist()
-            else:
-                codigos_eval = abc_df[abc_df["ABC"] == abc_sel]["Codigo"].dropna().astype(str).str.strip().unique().tolist()
+                # --- Productos a evaluar según ABC seleccionado ---
+                if abc_sel == "Todos":
+                    codigos_eval = abc_df["Codigo"].dropna().astype(str).str.strip().unique().tolist()
+                else:
+                    codigos_eval = abc_df[abc_df["ABC"] == abc_sel]["Codigo"].dropna().astype(str).str.strip().unique().tolist()
 
-            codigos_eval = sorted(codigos_eval)
+                codigos_eval = sorted(codigos_eval)
 
-            if not codigos_eval:
-                st.info("No hay productos para la categoría ABC seleccionada.")
-            else:
-                c1, c2, c3 = st.columns([1, 1, 2])
+                if not codigos_eval:
+                    st.info("No hay productos para la categoría ABC seleccionada.")
+                else:
+                    c1, c2, c3 = st.columns([1, 1, 2])
 
-                with c1:
-                    lead_time = st.selectbox("Lead time (meses)", options=[1, 2, 3], index=0, key="mass_lt")
+                    with c1:
+                        lead_time = st.selectbox("Lead time (meses)", options=[1, 2, 3], index=0, key="mass_lt")
 
-                with c2:
-                    test_months = st.slider("Backtest (últimos meses)", 6, 24, 12, 1, key="mass_test")
+                    with c2:
+                        test_months = st.slider("Backtest (últimos meses)", 6, 24, 12, 1, key="mass_test")
 
-                with c3:
-                    max_products = st.selectbox(
-                        "Cantidad de productos a procesar (performance)",
-                        options=[20, 50, 100, 200, "Todos"],
-                        index=1,
-                        key="mass_max"
-                    )
-                    max_products = None if max_products == "Todos" else int(max_products)
+                    with c3:
+                        max_products = st.selectbox(
+                            "Cantidad de productos a procesar (performance)",
+                            options=[20, 50, 100, 200, "Todos"],
+                            index=1,
+                            key="mass_max"
+                        )
+                        max_products = None if max_products == "Todos" else int(max_products)
 
-                run_btn = st.button("▶️ Generar recomendación masiva", type="primary", key="run_mass")
+                    run_btn = st.button("▶️ Generar recomendación masiva", type="primary", key="run_mass")
 
-                if run_btn:
-                    with st.spinner("Calculando recomendaciones (puede tardar según la cantidad de productos)..."):
+                    if run_btn:
+                        with st.spinner("Calculando recomendaciones (puede tardar según la cantidad de productos)..."):
 
-                        # Limitar por performance (prioriza los de mayor demanda total)
-                        abc_work = abc_df.copy()
-                        abc_work["Codigo"] = abc_work["Codigo"].astype(str).str.strip()
+                            # Limitar por performance (prioriza los de mayor demanda total)
+                            abc_work = abc_df.copy()
+                            abc_work["Codigo"] = abc_work["Codigo"].astype(str).str.strip()
 
-                        if abc_sel != "Todos":
-                            abc_work = abc_work[abc_work["ABC"] == abc_sel].copy()
+                            if abc_sel != "Todos":
+                                abc_work = abc_work[abc_work["ABC"] == abc_sel].copy()
 
-                        abc_work = abc_work.sort_values("Demanda_Total", ascending=False)
-                        codigos = abc_work["Codigo"].tolist()
-                        if max_products is not None:
-                            codigos = codigos[:max_products]
+                            abc_work = abc_work.sort_values("Demanda_Total", ascending=False)
+                            codigos = abc_work["Codigo"].tolist()
+                            if max_products is not None:
+                                codigos = codigos[:max_products]
 
-                        # ETS y RF params (estables)
-                        ets_params = dict(seasonal_periods=12, trend="add", seasonal="add", damped_trend=False, min_obs=24)
-                        rf_params = dict(n_estimators=400, min_obs=24, min_samples_leaf=1, random_state=42)
+                            # ETS y RF params (estables)
+                            ets_params = dict(seasonal_periods=12, trend="add", seasonal="add", damped_trend=False, min_obs=24)
+                            rf_params = dict(n_estimators=400, min_obs=24, min_samples_leaf=1, random_state=42)
 
-                        # Stock mensual
-                        stock = res_stock.copy() if res_stock is not None else pd.DataFrame()
-                        if not stock.empty:
-                            stock["Codigo"] = stock["Codigo"].astype(str).str.strip()
-                            stock = stock.sort_values(["Codigo", "Mes"])
-
-                        rows = []
-                        for cod in codigos:
-                            hist = dm[dm["Codigo"] == str(cod)][["Mes", "Demanda_Unid"]].copy().sort_values("Mes")
-                            if hist.empty:
-                                continue
-
-                            # Elegir ganador por MAE (baselines + ETS + RF) y extraer MAE del ganador
-                            # OJO: usamos ma_window fijo (puedes exponerlo si quieres)
-                            ma_window = 3
-                            bt_base = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), ma_window=int(ma_window))
-                            ets = ETSForecaster(**ets_params)
-                            bt_ets = backtest_ets_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), ets=ets)
-                            rf = RFForecaster(**rf_params)
-                            bt_rf = backtest_rf_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), rf=rf)
-
-                            cmp = compare_models_metrics(bt_base.metrics, bt_ets.metrics, bt_rf.metrics, sort_by="MAE")
-                            if cmp.empty:
-                                continue
-
-                            winner = str(cmp.iloc[0]["Modelo"])
-                            mae_win = float(pd.to_numeric(cmp.iloc[0].get("MAE", np.nan), errors="coerce"))
-
-                            # Forecast t+1 con el ganador
-                            if winner == "ETS(Holt-Winters)":
-                                yhat = float(max(0.0, ets.forecast_1step(hist, y_col="Demanda_Unid")))
-                            elif winner == "RandomForest":
-                                yhat = float(max(0.0, rf.forecast_1step(hist, y_col="Demanda_Unid")))
-                            elif winner == "Seasonal12":
-                                yhat = float(max(0.0, seasonal_naive_12(hist)))
-                            elif winner in ("MA3", "MA6"):
-                                w = 3 if winner == "MA3" else 6
-                                yhat = float(max(0.0, moving_average(hist, window=w)))
-                            else:  # Naive fallback
-                                yhat = float(max(0.0, naive_last(hist)))
-
-                            # Stock actual (último)
-                            stock_actual = 0.0
+                            # Stock mensual
+                            stock = res_stock.copy() if res_stock is not None else pd.DataFrame()
                             if not stock.empty:
-                                splot = stock[stock["Codigo"] == str(cod)]
-                                if not splot.empty:
-                                    stock_actual = float(splot.iloc[-1]["Stock_Unid"])
+                                stock["Codigo"] = stock["Codigo"].astype(str).str.strip()
+                                stock = stock.sort_values(["Codigo", "Mes"])
 
-                            # ABC + política Z
-                            row_abc = abc_work[abc_work["Codigo"] == str(cod)]
-                            abc_class = str(row_abc.iloc[0]["ABC"]) if not row_abc.empty else "C"
-                            demanda_total = float(row_abc.iloc[0]["Demanda_Total"]) if not row_abc.empty else 0.0
+                            rows = []
+                            for cod in codigos:
+                                hist = dm[dm["Codigo"] == str(cod)][["Mes", "Demanda_Unid"]].copy().sort_values("Mes")
+                                if hist.empty:
+                                    continue
 
-                            service_level = policy_service_level_by_abc(abc_class)
-                            z = z_from_service_level(service_level)
+                                # Elegir ganador por MAE (baselines + ETS + RF) y extraer MAE del ganador
+                                # OJO: usamos ma_window fijo (puedes exponerlo si quieres)
+                                ma_window = 3
+                                bt_base = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), ma_window=int(ma_window))
+                                ets = ETSForecaster(**ets_params)
+                                bt_ets = backtest_ets_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), ets=ets)
+                                rf = RFForecaster(**rf_params)
+                                bt_rf = backtest_rf_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), rf=rf)
 
-                            # SS con MAE como proxy σ
-                            sigma = float(max(0.0, mae_win if np.isfinite(mae_win) else 0.0))
-                            ss = float(z * sigma * np.sqrt(float(lead_time)))
+                                cmp = compare_models_metrics(bt_base.metrics, bt_ets.metrics, bt_rf.metrics, sort_by="MAE")
+                                if cmp.empty:
+                                    continue
 
-                            # Producción recomendada
-                            prod_reco = max(0.0, yhat + ss - stock_actual)
-                            prod_reco_int = int(np.ceil(prod_reco))
+                                winner = str(cmp.iloc[0]["Modelo"])
+                                mae_win = float(pd.to_numeric(cmp.iloc[0].get("MAE", np.nan), errors="coerce"))
 
-                            rows.append({
-                                "Codigo": str(cod),
-                                "ABC": abc_class,
-                                "Modelo_Ganador": winner,
-                                "Forecast_t+1": yhat,
-                                "MAE_ganador": sigma,
-                                "Z": z,
-                                "SS": ss,
-                                "Stock_Actual": stock_actual,
-                                "Produccion_Recomendada": prod_reco_int,
-                                "RIESGO_QUIEBRE": bool(stock_actual < ss),
-                                "DEMANDA_TOTAL_HIST": demanda_total,
-                            })
+                                # Forecast t+1 con el ganador
+                                if winner == "ETS(Holt-Winters)":
+                                    yhat = float(max(0.0, ets.forecast_1step(hist, y_col="Demanda_Unid")))
+                                elif winner == "RandomForest":
+                                    yhat = float(max(0.0, rf.forecast_1step(hist, y_col="Demanda_Unid")))
+                                elif winner == "Seasonal12":
+                                    yhat = float(max(0.0, seasonal_naive_12(hist)))
+                                elif winner in ("MA3", "MA6"):
+                                    w = 3 if winner == "MA3" else 6
+                                    yhat = float(max(0.0, moving_average(hist, window=w)))
+                                else:  # Naive fallback
+                                    yhat = float(max(0.0, naive_last(hist)))
 
-                        reco_df = pd.DataFrame(rows)
+                                # Stock actual (último)
+                                stock_actual = 0.0
+                                if not stock.empty:
+                                    splot = stock[stock["Codigo"] == str(cod)]
+                                    if not splot.empty:
+                                        stock_actual = float(splot.iloc[-1]["Stock_Unid"])
 
-                    if reco_df.empty:
-                        st.warning("No se generaron recomendaciones (revisa parámetros / data).")
-                    else:
-                        st.success(f"✅ Recomendación generada para {reco_df['Codigo'].nunique():,} productos.")
+                                # ABC + política Z
+                                row_abc = abc_work[abc_work["Codigo"] == str(cod)]
+                                abc_class = str(row_abc.iloc[0]["ABC"]) if not row_abc.empty else "C"
+                                demanda_total = float(row_abc.iloc[0]["Demanda_Total"]) if not row_abc.empty else 0.0
 
-                        # Orden sugerido: primero riesgo quiebre, luego producción recomendada, luego demanda total
-                        reco_df = reco_df.sort_values(
-                            ["RIESGO_QUIEBRE", "Produccion_Recomendada", "DEMANDA_TOTAL_HIST"],
-                            ascending=[False, False, False]
-                        ).reset_index(drop=True)
+                                service_level = policy_service_level_by_abc(abc_class)
+                                z = z_from_service_level(service_level)
 
-                        # KPIs rápidos
-                        k1, k2, k3 = st.columns(3)
-                        k1.metric("Productos evaluados", f"{reco_df['Codigo'].nunique():,}")
-                        k2.metric("Con riesgo quiebre", f"{int(reco_df['RIESGO_QUIEBRE'].sum()):,}")
-                        k3.metric("Producción total sugerida", f"{int(reco_df['Produccion_Recomendada'].sum()):,}")
+                                # SS con MAE como proxy σ
+                                sigma = float(max(0.0, mae_win if np.isfinite(mae_win) else 0.0))
+                                ss = float(z * sigma * np.sqrt(float(lead_time)))
 
-                        st.dataframe(reco_df, use_container_width=True, height=520)
+                                # Producción recomendada
+                                prod_reco = max(0.0, yhat + ss - stock_actual)
+                                prod_reco_int = int(np.ceil(prod_reco))
 
-                        with st.expander("⬇️ Descargar tabla (CSV)", expanded=False):
-                            csv = reco_df.to_csv(index=False).encode("utf-8")
-                            st.download_button("Descargar recomendaciones.csv", csv, file_name="recomendaciones.csv", mime="text/csv")
+                                rows.append({
+                                    "Codigo": str(cod),
+                                    "ABC": abc_class,
+                                    "Modelo_Ganador": winner,
+                                    "Forecast_t+1": yhat,
+                                    "MAE_ganador": sigma,
+                                    "Z": z,
+                                    "SS": ss,
+                                    "Stock_Actual": stock_actual,
+                                    "Produccion_Recomendada": prod_reco_int,
+                                    "RIESGO_QUIEBRE": bool(stock_actual < ss),
+                                    "DEMANDA_TOTAL_HIST": demanda_total,
+                                })
+
+                            reco_df = pd.DataFrame(rows)
+
+                        if reco_df.empty:
+                            st.warning("No se generaron recomendaciones (revisa parámetros / data).")
+                        else:
+                            st.success(f"✅ Recomendación generada para {reco_df['Codigo'].nunique():,} productos.")
+
+                            # Orden sugerido: primero riesgo quiebre, luego producción recomendada, luego demanda total
+                            reco_df = reco_df.sort_values(
+                                ["RIESGO_QUIEBRE", "Produccion_Recomendada", "DEMANDA_TOTAL_HIST"],
+                                ascending=[False, False, False]
+                            ).reset_index(drop=True)
+
+                            # KPIs rápidos
+                            k1, k2, k3 = st.columns(3)
+                            k1.metric("Productos evaluados", f"{reco_df['Codigo'].nunique():,}")
+                            k2.metric("Con riesgo quiebre", f"{int(reco_df['RIESGO_QUIEBRE'].sum()):,}")
+                            k3.metric("Producción total sugerida", f"{int(reco_df['Produccion_Recomendada'].sum()):,}")
+
+                            st.dataframe(reco_df, use_container_width=True, height=520)
+
+                            with st.expander("⬇️ Descargar tabla (CSV)", expanded=False):
+                                csv = reco_df.to_csv(index=False).encode("utf-8")
+                                st.download_button("Descargar recomendaciones.csv", csv, file_name="recomendaciones.csv", mime="text/csv")
 
 
         # ==========================================================
@@ -2039,84 +2040,85 @@ class Dashboard:
         # ==========================================================
 
 
-        with Valida_Retro:
-            st.subheader("🧪 Validación retrospectiva de la política (simulación)")
+        if is_admin:
+            with Valida_Retro:
+                st.subheader("🧪 Validación retrospectiva de la política (simulación)")
 
-            dm = res_demand.copy()
-            dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
-            hist = dm[dm["Codigo"] == str(prod_sel)][["Mes", "Demanda_Unid"]].copy().sort_values("Mes")
+                dm = res_demand.copy()
+                dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
+                hist = dm[dm["Codigo"] == str(prod_sel)][["Mes", "Demanda_Unid"]].copy().sort_values("Mes")
 
-            if hist.empty:
-                st.info("No hay serie mensual para este producto.")
-            else:
-                # Stock mensual del producto (empresa)
-                stock_p = pd.DataFrame()
-                if res_stock is not None and not res_stock.empty:
-                    stock_p = res_stock.copy()
-                    stock_p["Codigo"] = stock_p["Codigo"].astype(str).str.strip()
-                    stock_p = stock_p[stock_p["Codigo"] == str(prod_sel)][["Mes", "Stock_Unid"]].copy().sort_values("Mes")
+                if hist.empty:
+                    st.info("No hay serie mensual para este producto.")
+                else:
+                    # Stock mensual del producto (empresa)
+                    stock_p = pd.DataFrame()
+                    if res_stock is not None and not res_stock.empty:
+                        stock_p = res_stock.copy()
+                        stock_p["Codigo"] = stock_p["Codigo"].astype(str).str.strip()
+                        stock_p = stock_p[stock_p["Codigo"] == str(prod_sel)][["Mes", "Stock_Unid"]].copy().sort_values("Mes")
 
-                # ABC del producto
-                row = abc_df[abc_df["Codigo"] == str(prod_sel)]
-                abc_class = str(row.iloc[0]["ABC"]) if not row.empty else "C"
+                    # ABC del producto
+                    row = abc_df[abc_df["Codigo"] == str(prod_sel)]
+                    abc_class = str(row.iloc[0]["ABC"]) if not row.empty else "C"
 
-                eval_months = st.slider("Meses a simular (últimos)", 6, 24, 12, 1, key="sim_eval")
-                test_months = st.slider("Meses para elegir ganador (backtest)", 6, 24, 12, 1, key="sim_bt")
-                ma_window = st.selectbox("Ventana media móvil (baselines)", options=[3, 6], index=0, key="sim_ma")
-                lead_time = st.selectbox("Lead time (meses)", options=[1], index=0)
+                    eval_months = st.slider("Meses a simular (últimos)", 6, 24, 12, 1, key="sim_eval")
+                    test_months = st.slider("Meses para elegir ganador (backtest)", 6, 24, 12, 1, key="sim_bt")
+                    ma_window = st.selectbox("Ventana media móvil (baselines)", options=[3, 6], index=0, key="sim_ma")
+                    lead_time = st.selectbox("Lead time (meses)", options=[1], index=0)
 
-                run_sim = st.button("▶️ Ejecutar simulación (ganador automático por MAE)", type="primary", key="run_sim")
+                    run_sim = st.button("▶️ Ejecutar simulación (ganador automático por MAE)", type="primary", key="run_sim")
 
-                if run_sim:
-                    with st.spinner("Calculando ganador por MAE y simulando política..."):
-                        # 1) Backtests para elegir ganador por MAE
-                        bt_base = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), ma_window=int(ma_window))
+                    if run_sim:
+                        with st.spinner("Calculando ganador por MAE y simulando política..."):
+                            # 1) Backtests para elegir ganador por MAE
+                            bt_base = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), ma_window=int(ma_window))
 
-                        ets_params = dict(seasonal_periods=12, trend="add", seasonal="add", damped_trend=False, min_obs=24)
-                        ets = ETSForecaster(**ets_params)
-                        bt_ets = backtest_ets_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), ets=ets)
+                            ets_params = dict(seasonal_periods=12, trend="add", seasonal="add", damped_trend=False, min_obs=24)
+                            ets = ETSForecaster(**ets_params)
+                            bt_ets = backtest_ets_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), ets=ets)
 
-                        rf_params = dict(n_estimators=400, min_obs=24, min_samples_leaf=1, random_state=42)
-                        rf = RFForecaster(**rf_params)
-                        bt_rf = backtest_rf_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), rf=rf)
+                            rf_params = dict(n_estimators=400, min_obs=24, min_samples_leaf=1, random_state=42)
+                            rf = RFForecaster(**rf_params)
+                            bt_rf = backtest_rf_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), rf=rf)
 
-                        # 2) Unir métricas y escoger ganador por MAE
-                        cmp = compare_models_metrics(bt_base.metrics, bt_ets.metrics, bt_rf.metrics, sort_by="MAE")
-                        if cmp.empty:
-                            st.warning("No se pudo determinar ganador (métricas vacías).")
-                            st.stop()
+                            # 2) Unir métricas y escoger ganador por MAE
+                            cmp = compare_models_metrics(bt_base.metrics, bt_ets.metrics, bt_rf.metrics, sort_by="MAE")
+                            if cmp.empty:
+                                st.warning("No se pudo determinar ganador (métricas vacías).")
+                                st.stop()
 
-                        winner = str(cmp.iloc[0]["Modelo"])
-                        mae_win = float(pd.to_numeric(cmp.iloc[0].get("MAE", np.nan), errors="coerce"))
+                            winner = str(cmp.iloc[0]["Modelo"])
+                            mae_win = float(pd.to_numeric(cmp.iloc[0].get("MAE", np.nan), errors="coerce"))
 
-                        st.success(f"Ganador por MAE: **{winner}**  |  MAE: **{mae_win:.3f}**")
+                            st.success(f"Ganador por MAE: **{winner}**  |  MAE: **{mae_win:.3f}**")
 
-                        # 3) Simular política usando winner y sigma_fixed = MAE ganador
-                        df_sim, kpis = simulate_policy_backtest_1step(
-                            hist=hist,
-                            stock_series=stock_p,
-                            winner=winner,
-                            abc_class=abc_class,
-                            lead_time=int(lead_time),
-                            eval_months=int(eval_months),
-                            ets_params=ets_params,
-                            rf_params=rf_params,
-                            sigma_fixed=mae_win,   # 👈 CLAVE
-                        )
+                            # 3) Simular política usando winner y sigma_fixed = MAE ganador
+                            df_sim, kpis = simulate_policy_backtest_1step(
+                                hist=hist,
+                                stock_series=stock_p,
+                                winner=winner,
+                                abc_class=abc_class,
+                                lead_time=int(lead_time),
+                                eval_months=int(eval_months),
+                                ets_params=ets_params,
+                                rf_params=rf_params,
+                                sigma_fixed=mae_win,   # 👈 CLAVE
+                            )
 
-                    c1, c2, c3, c4 = st.columns(4)
-                    c1.metric("Meses con quiebre", f"{kpis['Meses_con_quiebre']}/{kpis['Meses_evaluados']}")
-                    c2.metric("Fill Rate", f"{kpis['FillRate_%']:.1f}%")
-                    c3.metric("Unidades faltantes", f"{kpis['Unidades_faltantes']:,.0f}")
-                    c4.metric("Inventario promedio", f"{kpis['Inventario_promedio']:,.0f}")
+                        c1, c2, c3, c4 = st.columns(4)
+                        c1.metric("Meses con quiebre", f"{kpis['Meses_con_quiebre']}/{kpis['Meses_evaluados']}")
+                        c2.metric("Fill Rate", f"{kpis['FillRate_%']:.1f}%")
+                        c3.metric("Unidades faltantes", f"{kpis['Unidades_faltantes']:,.0f}")
+                        c4.metric("Inventario promedio", f"{kpis['Inventario_promedio']:,.0f}")
 
-                    st.dataframe(df_sim, use_container_width=True, height=420)
+                        st.dataframe(df_sim, use_container_width=True, height=420)
 
-                    fig_stock = px.line(df_sim, x="Mes_target", y="Stock_fin", markers=True, title="Stock fin mensual (simulado)")
-                    st.plotly_chart(fig_stock, use_container_width=True)
+                        fig_stock = px.line(df_sim, x="Mes_target", y="Stock_fin", markers=True, title="Stock fin mensual (simulado)")
+                        st.plotly_chart(fig_stock, use_container_width=True)
 
-                    fig_lost = px.bar(df_sim, x="Mes_target", y="Faltante", title="Unidades faltantes por mes (quiebres)")
-                    st.plotly_chart(fig_lost, use_container_width=True)
+                        fig_lost = px.bar(df_sim, x="Mes_target", y="Faltante", title="Unidades faltantes por mes (quiebres)")
+                        st.plotly_chart(fig_lost, use_container_width=True)
 
 
 
@@ -2124,129 +2126,130 @@ class Dashboard:
         # TAB 11: COMPARATIVA RETROSPECTIVA SIN SISTEMA VS CON SISTEMA
         # ==========================================================
 
-        with ComparaRetroEntreSistema:
-            st.subheader("⚖️ Comparativa retrospectiva: Sin sistema vs Con sistema (costos)")
+        if is_admin:
+            with ComparaRetroEntreSistema:
+                st.subheader("⚖️ Comparativa retrospectiva: Sin sistema vs Con sistema (costos)")
 
-            dm = res_demand.copy()
-            dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
-            hist = dm[dm["Codigo"] == str(prod_sel)][["Mes", "Demanda_Unid"]].copy().sort_values("Mes")
+                dm = res_demand.copy()
+                dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
+                hist = dm[dm["Codigo"] == str(prod_sel)][["Mes", "Demanda_Unid"]].copy().sort_values("Mes")
 
-            # stock mensual producto
-            stock_p = pd.DataFrame()
-            if res_stock is not None and not res_stock.empty:
-                stock_p = res_stock.copy()
-                stock_p["Codigo"] = stock_p["Codigo"].astype(str).str.strip()
-                stock_p = stock_p[stock_p["Codigo"] == str(prod_sel)][["Mes", "Stock_Unid"]].copy().sort_values("Mes")
+                # stock mensual producto
+                stock_p = pd.DataFrame()
+                if res_stock is not None and not res_stock.empty:
+                    stock_p = res_stock.copy()
+                    stock_p["Codigo"] = stock_p["Codigo"].astype(str).str.strip()
+                    stock_p = stock_p[stock_p["Codigo"] == str(prod_sel)][["Mes", "Stock_Unid"]].copy().sort_values("Mes")
 
-            row = abc_df[abc_df["Codigo"] == str(prod_sel)]
-            abc_class = str(row.iloc[0]["ABC"]) if not row.empty else "C"
+                row = abc_df[abc_df["Codigo"] == str(prod_sel)]
+                abc_class = str(row.iloc[0]["ABC"]) if not row.empty else "C"
 
-            winner = st.session_state.get("winner_model", "ETS(Holt-Winters)")  # si guardas winner, sino pon uno fijo
+                winner = st.session_state.get("winner_model", "ETS(Holt-Winters)")  # si guardas winner, sino pon uno fijo
 
-            eval_months = st.slider("Meses a evaluar (últimos)", 6, 24, 12, 1, key="cmp_eval")
-            cost_stock_unit = st.number_input("Costo inventario por unidad (proxy)", min_value=0.0, value=1.0, step=0.5)
-            cost_stockout_unit = st.number_input("Costo quiebre por unidad (proxy)", min_value=0.0, value=5.0, step=0.5)
+                eval_months = st.slider("Meses a evaluar (últimos)", 6, 24, 12, 1, key="cmp_eval")
+                cost_stock_unit = st.number_input("Costo inventario por unidad (proxy)", min_value=0.0, value=1.0, step=0.5)
+                cost_stockout_unit = st.number_input("Costo quiebre por unidad (proxy)", min_value=0.0, value=5.0, step=0.5)
 
-            run_cmp = st.button("▶️ Ejecutar comparativa", type="primary", key="run_cmp")
+                run_cmp = st.button("▶️ Ejecutar comparativa", type="primary", key="run_cmp")
 
-            if run_cmp and not hist.empty:
-                df_cmp, s = simulate_compare_policy_vs_baseline(
-                    hist=hist,
-                    stock_series=stock_p,
-                    abc_class=abc_class,
-                    winner=winner,
-                    eval_months=int(eval_months),
-                    cost_stock_unit=float(cost_stock_unit),
-                    cost_stockout_unit=float(cost_stockout_unit),
-                    ma_window=3,
-                    test_months_for_mae=12,
-                )
-
-                c1, c2, c3 = st.columns(3)
-                c1.metric("Ahorro costo total", f"{s['Ahorro_CostoTotal']:,.1f}")
-                c2.metric("Mejora Fill Rate (pp)", f"{s['Mejora_FillRate_pp']:.1f}")
-                c3.metric("Reducción faltantes", f"{s['Reduccion_Faltantes']:,.0f}")
-
-                st.dataframe(df_cmp, use_container_width=True, height=420)
-
-                fig_cost = px.line(df_cmp, x="Mes", y=["Base_Costo_total", "Sys_Costo_total"], markers=True,
-                                title="Costo total mensual: Baseline vs Sistema")
-                st.plotly_chart(fig_cost, use_container_width=True)
-
-                fig_lost = px.bar(df_cmp, x="Mes", y=["Base_Faltante", "Sys_Faltante"], barmode="group",
-                                title="Faltantes (quiebre) por mes: Baseline vs Sistema")
-                st.plotly_chart(fig_lost, use_container_width=True)
-
-
-
-            st.divider()
-            st.subheader("📦 Portafolio: Comparativa costos SOLO ABC A (agregado)")
-
-            eval_months_port = st.slider("Meses a evaluar portafolio (últimos)", 6, 24, 12, 1, key="port_eval")
-            cost_stock_unit_port = st.number_input("Costo inventario por unidad (proxy) - Portafolio", min_value=0.0, value=1.0, step=0.5, key="port_cinv")
-            cost_stockout_unit_port = st.number_input("Costo quiebre por unidad (proxy) - Portafolio", min_value=0.0, value=5.0, step=0.5, key="port_cbrk")
-
-            winner_mode = st.selectbox(
-                "Modelo en portafolio",
-                options=["AUTO", "ETS(Holt-Winters)", "RandomForest", "Naive", "Seasonal12", "MA3", "MA6"],
-                index=0,
-                key="port_winner_mode"
-            )
-
-            max_products_port = st.selectbox(
-                "Cantidad de productos ABC A a procesar (performance)",
-                options=[20, 50, 100, 200, "Todos"],
-                index=1,
-                key="port_max"
-            )
-            max_products_port = None if max_products_port == "Todos" else int(max_products_port)
-
-            run_port = st.button("▶️ Ejecutar portafolio ABC A", type="primary", key="run_port_abcA")
-
-            if run_port:
-                with st.spinner("Calculando portafolio ABC A (puede tardar)..."):
-                    resumenA, detalleA = run_portfolio_cost_comparison_abcA(
-                        demand_monthly=res.demand_monthly,
-                        stock_monthly=res.stock_monthly,
-                        abc_df=abc_df,   # ya existe arriba en tu render
-                        eval_months=int(eval_months_port),
-                        cost_stock_unit=float(cost_stock_unit_port),
-                        cost_stockout_unit=float(cost_stockout_unit_port),
-                        winner_mode=str(winner_mode),
+                if run_cmp and not hist.empty:
+                    df_cmp, s = simulate_compare_policy_vs_baseline(
+                        hist=hist,
+                        stock_series=stock_p,
+                        abc_class=abc_class,
+                        winner=winner,
+                        eval_months=int(eval_months),
+                        cost_stock_unit=float(cost_stock_unit),
+                        cost_stockout_unit=float(cost_stockout_unit),
                         ma_window=3,
                         test_months_for_mae=12,
-                        max_products=max_products_port,
                     )
 
-                if resumenA.empty:
-                    st.warning("No se generó portafolio (revisa si hay productos ABC A con historia suficiente).")
-                else:
-                    st.success("✅ Portafolio ABC A generado.")
-                    st.dataframe(resumenA, use_container_width=True)
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("Ahorro costo total", f"{s['Ahorro_CostoTotal']:,.1f}")
+                    c2.metric("Mejora Fill Rate (pp)", f"{s['Mejora_FillRate_pp']:.1f}")
+                    c3.metric("Reducción faltantes", f"{s['Reduccion_Faltantes']:,.0f}")
 
-                    k1, k2, k3 = st.columns(3)
-                    k1.metric("Ahorro total", f"{float(resumenA.iloc[0]['Ahorro_total']):,.1f}")
-                    k2.metric("FillRate base", f"{float(resumenA.iloc[0]['FillRate_Base_%']):.1f}%")
-                    k3.metric("FillRate sistema", f"{float(resumenA.iloc[0]['FillRate_Sistema_%']):.1f}%")
+                    st.dataframe(df_cmp, use_container_width=True, height=420)
 
-                    st.markdown("### 🔝 Top productos (mayor ahorro)")
-                    st.dataframe(detalleA.head(30), use_container_width=True, height=420)
+                    fig_cost = px.line(df_cmp, x="Mes", y=["Base_Costo_total", "Sys_Costo_total"], markers=True,
+                                    title="Costo total mensual: Baseline vs Sistema")
+                    st.plotly_chart(fig_cost, use_container_width=True)
 
-                    with st.expander("⬇️ Exportar detalle portafolio (CSV)", expanded=False):
-                        csv_det = detalleA.to_csv(index=False).encode("utf-8-sig")  # utf-8-sig para Excel
-                        st.download_button(
-                            "Descargar detalle_portafolio_ABC_A.csv",
-                            data=csv_det,
-                            file_name="detalle_portafolio_ABC_A.csv",
-                            mime="text/csv",
-                            key="dl_detalle_portafolio_A"
+                    fig_lost = px.bar(df_cmp, x="Mes", y=["Base_Faltante", "Sys_Faltante"], barmode="group",
+                                    title="Faltantes (quiebre) por mes: Baseline vs Sistema")
+                    st.plotly_chart(fig_lost, use_container_width=True)
+
+
+
+                st.divider()
+                st.subheader("📦 Portafolio: Comparativa costos SOLO ABC A (agregado)")
+
+                eval_months_port = st.slider("Meses a evaluar portafolio (últimos)", 6, 24, 12, 1, key="port_eval")
+                cost_stock_unit_port = st.number_input("Costo inventario por unidad (proxy) - Portafolio", min_value=0.0, value=1.0, step=0.5, key="port_cinv")
+                cost_stockout_unit_port = st.number_input("Costo quiebre por unidad (proxy) - Portafolio", min_value=0.0, value=5.0, step=0.5, key="port_cbrk")
+
+                winner_mode = st.selectbox(
+                    "Modelo en portafolio",
+                    options=["AUTO", "ETS(Holt-Winters)", "RandomForest", "Naive", "Seasonal12", "MA3", "MA6"],
+                    index=0,
+                    key="port_winner_mode"
+                )
+
+                max_products_port = st.selectbox(
+                    "Cantidad de productos ABC A a procesar (performance)",
+                    options=[20, 50, 100, 200, "Todos"],
+                    index=1,
+                    key="port_max"
+                )
+                max_products_port = None if max_products_port == "Todos" else int(max_products_port)
+
+                run_port = st.button("▶️ Ejecutar portafolio ABC A", type="primary", key="run_port_abcA")
+
+                if run_port:
+                    with st.spinner("Calculando portafolio ABC A (puede tardar)..."):
+                        resumenA, detalleA = run_portfolio_cost_comparison_abcA(
+                            demand_monthly=res.demand_monthly,
+                            stock_monthly=res.stock_monthly,
+                            abc_df=abc_df,   # ya existe arriba en tu render
+                            eval_months=int(eval_months_port),
+                            cost_stock_unit=float(cost_stock_unit_port),
+                            cost_stockout_unit=float(cost_stockout_unit_port),
+                            winner_mode=str(winner_mode),
+                            ma_window=3,
+                            test_months_for_mae=12,
+                            max_products=max_products_port,
                         )
 
-                    fig_cost_port = px.bar(
-                        resumenA,
-                        x=["CostoTotal_Base", "CostoTotal_Sistema"],
-                        title="Costo total portafolio ABC A: Base vs Sistema"
-                    )
-                    st.plotly_chart(fig_cost_port, use_container_width=True)
+                    if resumenA.empty:
+                        st.warning("No se generó portafolio (revisa si hay productos ABC A con historia suficiente).")
+                    else:
+                        st.success("✅ Portafolio ABC A generado.")
+                        st.dataframe(resumenA, use_container_width=True)
+
+                        k1, k2, k3 = st.columns(3)
+                        k1.metric("Ahorro total", f"{float(resumenA.iloc[0]['Ahorro_total']):,.1f}")
+                        k2.metric("FillRate base", f"{float(resumenA.iloc[0]['FillRate_Base_%']):.1f}%")
+                        k3.metric("FillRate sistema", f"{float(resumenA.iloc[0]['FillRate_Sistema_%']):.1f}%")
+
+                        st.markdown("### 🔝 Top productos (mayor ahorro)")
+                        st.dataframe(detalleA.head(30), use_container_width=True, height=420)
+
+                        with st.expander("⬇️ Exportar detalle portafolio (CSV)", expanded=False):
+                            csv_det = detalleA.to_csv(index=False).encode("utf-8-sig")  # utf-8-sig para Excel
+                            st.download_button(
+                                "Descargar detalle_portafolio_ABC_A.csv",
+                                data=csv_det,
+                                file_name="detalle_portafolio_ABC_A.csv",
+                                mime="text/csv",
+                                key="dl_detalle_portafolio_A"
+                            )
+
+                        fig_cost_port = px.bar(
+                            resumenA,
+                            x=["CostoTotal_Base", "CostoTotal_Sistema"],
+                            title="Costo total portafolio ABC A: Base vs Sistema"
+                        )
+                        st.plotly_chart(fig_cost_port, use_container_width=True)
 
 
