@@ -75,11 +75,22 @@ def json_to_dataframe(json_str: str) -> pd.DataFrame:
         except:
             pass  # Si no, dejar como está
         
-        # Intentar convertir columnas numéricas
+        # Procesar cada columna
         for col in df.columns:
+            # Reemplazar 'null' con NaN
+            df[col] = df[col].replace('null', None)
+            
+            # Detectar columnas de fecha por nombre
+            col_lower = col.lower()
+            if any(date_col in col_lower for date_col in ['fecha', 'date', 'fecha_', 'date_', 'time', 'timestamp']):
+                try:
+                    df[col] = pd.to_datetime(df[col], errors='coerce')
+                    continue  # Pasar a siguiente columna
+                except:
+                    pass
+            
+            # Intentar conversión numérica para otras columnas
             try:
-                # Reemplazar 'null' con NaN
-                df[col] = df[col].replace('null', None)
                 df[col] = pd.to_numeric(df[col], errors='ignore')
             except:
                 pass
