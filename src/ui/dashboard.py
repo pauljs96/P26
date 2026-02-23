@@ -1053,67 +1053,62 @@ class Dashboard:
         
         # Mostrar formulario de autenticación
         st.title("🔐 Sistema de Planificación")
-        st.write("Inicia sesión o registrate para continuar")
+        st.write("Inicia sesión para continuar")
         
-        # Tab selector
-        tab1, tab2 = st.tabs(["Iniciar Sesión", "Registrarse"])
+        st.subheader("🔐 Iniciar Sesión")
+        email = st.text_input("Email:", placeholder="usuario@empresa.com", key="login_email_v2")
+        password = st.text_input("Contraseña:", type="password", key="login_password_v2")
         
-        with tab1:
-            st.subheader("🔐 Iniciar Sesión")
-            email = st.text_input("Email:", placeholder="usuario@empresa.com", key="login_email_v2")
-            password = st.text_input("Contraseña:", type="password", key="login_password_v2")
-            
-            if st.button("Entrar", type="primary", use_container_width=True, key="login_btn"):
-                if not email or not password:
-                    st.error("Por favor completa todos los campos")
-                else:
-                    # Intentar Supabase primero
-                    try:
-                        db = get_db()
-                        result = db.login_user(email, password)
-                        if result["success"]:
-                            # Obtener info completa del usuario (org_id, is_admin)
-                            user_info = db.get_user(result["user_id"])
-                            
-                            st.session_state.authenticated = True
-                            st.session_state.user_id = result["user_id"]
-                            st.session_state.email = result["email"]
-                            st.session_state.organization_id = user_info.get("organization_id") if user_info else None
-                            st.session_state.is_admin = user_info.get("is_admin", False) if user_info else False
-                            
-                            # Obtener nombre de organización
-                            if st.session_state.organization_id:
-                                org = db.get_organization(st.session_state.organization_id)
-                                st.session_state.organization_name = org.get("nombre") if org else "Unknown"
-                            
-                            # CLEAR CACHE para evitar conflictos multi-usuario
-                            st.cache_data.clear()
-                            st.cache_resource.clear()
-                            
-                            st.rerun()
-                        else:
-                            st.error(f"Error: {result['error']}")
-                    except Exception as e:
-                        # Demo mode fallback
-                        st.session_state.authenticated = True
-                        st.session_state.user_id = "demo-user-id"
-                        st.session_state.email = email
-                        st.session_state.company = "Demo Company"
-                        st.session_state.organization_id = "demo-org-id"
-                        st.session_state.is_admin = True
-                        st.session_state.organization_name = "Demo Organization"
+        if st.button("Entrar", type="primary", use_container_width=True, key="login_btn"):
+            if not email or not password:
+                st.error("Por favor completa todos los campos")
+            else:
+                # Intentar Supabase primero
+                try:
+                    db = get_db()
+                    result = db.login_user(email, password)
+                    if result["success"]:
+                        # Obtener info completa del usuario (org_id, is_admin)
+                        user_info = db.get_user(result["user_id"])
                         
-                        # CLEAR CACHE for demo mode
+                        st.session_state.authenticated = True
+                        st.session_state.user_id = result["user_id"]
+                        st.session_state.email = result["email"]
+                        st.session_state.organization_id = user_info.get("organization_id") if user_info else None
+                        st.session_state.is_admin = user_info.get("is_admin", False) if user_info else False
+                        
+                        # Obtener nombre de organización
+                        if st.session_state.organization_id:
+                            org = db.get_organization(st.session_state.organization_id)
+                            st.session_state.organization_name = org.get("nombre") if org else "Unknown"
+                        
+                        # CLEAR CACHE para evitar conflictos multi-usuario
                         st.cache_data.clear()
                         st.cache_resource.clear()
                         
-                        st.success("✅ Modo Demo: Sesión iniciada (datos no persistentes)")
-                        st.info("💡 Para usar BD real, configura SUPABASE_URL y SUPABASE_KEY en .env")
                         st.rerun()
+                    else:
+                        st.error(f"Error: {result['error']}")
+                except Exception as e:
+                    # Demo mode fallback
+                    st.session_state.authenticated = True
+                    st.session_state.user_id = "demo-user-id"
+                    st.session_state.email = email
+                    st.session_state.company = "Demo Company"
+                    st.session_state.organization_id = "demo-org-id"
+                    st.session_state.is_admin = True
+                    st.session_state.organization_name = "Demo Organization"
+                    
+                    # CLEAR CACHE for demo mode
+                    st.cache_data.clear()
+                    st.cache_resource.clear()
+                    
+                    st.success("✅ Modo Demo: Sesión iniciada (datos no persistentes)")
+                    st.info("💡 Para usar BD real, configura SUPABASE_URL y SUPABASE_KEY en .env")
+                    st.rerun()
         
-        with tab2:
-            st.subheader("📝 Registrarse")
-            st.warning("⚠️ El registro automático está deshabilitado. Contacta al administrador de tu organización para crear una cuenta.")
+        st.divider()
+        st.info("ℹ️ Para crear una nueva cuenta, contacta al administrador de tu organización.")
         
         return False
 
