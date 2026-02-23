@@ -1139,6 +1139,12 @@ class Dashboard:
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #FAFAFA;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .main {
+            padding-top: 0 !important;
         }
         
         /* Títulos principales */
@@ -1146,7 +1152,8 @@ class Dashboard:
             color: #0D47A1;
             font-weight: 700;
             font-size: 2.5em;
-            margin-bottom: 0.5em;
+            margin-top: 0 !important;
+            margin-bottom: 0.3em;
             letter-spacing: -0.5px;
         }
         
@@ -1310,7 +1317,7 @@ class Dashboard:
 
         st.markdown(
             "**Análisis avanzado de demanda, pronósticos inteligentes y optimización de stock.**  "
-            "Sube tus archivos CSV (2021–2025) y explora análisis detallados, comparativas de modelos y recomendaciones automáticas."
+            "Explora análisis detallados, comparativas de modelos y recomendaciones automáticas."
         )
 
         # Información de usuario y organización en sidebar
@@ -1542,11 +1549,12 @@ class Dashboard:
         # ------------------------------
         if is_admin:
             # Admin ve todas las tabs reorganizadas por grupo
-            tab_admin, tab_analytics, tab_models, tab_reco_group, tab_validation = st.tabs([
+            # ORDEN: Recomendación primero (por defecto), luego el resto
+            tab_reco_group, tab_admin, tab_analytics, tab_models, tab_validation = st.tabs([
+                "🔄 Recomendación",
                 "⚙️ Panel Admin",
                 "📊 Análisis de Datos",
                 "🔮 Modelos y Pronósticos",
-                "🔄 Recomendación",
                 "✅ Validación y Análisis",
             ])
             
