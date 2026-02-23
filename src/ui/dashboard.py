@@ -1541,21 +1541,45 @@ class Dashboard:
         # TABS (Con admin panel si aplica)
         # ------------------------------
         if is_admin:
-            # Admin ve todas las tabs más la de administración
-            tab_admin, tab_demanda, tab_baselines, tab_ets,tab_ml,Tab_Comparativa,ResumenComparativa ,tab_stock_diag,tab_reco,Reco_Masiva,Valida_Retro,ComparaRetroEntreSistema = st.tabs([
+            # Admin ve todas las tabs reorganizadas por grupo
+            tab_admin, tab_analytics, tab_models, tab_reco_group, tab_validation = st.tabs([
                 "⚙️ Panel Admin",
-                "🧩 Demanda y Componentes",
-                "🔮 Baselines y Backtest",
-                "📈 Holt–Winters (ETS)",
-                "🤖 Random Forest (RF)",
-                "🏆 Comparativa ETS vs Baselines vs RF",
-                "📊 Resumen Comparativa",
-                "🏢 Stock y Diagnóstico",
-                "🔄 Recomendación de Producción",
-                "📑 Recomendación Masiva",
-                "✅ Validación Retrospectiva",
-                "📉 Comparativa Retrospectiva entre Sistemas",
+                "📊 Análisis de Datos",
+                "🔮 Modelos y Pronósticos",
+                "🔄 Recomendación",
+                "✅ Validación y Análisis",
             ])
+            
+            # Crear subtabs dentro de Análisis de Datos
+            with tab_analytics:
+                tab_demanda, tab_stock_diag = st.tabs([
+                    "🧩 Demanda y Componentes",
+                    "🏢 Stock y Diagnóstico",
+                ])
+            
+            # Crear subtabs dentro de Modelos y Pronósticos
+            with tab_models:
+                tab_baselines, tab_ets, tab_ml, Tab_Comparativa, ResumenComparativa = st.tabs([
+                    "🔮 Baselines y Backtest",
+                    "📈 Holt–Winters (ETS)",
+                    "🤖 Random Forest (RF)",
+                    "🏆 Comparativa ETS vs Baselines vs RF",
+                    "📊 Resumen Comparativa",
+                ])
+            
+            # Crear subtabs dentro de Recomendación
+            with tab_reco_group:
+                tab_reco, Reco_Masiva = st.tabs([
+                    "🎯 Recomendación Individual",
+                    "📑 Recomendación Masiva",
+                ])
+            
+            # Crear subtabs dentro de Validación y Análisis
+            with tab_validation:
+                Valida_Retro, ComparaRetroEntreSistema = st.tabs([
+                    "✅ Validación Retrospectiva",
+                    "📉 Comparativa Retrospectiva",
+                ])
             
             # Renderizar admin panel
             with tab_admin:
@@ -1564,13 +1588,14 @@ class Dashboard:
                 admin.render()
         
         else:
-            # Usuario viewer (no admin) - SOLO VE RECOMENDACIÓN DE PRODUCCIÓN
+            # Usuario viewer (no admin) - SOLO VE RECOMENDACIÓN
             tab_reco, = st.tabs([
-                "🔄 Recomendación de Producción",
+                "🔄 Recomendación Individual",
             ])
             
             # Variables dummy para las otras tabs para evitar errores
-            tab_admin = tab_demanda = tab_baselines = tab_ets = tab_ml = Tab_Comparativa = ResumenComparativa = tab_stock_diag = Reco_Masiva = Valida_Retro = ComparaRetroEntreSistema = EmptyTab()
+            tab_admin = tab_analytics = tab_models = tab_reco_group = tab_validation = EmptyTab()
+            tab_demanda = tab_baselines = tab_ets = tab_ml = Tab_Comparativa = ResumenComparativa = tab_stock_diag = Reco_Masiva = Valida_Retro = ComparaRetroEntreSistema = EmptyTab()
 
         # ==========================================================
         if is_admin:
