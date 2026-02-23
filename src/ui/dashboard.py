@@ -1711,9 +1711,9 @@ class Dashboard:
                 if hist.empty:
                     st.info("No hay serie mensual para este producto.")
                 else:
-                    # Auto-calcular meses a evaluar: máximo 20, o menos si no hay suficientes datos
-                    test_months = min(20, max(6, len(hist) - 10))
-                    st.info(f"📊 Evaluando modelo con **{test_months} meses** (últimos de la serie) para máxima robustez.")
+                    # Auto-calcular meses a evaluar: 25% del histórico disponible (escalable)
+                    test_months = max(6, int(len(hist) * 0.25))
+                    st.info(f"📊 Evaluando modelo con **{test_months} meses** (25% de {len(hist)} disponibles) para máxima robustez.")
                     
                     ma_window = st.selectbox("Ventana Media Móvil", options=[3, 6], index=0)
 
@@ -2072,8 +2072,8 @@ class Dashboard:
                 st.caption(f"ABC del producto: **{abc_class}** → Nivel de servicio por política: **{int(service_level*100)}%** (Z≈{z})")
 
                 # Parámetros de evaluación para elegir ganador (automáticos para máxima comparabilidad)
-                test_months = min(20, max(6, len(hist) - 10))
-                st.info(f"📊 Ganador elegido usando **{test_months} meses** de backtest (estándar para todos los análisis)")
+                test_months = max(6, int(len(hist) * 0.25))
+                st.info(f"📊 Ganador elegido usando **{test_months} meses** de backtest (25% de {len(hist)}, estándar para todos los análisis)")
                 ma_window = st.selectbox("Ventana MA (baselines)", options=[3, 6], index=0, key="reco_ma_window")
 
                 ets_params = dict(seasonal_periods=12, trend="add", seasonal="add", damped_trend=False, min_obs=24)
@@ -2173,8 +2173,10 @@ class Dashboard:
                         lead_time = st.selectbox("Lead time (meses)", options=[1, 2, 3], index=0, key="mass_lt")
 
                     with c2:
-                        test_months = min(20, max(6, len(codigos_eval) * 2 if codigos_eval else 12))
-                        st.info(f"✅ Usando **{test_months} meses** para backtest")
+                        # Calcular 25% del máximo histórico disponible
+                        max_hist_months = res_demand.groupby('Codigo')['Mes'].count().max() if not res_demand.empty else 24
+                        test_months = max(6, int(max_hist_months * 0.25))
+                        st.info(f"✅ Usando **{test_months} meses** para backtest (25% del histórico máximo)")
 
                     with c3:
                         max_products = st.selectbox(
@@ -2337,9 +2339,9 @@ class Dashboard:
                     row = abc_df[abc_df["Codigo"] == str(prod_sel)]
                     abc_class = str(row.iloc[0]["ABC"]) if not row.empty else "C"
 
-                    # Auto-calcular test_months: máximo 20 meses para máxima comparabilidad
-                    test_months = min(20, max(6, len(hist) - 10))
-                    st.info(f"🎯 **{test_months} meses** para elegir ganador (mismo criterio que otros análisis)")
+                    # Auto-calcular test_months: 25% del histórico disponible para máxima comparabilidad
+                    test_months = max(6, int(len(hist) * 0.25))
+                    st.info(f"🎯 **{test_months} meses** para elegir ganador (25% de {len(hist)}, criterio estándar)")
                     ma_window = st.selectbox("Ventana media móvil (baselines)", options=[3, 6], index=0, key="sim_ma")
                     lead_time = st.selectbox("Lead time (meses)", options=[1], index=0)
 
@@ -2422,8 +2424,8 @@ class Dashboard:
 
                 winner = st.session_state.get("winner_model", "ETS(Holt-Winters)")  # si guardas winner, sino pon uno fijo
 
-                eval_months = min(20, max(6, len(hist) - 10))
-                st.info(f"📊 Evaluando con **{eval_months} meses** (\u00faltimos de la serie) para m\u00e1xima comparabilidad")
+                eval_months = max(6, int(len(hist) * 0.25))
+                st.info(f"📊 Evaluando con **{eval_months} meses** (25% de {len(hist)}) para máxima comparabilidad")
                 cost_stock_unit = st.number_input("Costo inventario por unidad (proxy)", min_value=0.0, value=1.0, step=0.5)
                 cost_stockout_unit = st.number_input("Costo quiebre por unidad (proxy)", min_value=0.0, value=5.0, step=0.5)
 
