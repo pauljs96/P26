@@ -36,6 +36,82 @@ from src.db import get_db
 from src.storage import get_storage_manager
 
 
+# ==================== FUNCIONES DE PRESENTACIÓN VISUAL ====================
+
+def display_prominent_chart(fig, title: str = "", description: str = ""):
+    """Muestra una gráfica de forma destacada con título y descripción profesional."""
+    if title:
+        st.markdown(f"<h3 style='color: #1976D2; font-weight: 600; margin-top: 1em; margin-bottom: 0.5em;'>{title}</h3>", unsafe_allow_html=True)
+    if description:
+        st.markdown(f"<p style='color: #666; font-size: 0.95em; margin-bottom: 1em;'>{description}</p>", unsafe_allow_html=True)
+    
+    st.plotly_chart(fig, use_container_width=True, config={"responsive": True, "displayModeBar": True})
+
+
+def display_metrics_row(metrics: list[dict], cols: int = 4):
+    """
+    Muestra KPIs en fila de forma elegante.
+    
+    Formato:
+    metrics = [
+        {"label": "Total", "value": 1000, "unit": "unid", "icon": "📦"},
+        {"label": "Fill Rate", "value": 95.5, "unit": "%", "icon": "✅"},
+    ]
+    """
+    cols_layout = st.columns(cols)
+    for idx, metric in enumerate(metrics):
+        if idx >= cols:
+            break
+        with cols_layout[idx % cols]:
+            icon = metric.get("icon", "📊")
+            label = metric.get("label", "")
+            value = metric.get("value", 0)
+            unit = metric.get("unit", "")
+            
+            st.metric(label=f"{icon} {label}", value=f"{value:,.1f} {unit}".strip())
+
+
+def section_divider():
+    """Crea un divisor visual profesional."""
+    st.markdown("""
+    <hr style='border: none; border-top: 2px solid #E0E0E0; margin: 2em 0;'>
+    """, unsafe_allow_html=True)
+
+
+def highlight_box(text: str, box_type: str = "info", icon: str = "ℹ️"):
+    """Muestra un cuadro destacado de información."""
+    if box_type == "success":
+        bg_color = "#E8F5E9"
+        border_color = "#4CAF50"
+        default_icon = "✅"
+    elif box_type == "warning":
+        bg_color = "#FFF3E0"
+        border_color = "#FF9800"
+        default_icon = "⚠️"
+    elif box_type == "danger":
+        bg_color = "#FFEBEE"
+        border_color = "#F44336"
+        default_icon = "❌"
+    else:  # info
+        bg_color = "#E3F2FD"
+        border_color = "#1976D2"
+        default_icon = "ℹ️"
+    
+    icon = icon or default_icon
+    st.markdown(f"""
+    <div style='
+        background-color: {bg_color};
+        border-left: 5px solid {border_color};
+        padding: 1em 1.2em;
+        border-radius: 6px;
+        margin: 1em 0;
+    '>
+        <span style='font-size: 1.2em; margin-right: 0.5em;'>{icon}</span>
+        <span style='color: #333; font-size: 0.95em;'>{text}</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+
 #1. FUNCIONES AUXILIARES (Modular)
 
 #A. Normalizacion y Construcción
@@ -1043,18 +1119,203 @@ class Dashboard:
 
     def render(self):
 
-        st.set_page_config(page_title="Planificación - MVP", layout="wide")
+        st.set_page_config(
+            page_title="Predicast - Sistema de Planificación",
+            layout="wide",
+            initial_sidebar_state="expanded",
+            menu_items={"About": "Sistema avanzado de planificación de demanda y pronósticos"}
+        )
+        
+        # ==================== ESTILOS CSS PROFESIONALES ====================
+        st.markdown("""
+        <style>
+        /* Paleta de colores profesionales */
+        :root {
+            --primary: #0D47A1;     /* Azul marino corporativo */
+            --secondary: #1976D2;   /* Azul profesional */
+            --accent: #4CAF50;      /* Verde éxito */
+            --warning: #FF9800;     /* Naranja advertencia */
+            --danger: #F44336;      /* Rojo crítico */
+            --dark: #263238;        /* Gris oscuro */
+            --light: #ECEFF1;       /* Gris claro */
+        }
+        
+        /* Configuración general */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #FAFAFA;
+        }
+        
+        /* Títulos principales */
+        h1 {
+            color: #0D47A1;
+            font-weight: 700;
+            font-size: 2.5em;
+            margin-bottom: 0.5em;
+            letter-spacing: -0.5px;
+        }
+        
+        /* Subtítulos */
+        h2 {
+            color: #1976D2;
+            font-weight: 600;
+            font-size: 1.8em;
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 0.5em;
+        }
+        
+        h3 {
+            color: #263238;
+            font-weight: 600;
+            font-size: 1.3em;
+        }
+        
+        /* Métricas desatacadas */
+        [data-testid="metric-container"] {
+            background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
+            border: 2px solid #E0E0E0;
+            border-radius: 12px;
+            padding: 1.5em;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+        }
+        
+        [data-testid="metric-container"]:hover {
+            box-shadow: 0 4px 16px rgba(13, 71, 161, 0.15);
+            border-color: #1976D2;
+            transform: translateY(-2px);
+        }
+        
+        /* Plotly charts con sombra */
+        .plotly-graph-div {
+            border-radius: 10px;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.1);
+            background: white;
+            padding: 1em;
+            margin: 1em 0;
+        }
+        
+        /* Tabs profesionales */
+        .stTabs [role="tablist"] {
+            background-color: #F5F5F5;
+            border-radius: 8px;
+            border-bottom: 3px solid #0D47A1;
+            padding: 0.5em;
+        }
+        
+        .stTabs [role="tab"][aria-selected="true"] {
+            background-color: #0D47A1;
+            color: white;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+        
+        .stTabs [role="tab"][aria-selected="false"] {
+            color: #263238;
+        }
+        
+        /* Botones estilizados */
+        .stButton > button {
+            background-color: #1976D2;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.75em 1.5em;
+            font-weight: 600;
+            font-size: 0.95em;
+            transition: all 0.3s ease;
+        }
+        
+        .stButton > button:hover {
+            background-color: #0D47A1;
+            box-shadow: 0 4px 12px rgba(13, 71, 161, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        .stButton > button[kind="primary"] {
+            background-color: #4CAF50;
+        }
+        
+        .stButton > button[kind="primary"]:hover {
+            background-color: #388E3C;
+        }
+        
+        /* Input fields */
+        .stTextInput input, .stNumberInput input, .stSelectbox select {
+            border: 2px solid #E0E0E0;
+            border-radius: 6px;
+            color: #263238;
+        }
+        
+        .stTextInput input:focus, .stNumberInput input:focus {
+            border-color: #1976D2;
+            box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+        }
+        
+        /* Info boxes */
+        .stInfo {
+            background-color: #E3F2FD;
+            border-left: 5px solid #1976D2;
+            border-radius: 6px;
+        }
+        
+        .stSuccess {
+            background-color: #E8F5E9;
+            border-left: 5px solid #4CAF50;
+            border-radius: 6px;
+        }
+        
+        .stWarning {
+            background-color: #FFF3E0;
+            border-left: 5px solid #FF9800;
+            border-radius: 6px;
+        }
+        
+        .stError {
+            background-color: #FFEBEE;
+            border-left: 5px solid #F44336;
+            border-radius: 6px;
+        }
+        
+        /* Sidebar */
+        .stSidebar {
+            background-color: #FAFAFA;
+            border-right: 2px solid #E0E0E0;
+        }
+        
+        /* Dividers */
+        hr {
+            border-top: 2px solid #E0E0E0;
+            margin: 1.5em 0;
+        }
+        
+        /* Dataframe styling */
+        .stDataFrame, [data-testid="stDataFrame"] {
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+        
+        /* Expander styling */
+        .stExpander {
+            border: 1px solid #E0E0E0;
+            border-radius: 8px;
+        }
+        
+        </style>
+        """, unsafe_allow_html=True)
         
         # ==================== AUTENTICACIÓN ====================
         if not self._check_authentication():
             return  # Muestra login screen y retorna
         
         # ==================== DASHBOARD PRINCIPAL ====================
-        st.title("📦 Sistema de Planificación (MVP)")
+        st.title("📊 Predicast - Sistema de Planificación")
 
-        st.write(
-            "Sube tus archivos CSV (2021–2025). "
-            "Luego selecciona un producto para ver demanda, pronósticos y diagnósticos."
+        st.markdown(
+            "**Análisis avanzado de demanda, pronósticos inteligentes y optimización de stock.**  "
+            "Sube tus archivos CSV (2021–2025) y explora análisis detallados, comparativas de modelos y recomendaciones automáticas."
         )
 
         # Información de usuario y organización en sidebar
