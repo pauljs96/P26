@@ -1944,11 +1944,11 @@ class Dashboard:
                 abc_class = str(abc_row.iloc[0]["ABC"]) if not abc_row.empty else "C"
 
                 # Parámetros de política
-                lead_time = st.selectbox("Lead time (meses)", options=[1, 2, 3], index=0)
+                lead_time = 1  # Parámetro operacional fijo
                 service_level = policy_service_level_by_abc(abc_class)
                 z = z_from_service_level(service_level)
 
-                st.caption(f"ABC del producto: **{abc_class}** → Nivel de servicio por política: **{int(service_level*100)}%** (Z≈{z})")
+                st.caption(f"ABC del producto: **{abc_class}** → Nivel de servicio por política: **{int(service_level*100)}%** (Z≈{z}) | Lead time: **{lead_time} mes**")
 
                 # Parámetros de evaluación para elegir ganador (automáticos para máxima comparabilidad)
                 test_months = max(6, int(len(hist) * 0.25))
@@ -2049,7 +2049,8 @@ class Dashboard:
                     c1, c2, c3 = st.columns([1, 1, 2])
 
                     with c1:
-                        lead_time = st.selectbox("Lead time (meses)", options=[1, 2, 3], index=0, key="mass_lt")
+                        lead_time = 1  # Parámetro operacional fijo
+                        st.metric("Lead time (meses)", lead_time)
 
                     with c2:
                         # Calcular 25% del máximo histórico disponible
@@ -2222,7 +2223,7 @@ class Dashboard:
                     test_months = max(6, int(len(hist) * 0.25))
                     st.info(f"🎯 **{test_months} meses** para elegir ganador (25% de {len(hist)}, criterio estándar)")
                     ma_window = st.selectbox("Ventana media móvil (baselines)", options=[3, 6], index=0, key="sim_ma")
-                    lead_time = st.selectbox("Lead time (meses)", options=[1], index=0)
+                    lead_time = 1  # Parámetro operacional fijo
 
                     run_sim = st.button("▶️ Ejecutar simulación (ganador automático por MAE)", type="primary", key="run_sim")
 
