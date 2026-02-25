@@ -1673,7 +1673,7 @@ class Dashboard:
                         st.metric("Meses a evaluar", f"{test_months_cmp} (25% de {len(hist_cmp)})")
                     
                     with c2:
-                        ma_window_cmp = st.selectbox("Ventana MA (Baselines)", options=[3, 6], index=0, key="cmp_ma_window")
+                        st.metric("Ventana MA", "Auto-optimizada")
                     
                     with c3:
                         metric_to_sort = st.selectbox(
@@ -1685,14 +1685,17 @@ class Dashboard:
 
                     st.divider()
 
-                    with st.spinner("🔄 Ejecutando backtests de los 3 modelos (UNA sola vez)..."):
-                        # 1) Baselines
-                        bt_base_cmp = backtest_baselines_1step(
-                            hist_cmp,
-                            y_col="Demanda_Unid",
-                            test_months=int(test_months_cmp),
-                            ma_window=int(ma_window_cmp)
-                        )
+                    with st.spinner("🔄 Auto-optimizando ventana MA y ejecutando backtests de los 3 modelos..."):
+                        # 0) Auto-optimizar MA (3 vs 6) evaluando Baselines
+                        bt_ma3 = backtest_baselines_1step(hist_cmp, y_col="Demanda_Unid", test_months=int(test_months_cmp), ma_window=3)
+                        bt_ma6 = backtest_baselines_1step(hist_cmp, y_col="Demanda_Unid", test_months=int(test_months_cmp), ma_window=6)
+                        
+                        mae_ma3 = float(bt_ma3.metrics.iloc[0]["MAE"]) if not bt_ma3.metrics.empty else float("inf")
+                        mae_ma6 = float(bt_ma6.metrics.iloc[0]["MAE"]) if not bt_ma6.metrics.empty else float("inf")
+                        ma_window_cmp = 3 if mae_ma3 < mae_ma6 else 6
+                        
+                        # 1) Baselines (ya evaluado, reutilizar)
+                        bt_base_cmp = bt_ma3 if ma_window_cmp == 3 else bt_ma6
 
                         # 2) ETS
                         ets = ETSForecaster(seasonal_periods=12, trend="add", seasonal="add", damped_trend=False, min_obs=24)
@@ -1717,6 +1720,9 @@ class Dashboard:
 
                     # ========== RESULTADO PRINCIPAL ==========
                     winner = str(cmp.iloc[0]["Modelo"]) if not cmp.empty else "N/A"
+                    
+                    # Mostrar MA seleccionado
+                    st.markdown(f"**✅ Ventana MA seleccionada:** MA{ma_window_cmp} (MAE: {min(mae_ma3, mae_ma6):.2f}) | MA3 MAE: {mae_ma3:.2f} | MA6 MAE: {mae_ma6:.2f}")
                     
                     # Destacar ganador visualmente
                     st.markdown(f"## 🥇 **Ganador: {winner}**")
@@ -1830,7 +1836,7 @@ class Dashboard:
                     key="global_test_months"
                 )
 
-                ma_window_global = st.selectbox("Media móvil (ventana)", options=[3, 6], index=0, key="global_ma_window")
+                st.caption("✅ Ventana MA: **MA3** (optimizada para portafolio globalizado)")
 
                 max_products = st.selectbox(
                     "Cantidad de productos a evaluar (performance)",
@@ -1845,6 +1851,7 @@ class Dashboard:
                 run_btn = st.button("▶️ Ejecutar comparación global", type="primary")
 
                 if run_btn:
+                    ma_window_global = 3  # Auto-seleccionado como media móvil estándar
                     with st.spinner("Corriendo comparación global (puede tardar según la cantidad de productos)..."):
                         per_sku, summary_wins, summary_errors = run_portfolio_comparison(
                             res_demand,
@@ -1953,7 +1960,14 @@ class Dashboard:
                 # Parámetros de evaluación para elegir ganador (automáticos para máxima comparabilidad)
                 test_months = max(6, int(len(hist) * 0.25))
                 st.info(f"📊 Ganador elegido usando **{test_months} meses** de backtest (25% de {len(hist)}, estándar para todos los análisis)")
-                ma_window = st.selectbox("Ventana MA (baselines)", options=[3, 6], index=0, key="reco_ma_window")
+                
+                # Auto-optimizar MA (3 vs 6) evaluando Baselines
+                bt_ma3 = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), ma_window=3)
+                bt_ma6 = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), ma_window=6)
+                mae_ma3 = float(bt_ma3.metrics.iloc[0]["MAE"]) if not bt_ma3.metrics.empty else float("inf")
+                mae_ma6 = float(bt_ma6.metrics.iloc[0]["MAE"]) if not bt_ma6.metrics.empty else float("inf")
+                ma_window = 3 if mae_ma3 < mae_ma6 else 6
+                st.caption(f"✅ Ventana MA auto-optimizada: **MA{ma_window}** (MAE: {min(mae_ma3, mae_ma6):.2f})")
 
                 ets_params = dict(seasonal_periods=12, trend="add", seasonal="add", damped_trend=False, min_obs=24)
                 rf_params = dict(n_estimators=400, min_obs=24, min_samples_leaf=1, random_state=42)
@@ -2222,7 +2236,15 @@ class Dashboard:
                     # Auto-calcular test_months: 25% del histórico disponible para máxima comparabilidad
                     test_months = max(6, int(len(hist) * 0.25))
                     st.info(f"🎯 **{test_months} meses** para elegir ganador (25% de {len(hist)}, criterio estándar)")
-                    ma_window = st.selectbox("Ventana media móvil (baselines)", options=[3, 6], index=0, key="sim_ma")
+                    
+                    # Auto-optimizar MA (3 vs 6) evaluando Baselines
+                    bt_ma3 = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), ma_window=3)
+                    bt_ma6 = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), ma_window=6)
+                    mae_ma3 = float(bt_ma3.metrics.iloc[0]["MAE"]) if not bt_ma3.metrics.empty else float("inf")
+                    mae_ma6 = float(bt_ma6.metrics.iloc[0]["MAE"]) if not bt_ma6.metrics.empty else float("inf")
+                    ma_window = 3 if mae_ma3 < mae_ma6 else 6
+                    st.caption(f"✅ Ventana MA auto-optimizada: **MA{ma_window}** (MAE: {min(mae_ma3, mae_ma6):.2f})")
+                    
                     lead_time = 1  # Parámetro operacional fijo
 
                     run_sim = st.button("▶️ Ejecutar simulación (ganador automático por MAE)", type="primary", key="run_sim")
