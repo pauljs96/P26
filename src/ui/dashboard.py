@@ -1552,8 +1552,8 @@ class Dashboard:
         # ------------------------------
         if is_admin:
             # Admin ve todas las tabs reorganizadas: Individual Analysis + Group Analysis
-            tab_reco_group, tab_individual, tab_grupal, tab_admin = st.tabs([
-                "🔄 Recomendación",
+            tab_dashboard, tab_individual, tab_grupal, tab_admin = st.tabs([
+                "🏠 Dashboard",
                 "📊 Análisis Individual",
                 "📊 Análisis de Grupo",
                 "⚙️ Panel Admin",
@@ -1561,24 +1561,19 @@ class Dashboard:
             
             # Crear subtabs dentro de Análisis Individual
             with tab_individual:
-                tab_demanda, tab_stock_diag = st.tabs([
+                tab_demanda, tab_stock_diag, Tab_Comparativa, tab_reco = st.tabs([
                     "🧩 Demanda y Componentes",
                     "🏢 Stock y Diagnóstico",
+                    "🏆 Comparador de Modelos (Baselines vs ETS vs RF)",
+                    "🎯 Recomendación Individual",
                 ])
             
-            # Crear subtabs dentro de Análisis de Grupo (Modelos + Validación)
+            # Crear subtabs dentro de Análisis de Grupo
             with tab_grupal:
-                Tab_Comparativa, ResumenComparativa, Valida_Retro, ComparaRetroEntreSistema = st.tabs([
-                    "🏆 Comparador de Modelos (Baselines vs ETS vs RF)",
+                ResumenComparativa, Valida_Retro, ComparaRetroEntreSistema, Reco_Masiva = st.tabs([
                     "📊 Resumen Comparativa Global",
                     "✅ Validación Retrospectiva",
                     "📉 Comparativa Retrospectiva",
-                ])
-            
-            # Crear subtabs dentro de Recomendación
-            with tab_reco_group:
-                tab_reco, Reco_Masiva = st.tabs([
-                    "🎯 Recomendación Individual",
                     "📑 Recomendación Masiva",
                 ])
             
@@ -1589,14 +1584,14 @@ class Dashboard:
                 admin.render()
         
         else:
-            # Usuario viewer (no admin) - SOLO VE RECOMENDACIÓN
-            tab_reco, = st.tabs([
-                "🔄 Recomendación Individual",
+            # Usuario viewer (no admin) - SOLO VE ANÁLISIS INDIVIDUAL (RECOMENDACIÓN)
+            tab_individual, = st.tabs([
+                "📊 Análisis Individual",
             ])
             
             # Variables dummy para las otras tabs para evitar errores
-            tab_admin = tab_individual = tab_grupal = tab_reco_group = EmptyTab()
-            tab_demanda = Tab_Comparativa = ResumenComparativa = tab_stock_diag = Reco_Masiva = Valida_Retro = ComparaRetroEntreSistema = EmptyTab()
+            tab_admin = tab_dashboard = tab_grupal = EmptyTab()
+            tab_demanda = Tab_Comparativa = ResumenComparativa = tab_stock_diag = Reco_Masiva = Valida_Retro = ComparaRetroEntreSistema = tab_reco = EmptyTab()
 
         # ==========================================================
         if is_admin:
