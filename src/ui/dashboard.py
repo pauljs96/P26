@@ -1674,7 +1674,7 @@ class Dashboard:
                     
                     if len(demo_data) >= 6:  # Mínimo para pronóstico
                         # Usar modelo Seasonal12 para demo (simple y efectivo)
-                        forecast_demo = seasonal_naive_12(demo_data["Demanda_Unid"].values)
+                        forecast_demo = seasonal_naive_12(demo_data)
                         
                         # Crear DataFrame para visualizar
                         last_mes = demo_data.iloc[-1]["Mes"]
