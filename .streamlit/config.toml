@@ -1,6 +1,7 @@
 [client]
 showErrorDetails = true
 toolbarMode = "developer"
+initialSidebarState = "collapsed"
 
 [logger]
 level = "info"
