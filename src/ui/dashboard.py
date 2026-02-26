@@ -1664,68 +1664,68 @@ class Dashboard:
                 # Gráfico Demo: Tomar un producto aleatorio o el primero disponible
                 st.markdown("### 📈 Ejemplo: Predicción de Demanda")
                 
-                # Usar el primer producto disponible para demo
-                demo_producto = sorted(res_demand["Codigo"].dropna().astype(str).str.strip().unique().tolist())[0] if n_productos > 0 else None
+                # Crear gráfico de ejemplo con datos sintéticos (referencial)
+                import numpy as np
                 
-                if demo_producto:
-                    # Datos del producto demo
-                    demo_data = res_demand[res_demand["Codigo"].astype(str).str.strip() == str(demo_producto)][["Mes", "Demanda_Unid"]].copy()
-                    demo_data = demo_data.sort_values("Mes")
-                    
-                    if len(demo_data) >= 6:  # Mínimo para pronóstico
-                        # Usar modelo Seasonal12 para demo (simple y efectivo)
-                        forecast_demo = seasonal_naive_12(demo_data)
-                        
-                        # Crear DataFrame para visualizar
-                        last_mes = demo_data.iloc[-1]["Mes"]
-                        next_mes = last_mes + pd.DateOffset(months=1)
-                        
-                        demo_plot = demo_data.copy()
-                        demo_plot = pd.concat([
-                            demo_plot,
-                            pd.DataFrame({
-                                "Mes": [next_mes],
-                                "Demanda_Unid": [forecast_demo],
-                                "Tipo": ["Pronóstico"]
-                            })
-                        ], ignore_index=True)
-                        
-                        demo_plot["Tipo"] = demo_plot["Tipo"].fillna("Real")
-                        
-                        # Gráfico
-                        fig_demo = px.line(
-                            demo_data.tail(24),  # Últimos 24 meses
-                            x="Mes", y="Demanda_Unid",
-                            title=f"Demanda Histórica - Producto {demo_producto}",
-                            markers=True,
-                            line_shape="linear"
-                        )
-                        
-                        # Agregar pronóstico como punto
-                        fig_demo.add_scatter(
-                            x=[next_mes],
-                            y=[forecast_demo],
-                            mode="markers+text",
-                            name="Pronóstico t+1",
-                            marker=dict(size=15, color="red", symbol="star"),
-                            text=[f"{forecast_demo:.0f}"],
-                            textposition="top center"
-                        )
-                        
-                        st.plotly_chart(fig_demo, use_container_width=True)
-                        
-                        st.info(f"""
-                        **Ejemplo de predicción:** Para el producto **{demo_producto}**, 
-                        basándonos en los últimos 24 meses de demanda, el modelo predice 
-                        **{forecast_demo:.0f} unidades** para el siguiente mes.
-                        
-                        En la sección **Análisis Individual** → **Comparador de Modelos** 
-                        puedes evaluar cuál modelo funciona mejor para cada producto específico.
-                        """)
-                    else:
-                        st.warning(f"Producto {demo_producto} tiene muy pocos datos para demo.")
-                else:
-                    st.warning("No hay productos disponibles para mostrar en el demo.")
+                # Datos sintéticos de demanda histórica (24 meses)
+                meses_demo = pd.date_range(start="2023-01", periods=24, freq="MS")
+                demanda_historica = np.array([
+                    120, 135, 145, 155, 140, 130,
+                    150, 165, 175, 160, 140, 135,
+                    125, 140, 150, 165, 155, 145,
+                    160, 175, 185, 170, 150, 145
+                ])
+                
+                demo_df = pd.DataFrame({
+                    "Mes": meses_demo,
+                    "Demanda": demanda_historica,
+                    "Tipo": ["Real"] * 24
+                })
+                
+                # Pronóstico para el siguiente mes (media móvil simple de ejemplo)
+                forecast_valor = int(np.mean(demanda_historica[-6:]))
+                next_mes_demo = meses_demo[-1] + pd.DateOffset(months=1)
+                
+                # Gráfico de ejemplo
+                fig_demo = px.line(
+                    demo_df,
+                    x="Mes", y="Demanda",
+                    title="Ejemplo: Histórico de Demanda vs Pronóstico",
+                    markers=True,
+                    line_shape="linear"
+                )
+                
+                # Agregar pronóstico como estrella roja
+                fig_demo.add_scatter(
+                    x=[next_mes_demo],
+                    y=[forecast_valor],
+                    mode="markers+text",
+                    name="Pronóstico t+1",
+                    marker=dict(size=15, color="red", symbol="star"),
+                    text=[f"{forecast_valor}"],
+                    textposition="top center"
+                )
+                
+                fig_demo.update_layout(
+                    hovermode="x unified",
+                    template="plotly_white",
+                    yaxis_title="Unidades de Demanda",
+                    xaxis_title="Fecha"
+                )
+                
+                st.plotly_chart(fig_demo, use_container_width=True)
+                
+                st.info(f"""
+                **¿Cómo funciona?** 
+                
+                Este es un ejemplo referencial que muestra cómo el sistema predice demanda futura:
+                - 📊 La **línea azul** representa los datos históricos de demanda
+                - ⭐ La **estrella roja** es el pronóstico para el próximo mes (**{forecast_valor} unidades**)
+                
+                Cuando navegues a **Análisis Individual** y selecciones un producto real, 
+                verás este mismo análisis pero con tus datos, comparando 3 modelos (Baselines, ETS, Random Forest) 
+                para elegir el mejor pronóstico según la precisión histórica.
+                """)
 
             # TAB 1: DEMANDA Y COMPONENTES
             # ==========================================================
