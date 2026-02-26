@@ -1313,12 +1313,10 @@ class Dashboard:
             return  # Muestra login screen y retorna
         
         # ==================== DASHBOARD PRINCIPAL ====================
-        # Título mejorado con diseño UX moderno
+        # Título limpio y minimalista
         st.markdown("""
-        <div style='text-align: center; padding: 1.5em; background: linear-gradient(135deg, #0D47A1 0%, #1565C0 100%); border-radius: 15px; margin-bottom: 0.5em; box-shadow: 0 4px 15px rgba(13, 71, 161, 0.4);'>
-            <h1 style='color: white; font-size: 3.2em; font-weight: 800; margin: 0; letter-spacing: 2px;'>📊 PREDICAST</h1>
-            <p style='color: rgba(255, 255, 255, 0.9); font-size: 1.15em; margin: 0.8em 0 0 0; font-weight: 500;'>Inteligencia Predictiva en Demanda</p>
-        </div>
+        <h1 style='color: #0D47A1; font-size: 2.8em; font-weight: 800; margin: 0.5em 0 0.3em 0; letter-spacing: 1px;'>🔮 PREDICAST</h1>
+        <p style='color: #666; font-size: 0.95em; margin: 0.5em 0 2em 0;'>Inteligencia Predictiva en Demanda</p>
         """, unsafe_allow_html=True)
 
 
