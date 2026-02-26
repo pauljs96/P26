@@ -1595,6 +1595,138 @@ class Dashboard:
 
         # ==========================================================
         if is_admin:
+            # TAB 0: DASHBOARD (LANDING PAGE)
+            # ==========================================================
+            with tab_dashboard:
+                # Header
+                st.markdown("""
+                <div style='text-align: center; margin-bottom: 2em;'>
+                    <h1 style='color: #1976D2; font-size: 2.5em; margin-bottom: 0.2em;'>📊 Sistema de Recomendación de Producción</h1>
+                    <p style='color: #666; font-size: 1.1em; margin-top: 0;'>Pronósticos inteligentes basados en Baselines, ETS y Random Forest</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Descripción
+                st.markdown("""
+                ### 🎯 ¿Qué encontrarás aquí?
+                
+                Este sistema te ayuda a:
+                - **📈 Analizar tendencias** de demanda por producto
+                - **🔮 Pronosticar demanda futura** con tres modelos complementarios
+                - **📦 Tomar decisiones de producción** basadas en datos
+                - **✅ Validar predicciones** contra datos reales
+                
+                **Flujo recomendado:**
+                1. **Análisis Individual** → Elige un producto, visualiza su demanda histórica y próximos pasos
+                2. **Comparador de Modelos** → Compara Baselines vs ETS vs Random Forest para ese producto
+                3. **Recomendación** → Obten la cantidad sugerida a producir el próximo mes
+                4. **Análisis de Grupo** → Valida y compara múltiples productos simultáneamente
+                """)
+                
+                st.divider()
+                
+                # KPIs
+                st.markdown("### 📊 Resumen de Datos Cargados")
+                
+                # Calcular métricas
+                n_productos = res_demand["Codigo"].nunique()
+                min_mes = res_demand["Mes"].min()
+                max_mes = res_demand["Mes"].max()
+                n_meses = len(res_demand["Mes"].unique())
+                n_movimientos = len(res_movements)
+                
+                # Clasificación ABC
+                n_a = len(abc_df[abc_df["ABC"] == "A"])
+                n_b = len(abc_df[abc_df["ABC"] == "B"])
+                n_c = len(abc_df[abc_df["ABC"] == "C"])
+                
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("📦 Productos", n_productos)
+                with col2:
+                    st.metric("📅 Meses de Datos", n_meses)
+                with col3:
+                    st.metric("📋 Movimientos", f"{n_movimientos:,}")
+                with col4:
+                    st.metric("Período", f"{min_mes.strftime('%Y-%m')} a {max_mes.strftime('%Y-%m')}")
+                
+                # Clasificación ABC
+                col_a, col_b, col_c = st.columns(3)
+                with col_a:
+                    st.metric("🔴 Clase A", n_a)
+                with col_b:
+                    st.metric("🟡 Clase B", n_b)
+                with col_c:
+                    st.metric("🟢 Clase C", n_c)
+                
+                st.divider()
+                
+                # Gráfico Demo: Tomar un producto aleatorio o el primero disponible
+                st.markdown("### 📈 Ejemplo: Predicción de Demanda")
+                
+                # Usar el primer producto disponible para demo
+                demo_producto = sorted(res_demand["Codigo"].dropna().astype(str).str.strip().unique().tolist())[0] if n_productos > 0 else None
+                
+                if demo_producto:
+                    # Datos del producto demo
+                    demo_data = res_demand[res_demand["Codigo"].astype(str).str.strip() == str(demo_producto)][["Mes", "Demanda_Unid"]].copy()
+                    demo_data = demo_data.sort_values("Mes")
+                    
+                    if len(demo_data) >= 6:  # Mínimo para pronóstico
+                        # Usar modelo Seasonal12 para demo (simple y efectivo)
+                        forecast_demo = seasonal_naive_12(demo_data["Demanda_Unid"].values)
+                        
+                        # Crear DataFrame para visualizar
+                        last_mes = demo_data.iloc[-1]["Mes"]
+                        next_mes = last_mes + pd.DateOffset(months=1)
+                        
+                        demo_plot = demo_data.copy()
+                        demo_plot = pd.concat([
+                            demo_plot,
+                            pd.DataFrame({
+                                "Mes": [next_mes],
+                                "Demanda_Unid": [forecast_demo],
+                                "Tipo": ["Pronóstico"]
+                            })
+                        ], ignore_index=True)
+                        
+                        demo_plot["Tipo"] = demo_plot["Tipo"].fillna("Real")
+                        
+                        # Gráfico
+                        fig_demo = px.line(
+                            demo_data.tail(24),  # Últimos 24 meses
+                            x="Mes", y="Demanda_Unid",
+                            title=f"Demanda Histórica - Producto {demo_producto}",
+                            markers=True,
+                            line_shape="linear"
+                        )
+                        
+                        # Agregar pronóstico como punto
+                        fig_demo.add_scatter(
+                            x=[next_mes],
+                            y=[forecast_demo],
+                            mode="markers+text",
+                            name="Pronóstico t+1",
+                            marker=dict(size=15, color="red", symbol="star"),
+                            text=[f"{forecast_demo:.0f}"],
+                            textposition="top center"
+                        )
+                        
+                        st.plotly_chart(fig_demo, use_container_width=True)
+                        
+                        st.info(f"""
+                        **Ejemplo de predicción:** Para el producto **{demo_producto}**, 
+                        basándonos en los últimos 24 meses de demanda, el modelo predice 
+                        **{forecast_demo:.0f} unidades** para el siguiente mes.
+                        
+                        En la sección **Análisis Individual** → **Comparador de Modelos** 
+                        puedes evaluar cuál modelo funciona mejor para cada producto específico.
+                        """)
+                    else:
+                        st.warning(f"Producto {demo_producto} tiene muy pocos datos para demo.")
+                else:
+                    st.warning("No hay productos disponibles para mostrar en el demo.")
+
             # TAB 1: DEMANDA Y COMPONENTES
             # ==========================================================
             with tab_demanda:
