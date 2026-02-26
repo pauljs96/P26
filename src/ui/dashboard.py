@@ -1506,33 +1506,36 @@ class Dashboard:
         dm_abc["Codigo"] = dm_abc["Codigo"].astype(str).str.strip()
         abc_df = build_abc_from_demand(dm_abc)  # columnas: Codigo, Demanda_Total, Share, CumShare, ABC
 
+        # === FILTROS MOVIDOS DEL SIDEBAR A EXPANDER EN UI ===
+        with st.expander("🔍 **Filtros** (Selecciona Producto)", expanded=False):
+            col_abc, col_prod = st.columns(2)
+            
+            with col_abc:
+                # 1) Filtro ABC
+                abc_options = ["A", "B", "C", "Todos"]
+                abc_sel = st.selectbox("Categoría ABC", options=abc_options, index=0)
 
-        st.sidebar.header("Filtros")
+            with col_prod:
+                # 2) Productos filtrados por ABC
+                if abc_sel == "Todos":
+                    productos = sorted(res_movements["Codigo"].dropna().astype(str).str.strip().unique().tolist())
+                else:
+                    productos = (
+                        abc_df[abc_df["ABC"] == abc_sel]["Codigo"]
+                        .dropna()
+                        .astype(str)
+                        .str.strip()
+                        .unique()
+                        .tolist()
+                    )
+                    productos = sorted(productos)
 
-        # 1) Filtro ABC
-        abc_options = ["A", "B", "C", "Todos"]
-        abc_sel = st.sidebar.selectbox("Categoría ABC", options=abc_options, index=0)
-
-        # 2) Productos filtrados por ABC
-        if abc_sel == "Todos":
-            productos = sorted(res_movements["Codigo"].dropna().astype(str).str.strip().unique().tolist())
-        else:
-            productos = (
-                abc_df[abc_df["ABC"] == abc_sel]["Codigo"]
-                .dropna()
-                .astype(str)
-                .str.strip()
-                .unique()
-                .tolist()
-            )
-            productos = sorted(productos)
-
-        # 3) Select producto (con fallback)
-        if not productos:
-            st.sidebar.warning("No hay productos en esa categoría ABC.")
-            prod_sel = None
-        else:
-            prod_sel = st.sidebar.selectbox("Producto (Código)", options=productos)
+                # 3) Select producto (con fallback)
+                if not productos:
+                    st.warning("No hay productos en esa categoría ABC.")
+                    prod_sel = None
+                else:
+                    prod_sel = st.selectbox("Producto (Código)", options=productos)
 
 
         # Defaults para evitar UnboundLocalError entre tabs / reruns
