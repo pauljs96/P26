@@ -1313,7 +1313,13 @@ class Dashboard:
             return  # Muestra login screen y retorna
         
         # ==================== DASHBOARD PRINCIPAL ====================
-        st.title("📊 Predicast - Sistema de Planificación")
+        # Título mejorado con diseño UX moderno
+        st.markdown("""
+        <div style='text-align: center; padding: 1.5em; background: linear-gradient(135deg, #1976D2 0%, #0097A7 100%); border-radius: 15px; margin-bottom: 2.5em; box-shadow: 0 4px 15px rgba(25, 118, 210, 0.3);'>
+            <h1 style='color: white; font-size: 3.2em; font-weight: 800; margin: 0; letter-spacing: 2px;'>📊 PREDICAST</h1>
+            <p style='color: rgba(255, 255, 255, 0.9); font-size: 1.15em; margin: 0.8em 0 0 0; font-weight: 500;'>Inteligencia Predictiva en Demanda</p>
+        </div>
+        """, unsafe_allow_html=True)
 
         st.markdown(
             "**Análisis avanzado de demanda, pronósticos inteligentes y optimización de stock.**  "
