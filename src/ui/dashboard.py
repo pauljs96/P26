@@ -1541,12 +1541,6 @@ class Dashboard:
                     prod_sel = st.selectbox("Producto (Código)", options=productos)
 
 
-        # Defaults para evitar UnboundLocalError entre tabs / reruns
-        if "ets_test_months" not in st.session_state:
-            st.session_state["ets_test_months"] = 12
-        if "global_test_months" not in st.session_state:
-            st.session_state["global_test_months"] = 12
-
         # Verificar si es admin para mostrar tab de administración
         is_admin = st.session_state.get("is_admin", False)
 
