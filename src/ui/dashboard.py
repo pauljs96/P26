@@ -1788,7 +1788,7 @@ class Dashboard:
                         display: flex;
                         flex-direction: column;
                     ">
-                        <h4 style="margin-top: 0; margin-bottom: 0.3em;">📈 Demanda y Componentes</h4>
+                        <h4 style="margin-top: 0; margin-bottom: 0.3em; font-size: 0.95em;">📈 Demanda y Componentes</h4>
                         <div style="
                             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                             color: white;
@@ -1811,7 +1811,7 @@ class Dashboard:
                         display: flex;
                         flex-direction: column;
                     ">
-                        <h4 style="margin-top: 0; margin-bottom: 0.3em;">🏢 Stock y Diagnóstico</h4>
+                        <h4 style="margin-top: 0; margin-bottom: 0.3em; font-size: 0.95em;">🏢 Stock y Diagnóstico</h4>
                         <div style="
                             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
                             color: white;
@@ -1834,7 +1834,7 @@ class Dashboard:
                         display: flex;
                         flex-direction: column;
                     ">
-                        <h4 style="margin-top: 0; margin-bottom: 0.3em;">🏆 Comparador de Modelos</h4>
+                        <h4 style="margin-top: 0; margin-bottom: 0.3em; font-size: 0.95em;">🏆 Comparador de Modelos</h4>
                         <div style="
                             background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
                             color: white;
@@ -1857,7 +1857,7 @@ class Dashboard:
                         display: flex;
                         flex-direction: column;
                     ">
-                        <h4 style="margin-top: 0; margin-bottom: 0.3em;">🎯 Recomendación Individual</h4>
+                        <h4 style="margin-top: 0; margin-bottom: 0.3em; font-size: 0.95em;">🎯 Recomendación Individual</h4>
                         <div style="
                             background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
                             color: white;
@@ -1886,7 +1886,7 @@ class Dashboard:
                         display: flex;
                         flex-direction: column;
                     ">
-                        <h4 style="margin-top: 0; margin-bottom: 0.3em;">📊 Resumen Comparativa</h4>
+                        <h4 style="margin-top: 0; margin-bottom: 0.3em; font-size: 0.95em;">📊 Resumen Comparativa</h4>
                         <div style="
                             background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
                             color: white;
@@ -1909,7 +1909,7 @@ class Dashboard:
                         display: flex;
                         flex-direction: column;
                     ">
-                        <h4 style="margin-top: 0; margin-bottom: 0.3em;">✅ Validación Retrospectiva</h4>
+                        <h4 style="margin-top: 0; margin-bottom: 0.3em; font-size: 0.95em;">✅ Validación Retrospectiva</h4>
                         <div style="
                             background: linear-gradient(135deg, #ee0979 0%, #ff6a00 100%);
                             color: white;
@@ -1932,7 +1932,7 @@ class Dashboard:
                         display: flex;
                         flex-direction: column;
                     ">
-                        <h4 style="margin-top: 0; margin-bottom: 0.3em;">📉 Comparativa Retrospectiva</h4>
+                        <h4 style="margin-top: 0; margin-bottom: 0.3em; font-size: 0.95em;">📉 Comparativa Retrospectiva</h4>
                         <div style="
                             background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
                             color: #333;
@@ -1955,7 +1955,7 @@ class Dashboard:
                         display: flex;
                         flex-direction: column;
                     ">
-                        <h4 style="margin-top: 0; margin-bottom: 0.3em;">📑 Recomendación Masiva</h4>
+                        <h4 style="margin-top: 0; margin-bottom: 0.3em; font-size: 0.95em;">📑 Recomendación Masiva</h4>
                         <div style="
                             background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
                             color: #333;
