@@ -2131,39 +2131,109 @@ class Dashboard:
                     prod_reco = max(0.0, yhat + ss - float(stock_actual))
                     prod_reco_int = int(np.ceil(prod_reco))
 
-                    # Mostrar resultados
-                    c1, c2, c3, c4 = st.columns(4)
-                    c1.metric("Modelo ganador (MAE)", winner)
-                    c2.metric("Forecast t+1 (unid)", f"{yhat:,.0f}")
-                    c3.metric("MAE (proxy σ)", f"{sigma:,.2f}")
-                    c4.metric("Stock actual (unid)", f"{stock_actual:,.0f}")
-
-                    c5, c6, c7 = st.columns(3)
-                    c5.metric("Z", f"{z}")
-                    c6.metric("Stock seguridad (SS)", f"{ss:,.0f}")
-                    c7.metric("✅ Producción recomendada", f"{prod_reco_int:,.0f}")
-
-                    st.markdown("### Detalle cálculo")
-                    det = pd.DataFrame([{
-                        "Producto": str(prod_sel),
-                        "ABC": abc_class,
-                        "LeadTime_meses": int(lead_time),
-                        "ServiceLevel_%": int(service_level * 100),
-                        "Z": z,
-                        "Forecast_t+1": yhat,
-                        "MAE_ganador": sigma,
-                        "Stock_Seguridad": ss,
-                        "Stock_Actual": stock_actual,
-                        "Produccion_Recomendada": prod_reco_int
-                    }])
-                    st.dataframe(det, use_container_width=True)
-
-                    with st.expander("📌 Backtest: métricas comparadas (para justificar ganador)", expanded=False):
+                    # =================================================================
+                    # DISEÑO AMIGABLE PARA CLIENTE (Sin términos técnicos)
+                    # =================================================================
+                    
+                    st.markdown("---")
+                    
+                    # SECCIÓN PRINCIPAL: LO MÁS IMPORTANTE
+                    st.markdown(f"""
+                    <div style='
+                        background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+                        padding: 30px;
+                        border-radius: 10px;
+                        text-align: center;
+                        color: white;
+                        margin-bottom: 40px;
+                    '>
+                        <h2 style='margin: 0; font-size: 1.2em; opacity: 0.9;'>Cantidad a Producir en {predicted_month_str.upper()}</h2>
+                        <h1 style='margin: 15px 0 0 0; font-size: 3.5em; font-weight: bold;'>{prod_reco_int:,.0f}</h1>
+                        <p style='margin: 10px 0 0 0; font-size: 1.1em; opacity: 0.95;'>unidades</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # CONTEXTO: La información que el cliente necesita entender
+                    st.markdown("### 📊 Contexto de la Recomendación")
+                    
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.metric(
+                            "📈 Se espera vender",
+                            f"{yhat:,.0f}",
+                            delta="unidades el próximo mes"
+                        )
+                        st.caption("Pronóstico de demanda basado en histórico")
+                    
+                    with col2:
+                        st.metric(
+                            "📦 Stock actual",
+                            f"{stock_actual:,.0f}",
+                            delta="unidades disponibles"
+                        )
+                        st.caption("Inventario al final del mes actual")
+                    
+                    with col3:
+                        st.metric(
+                            "🛡️ Stock de seguridad",
+                            f"{ss:,.0f}",
+                            delta="unidades recomendadas"
+                        )
+                        st.caption("Colchón para posibles sorpresas")
+                    
+                    # EXPLICACIÓN NARRATIVA
+                    st.markdown("### 💡 ¿Por qué esta cantidad?")
+                    
+                    explanation = f"""
+                    <div style='
+                        background-color: #F5F5F5;
+                        padding: 20px;
+                        border-left: 4px solid #1976D2;
+                        border-radius: 5px;
+                        line-height: 1.8;
+                    '>
+                    
+                    <p><strong>Demanda esperada:</strong> {yhat:,.0f} unidades</p>
+                    <p style='margin-top: 12px;'><strong>+ Stock de seguridad:</strong> {ss:,.0f} unidades 
+                    <br><span style='font-size: 0.95em; color: #666;'>(Protección contra cambios inesperados en la demanda)</span></p>
+                    
+                    <p style='margin-top: 12px;'><strong>- Stock disponible:</strong> {stock_actual:,.0f} unidades
+                    <br><span style='font-size: 0.95em; color: #666;'>(Inventario que ya tienes)</span></p>
+                    
+                    <p style='margin-top: 20px; padding-top: 15px; border-top: 1px solid #DDD;'>
+                    <strong style='font-size: 1.1em; color: #1565C0;'>= {prod_reco_int:,.0f} unidades a producir</strong>
+                    </p>
+                    </div>
+                    """
+                    st.markdown(explanation, unsafe_allow_html=True)
+                    
+                    # INFORMACIÓN TÉCNICA ADICIONAL (desplegable)
+                    with st.expander("📋 Detalles técnicos", expanded=False):
+                        st.caption("ℹ️ Esta información es para equipos analíticos o de confiración")
+                        
+                        det = pd.DataFrame([{
+                            "Producto": str(prod_sel),
+                            "ABC": abc_class,
+                            "Modelo ganador": winner,
+                            "Lead time": f"{lead_time} mes",
+                            "Nivel de servicio": f"{int(service_level*100)}%",
+                            "Error promedio (MAE)": f"{sigma:,.2f}",
+                            "Factor de seguridad (Z)": f"{z}",
+                            "Inversión en stock seg.": f"{ss:,.0f}",
+                            "Producción recomendada": f"{prod_reco_int:,.0f}"
+                        }])
+                        st.dataframe(det, use_container_width=True)
+                        
+                        st.markdown("**Comparación de modelos usados:**")
                         st.dataframe(cmp, use_container_width=True)
-
-                    with st.expander("📈 Backtest ganador: Real vs Predicho", expanded=False):
-                        fig = px.line(pred_best, x="Mes_target", y=["y_true", "y_pred"], markers=True,
-                                    title=f"Ganador vs Real - {winner} (Backtest)")
+                    
+                    with st.expander("📈 Validación del modelo (gráfico)", expanded=False):
+                        fig = px.line(pred_best, x="Mes_target", y=["y_true", "y_pred"], 
+                                    markers=True,
+                                    title=f"Precisión histórica: {winner}",
+                                    labels={"y_true": "Demanda Real", "y_pred": "Predicción"})
+                        fig.update_layout(hovermode="x unified", template="plotly_white")
                         st.plotly_chart(fig, use_container_width=True)
 
 
