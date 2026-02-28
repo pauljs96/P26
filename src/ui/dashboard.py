@@ -1393,7 +1393,6 @@ class Dashboard:
             # === MOSTRAR KPIs COMPACTOS EN SIDEBAR ===
             st.sidebar.divider()
             with st.sidebar.expander("📊 Resumen de Datos", expanded=False):
-                from src.data.pipeline import build_abc_from_demand
                 dm_kpi = res_demand.copy()
                 dm_kpi["Codigo"] = dm_kpi["Codigo"].astype(str).str.strip()
                 abc_kpi = build_abc_from_demand(dm_kpi)
