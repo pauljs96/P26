@@ -1599,10 +1599,26 @@ class Dashboard:
         </style>
         <div class='floating-filter-badge' title='Filtros disponibles en el sidebar'>🔍</div>
         """, unsafe_allow_html=True)
-
-
-        # Verificar si es admin para mostrar tab de administración
-        is_admin = st.session_state.get("is_admin", False)
+        
+        # === CSS PARA MEJORAR DISTRIBUCIÓN DE TABS ===
+        st.markdown("""
+        <style>
+        /* Hacer que las tabs ocupen más espacio horizontal */
+        .stTabs [role="tablist"] {
+            display: flex;
+            justify-content: flex-start;
+            gap: 1px;
+            width: 100%;
+            flex-wrap: wrap;
+        }
+        .stTabs [role="tab"] {
+            flex: 1;
+            min-width: 150px;
+            padding: 10px 15px !important;
+            text-align: center;
+        }
+        </style>
+        """, unsafe_allow_html=True)
 
         # ------------------------------
         # TABS - Todos ven el mismo contenido (excepto Panel Admin)
@@ -1660,21 +1676,44 @@ class Dashboard:
             </div>
             """, unsafe_allow_html=True)
             
-            # Descripción colapsable
-            with st.expander("**🎯 ¿Qué encontrarás aquí? / Flujo recomendado**", expanded=True):
-                st.markdown("""
-                **Este sistema te ayuda a:**
-                - 📈 Analizar tendencias de demanda por producto
-                - 🔮 Pronosticar demanda futura con tres modelos
-                - 📦 Tomar decisiones de producción basadas en datos
-                - ✅ Validar predicciones contra datos reales
+            # Descripción colapsable con botones interactivos
+            with st.expander("**🎯 ¿Qué encontrarás aquí? / Funciones disponibles**", expanded=True):
+                st.markdown("**Elige una sección para comenzar:**")
                 
-                **Flujo recomendado:**
-                1. **Análisis Individual** → Visualiza demanda histórica y próximos pasos
-                2. **Comparador de Modelos** → Compara precisión de modelos
-                3. **Recomendación** → Obtén cantidad a producir
-                4. **Análisis de Grupo** → Valida múltiples productos
-                """)
+                # 4 columnas para las opciones
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    st.markdown("""
+                    #### 📈 Análisis Individual
+                    
+                    Visualiza demanda histórica, compara modelos y obtén recomendaciones para un producto.
+                    """)
+                    st.info("👉 Selecciona el tab 'Análisis Individual' arriba para comenzar", icon="🔗")
+                
+                with col2:
+                    st.markdown("""
+                    #### 🏆 Comparador de Modelos
+                    
+                    Compara precisión de Baselines, ETS y Random Forest para elegir el mejor.
+                    """)
+                    st.info("👉 Disponible dentro de 'Análisis Individual'", icon="🔗")
+                
+                with col3:
+                    st.markdown("""
+                    #### 🎯 Recomendación
+                    
+                    Obtén cantidad exacta a producir el próximo mes basada en datos históricos.
+                    """)
+                    st.info("👉 Disponible dentro de 'Análisis Individual'", icon="🔗")
+                
+                with col4:
+                    st.markdown("""
+                    #### 📊 Análisis de Grupo
+                    
+                    Valida y compara múltiples productos para decisiones estratégicas.
+                    """)
+                    st.info("👉 Selecciona el tab 'Análisis de Grupo' arriba", icon="🔗")
             
             # Gráfico Demo compacto
             st.markdown("#### 📈 Ejemplo de Predicción")
