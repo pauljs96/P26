@@ -2052,12 +2052,25 @@ class Dashboard:
         # ==========================================================
 
         with tab_reco:
-            st.subheader("🧾 Recomendación de producción (t+1)")
-
             # Data mensual para el producto
             dm = res_demand.copy()
             dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
             hist = dm[dm["Codigo"] == str(prod_sel)][["Mes", "Demanda_Unid"]].copy().sort_values("Mes")
+
+            # Calcular el mes predicho (t+1) con formato legible
+            if not hist.empty:
+                last_mes = hist.iloc[-1]["Mes"]
+                next_mes = last_mes + pd.DateOffset(months=1)
+                months_es = {
+                    1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
+                    5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
+                    9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
+                }
+                mes_nombre = months_es.get(next_mes.month, "")
+                predicted_month_str = f"{mes_nombre} {next_mes.year}" if mes_nombre else "Mes siguiente"
+                st.subheader(f"🧾 Recomendación de producción - {predicted_month_str}")
+            else:
+                st.subheader("🧾 Recomendación de producción")
 
             if hist.empty:
                 st.info("No hay serie mensual para este producto.")
