@@ -1114,6 +1114,61 @@ class Dashboard:
 
     def render(self):
 
+        # ========================================
+        # FUNCIÓN CACHEADA: Crear gráfico demo
+        # ========================================
+        @st.cache_data(ttl=3600)
+        def crear_grafico_demo():
+            """Genera el gráfico demo de predicción (se cachea para evitar regenerar en cada rerun)"""
+            import numpy as np
+            
+            # Datos sintéticos de demanda histórica (24 meses)
+            meses_demo = pd.date_range(start="2023-01", periods=24, freq="MS")
+            demanda_historica = np.array([
+                120, 135, 145, 155, 140, 130,
+                150, 165, 175, 160, 140, 135,
+                125, 140, 150, 165, 155, 145,
+                160, 175, 185, 170, 150, 145
+            ])
+            
+            demo_df = pd.DataFrame({
+                "Mes": meses_demo,
+                "Demanda": demanda_historica,
+                "Tipo": ["Real"] * 24
+            })
+            
+            forecast_valor = int(np.mean(demanda_historica[-6:]))
+            next_mes_demo = meses_demo[-1] + pd.DateOffset(months=1)
+            
+            fig_demo = px.line(
+                demo_df,
+                x="Mes", y="Demanda",
+                title="Histórico vs Pronóstico",
+                markers=True,
+                line_shape="linear",
+                height=300
+            )
+            
+            fig_demo.add_scatter(
+                x=[next_mes_demo],
+                y=[forecast_valor],
+                mode="markers+text",
+                name="Pronóstico",
+                marker=dict(size=12, color="red", symbol="star"),
+                text=[f"{forecast_valor}"],
+                textposition="top center"
+            )
+            
+            fig_demo.update_layout(
+                hovermode="x unified",
+                template="plotly_white",
+                yaxis_title="Unidades",
+                xaxis_title="",
+                showlegend=False
+            )
+            
+            return fig_demo
+
         st.set_page_config(
             page_title="Predicast - Sistema de Planificación",
             layout="wide",
@@ -1765,53 +1820,7 @@ class Dashboard:
             # Gráfico Demo compacto
             st.markdown("#### 📈 Ejemplo de Predicción")
             
-            import numpy as np
-            
-            # Datos sintéticos de demanda histórica (24 meses)
-            meses_demo = pd.date_range(start="2023-01", periods=24, freq="MS")
-            demanda_historica = np.array([
-                120, 135, 145, 155, 140, 130,
-                150, 165, 175, 160, 140, 135,
-                125, 140, 150, 165, 155, 145,
-                160, 175, 185, 170, 150, 145
-            ])
-            
-            demo_df = pd.DataFrame({
-                "Mes": meses_demo,
-                "Demanda": demanda_historica,
-                "Tipo": ["Real"] * 24
-            })
-            
-            forecast_valor = int(np.mean(demanda_historica[-6:]))
-            next_mes_demo = meses_demo[-1] + pd.DateOffset(months=1)
-            
-            fig_demo = px.line(
-                demo_df,
-                x="Mes", y="Demanda",
-                title="Histórico vs Pronóstico",
-                markers=True,
-                line_shape="linear",
-                height=300
-            )
-            
-            fig_demo.add_scatter(
-                x=[next_mes_demo],
-                y=[forecast_valor],
-                mode="markers+text",
-                name="Pronóstico",
-                marker=dict(size=12, color="red", symbol="star"),
-                text=[f"{forecast_valor}"],
-                textposition="top center"
-            )
-            
-            fig_demo.update_layout(
-                hovermode="x unified",
-                template="plotly_white",
-                yaxis_title="Unidades",
-                xaxis_title="",
-                showlegend=False
-            )
-            
+            fig_demo = crear_grafico_demo()
             st.plotly_chart(fig_demo, use_container_width=True)
 
         # TAB 1: DEMANDA Y COMPONENTES
