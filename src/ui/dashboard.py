@@ -1996,48 +1996,19 @@ class Dashboard:
         # TAB 1: DEMANDA Y COMPONENTES
         # ==========================================================
         with tab_demanda:
-            st.subheader("🧩 Componentes de demanda por mes (producto seleccionado)")
+            st.subheader("📈 Demanda total por mes (producto seleccionado)")
             comp = get_demanda_components(prod_sel)
 
-            cA, cB = st.columns([1, 1])
-            with cA:
+            # Gráfico de demanda total (ancho completo)
+            fig_total = px.line(
+                comp, x="Mes", y="Demanda_Total", markers=True,
+                title=f"Demanda total (suma de componentes) - Producto {prod_sel}"
+            )
+            st.plotly_chart(fig_total, use_container_width=True)
+
+            # Tabla de componentes colapsada
+            with st.expander("🧩 Detalles: Componentes de demanda por mes", expanded=False):
                 st.dataframe(comp, use_container_width=True, height=380)
-
-            with cB:
-                fig_total = px.line(
-                    comp, x="Mes", y="Demanda_Total", markers=True,
-                    title=f"Demanda total (suma de componentes) - Producto {prod_sel}"
-                )
-                st.plotly_chart(fig_total, use_container_width=True)
-
-            st.subheader("📊 Componentes (Venta / Consumo / Guía externa)")
-            comp_long = comp.melt(
-                id_vars=["Mes"],
-                value_vars=["Venta_Tienda", "Consumo", "Guia_Externa"],
-                var_name="Componente",
-                value_name="Unidades"
-            )
-            fig_comp = px.line(
-                comp_long, x="Mes", y="Unidades", color="Componente", markers=True,
-                title=f"Componentes de demanda - Producto {prod_sel}"
-            )
-            st.plotly_chart(fig_comp, use_container_width=True)
-
-            with st.expander("🔍 Debug: detalle de guías externas por mes", expanded=False):
-                dfp = res_movements[res_movements["Codigo"] == str(prod_sel)].copy()
-                if not dfp.empty:
-                    dfp["Documento"] = _normalize_text(dfp["Documento"])
-                    dfp["Numero"] = _normalize_text(dfp["Numero"])
-                    dfp["Mes"] = dfp["Fecha"].dt.to_period("M").dt.to_timestamp()
-                    det = dfp[(dfp["Documento"] == config.GUIDE_DOC)].copy()
-                    if not det.empty:
-                        det = det[["Fecha", "Mes", "Numero", "Bodega", "Entrada_unid", "Salida_unid", "Tipo_Guia", "Guia_Salida_Externa_Unid"]]
-                        det = det.sort_values(["Mes", "Fecha", "Numero"])
-                        st.dataframe(det, use_container_width=True, height=350)
-                    else:
-                        st.info("No hay guías para este producto.")
-                else:
-                    st.info("No hay movimientos para este producto.")
 
         # ==========================================================
         # TAB: COMPARADOR DE MODELOS (CONSOLIDADO)
