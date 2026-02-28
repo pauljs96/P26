@@ -1775,7 +1775,7 @@ class Dashboard:
             """, unsafe_allow_html=True)
             
             # Descripción colapsable con botones interactivos
-            with st.expander("**🎯 ¿Qué encontrarás aquí? / Funciones disponibles**", expanded=True):
+            with st.expander("**🎯 ¿Qué encontrarás aquí? / Funciones disponibles**", expanded=False):
                 
                 
                 # ========== FILA 1: ANÁLISIS INDIVIDUAL ==========
