@@ -1733,7 +1733,9 @@ class Dashboard:
                         dfp["Mes"] = dfp["Fecha"].dt.to_period("M").dt.to_timestamp()
                         det = dfp[(dfp["Documento"] == config.GUIDE_DOC)].copy()
                         if not det.empty:
-                            st.write(det[["Fecha", "Numero", "Origen_Descripcion", "Cantidad"]].sort_values("Fecha"))
+                            det = det[["Fecha", "Mes", "Numero", "Bodega", "Entrada_unid", "Salida_unid", "Tipo_Guia", "Guia_Salida_Externa_Unid"]]
+                            det = det.sort_values(["Mes", "Fecha", "Numero"])
+                            st.dataframe(det, use_container_width=True, height=350)
                         else:
                             st.info("No hay guías externas para este producto.")
                     else:
@@ -1741,33 +1743,42 @@ class Dashboard:
             
             elif section_name == "stock":
                 # TAB 2: STOCK Y DIAGNÓSTICO
-                st.subheader("🏢 Stock histórico (Cierre de mes) - Producto selecciono")
-                stock_data = build_monthly_stock(res_stock, prod_sel)
+                st.subheader("🏢 Stock histórico (Cierre de mes) - Producto seleccionado")
                 
-                cA, cB = st.columns([1, 1])
+                if res_stock is None or res_stock.empty:
+                    st.warning("No se generó stock mensual.")
+                else:
+                    stock_data = res_stock[res_stock["Codigo"] == str(prod_sel)].copy()
+                    
+                    if stock_data.empty:
+                        st.info(f"No hay stock para el producto {prod_sel}.")
+                    else:
+                        comp = build_monthly_components(res_movements, prod_sel)
+                        
+                        cA, cB = st.columns([1, 1])
 
-                with cA:
-                    st.dataframe(stock_data, use_container_width=True, height=380)
+                        with cA:
+                            st.dataframe(stock_data[["Mes", "Stock_Unid"]], use_container_width=True, height=380)
 
-                with cB:
-                    fig_stock = px.line(
-                        stock_data, x="Mes", y="Stock", markers=True,
-                        title=f"Stock histórico - Producto {prod_sel}"
-                    )
-                    st.plotly_chart(fig_stock, use_container_width=True)
+                        with cB:
+                            fig_stock = px.line(
+                                stock_data, x="Mes", y="Stock_Unid", markers=True,
+                                title=f"Stock histórico - Producto {prod_sel}"
+                            )
+                            st.plotly_chart(fig_stock, use_container_width=True)
 
-                st.subheader("📊 Diagnóstico de stock")
-                current_stock = stock_data.iloc[-1]["Stock"] if not stock_data.empty else 0
-                avg_demand = comp["Demanda_Total"].mean() if "comp" in locals() else 0
-                
-                kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
-                with kpi_col1:
-                    st.metric("Stock actual", f"{current_stock:.0f}", delta=None)
-                with kpi_col2:
-                    st.metric("Demanda promedio", f"{avg_demand:.0f}", delta=None)
-                with kpi_col3:
-                    coverage = current_stock / avg_demand if avg_demand > 0 else 0
-                    st.metric("Cobertura (meses)", f"{coverage:.1f}", delta=None)
+                        st.subheader("📊 Diagnóstico de stock")
+                        current_stock = stock_data.iloc[-1]["Stock_Unid"] if not stock_data.empty else 0
+                        avg_demand = comp["Demanda_Total"].mean() if not comp.empty else 0
+                        
+                        kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
+                        with kpi_col1:
+                            st.metric("Stock actual", f"{current_stock:.0f}", delta=None)
+                        with kpi_col2:
+                            st.metric("Demanda promedio", f"{avg_demand:.0f}", delta=None)
+                        with kpi_col3:
+                            coverage = current_stock / avg_demand if avg_demand > 0 else 0
+                            st.metric("Cobertura (meses)", f"{coverage:.1f}", delta=None)
             
             elif section_name == "comparador":
                 # TAB 3: COMPARADOR DE MODELOS
@@ -1793,6 +1804,8 @@ class Dashboard:
             elif section_name == "reco_indiv":
                 # TAB 4: RECOMENDACIÓN INDIVIDUAL
                 st.title("🎯 Recomendación Individual")
+                comp = build_monthly_components(res_movements, prod_sel)
+                avg_demand = comp["Demanda_Total"].mean() if not comp.empty else 0
                 st.success(f"**Cantidad recomendada para el próximo mes: {int(avg_demand * 1.1)} unidades**")
             
             elif section_name == "resumen_global":
