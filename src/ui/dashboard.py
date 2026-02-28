@@ -1389,6 +1389,32 @@ class Dashboard:
             st.session_state.pipeline_stock = res_stock
             
             st.sidebar.write("✨ Los datos están listos para análisis")
+            
+            # === MOSTRAR KPIs COMPACTOS EN SIDEBAR ===
+            st.sidebar.divider()
+            with st.sidebar.expander("📊 Resumen de Datos", expanded=False):
+                from src.data.pipeline import build_abc_from_demand
+                dm_kpi = res_demand.copy()
+                dm_kpi["Codigo"] = dm_kpi["Codigo"].astype(str).str.strip()
+                abc_kpi = build_abc_from_demand(dm_kpi)
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("📦 Productos", res_demand["Codigo"].nunique())
+                    st.metric("🔴 Clase A", len(abc_kpi[abc_kpi["ABC"] == "A"]))
+                with col2:
+                    st.metric("📅 Meses", len(res_demand["Mes"].unique()))
+                    st.metric("🟡 Clase B", len(abc_kpi[abc_kpi["ABC"] == "B"]))
+                
+                col3, col4 = st.columns(2)
+                with col3:
+                    st.metric("📋 Movimientos", len(res_movements))
+                    st.metric("🟢 Clase C", len(abc_kpi[abc_kpi["ABC"] == "C"]))
+                with col4:
+                    min_mes = res_demand["Mes"].min()
+                    max_mes = res_demand["Mes"].max()
+                    period_str = f"{min_mes.strftime('%Y-%m')}\n{max_mes.strftime('%Y-%m')}"
+                    st.caption(f"Período:\n{period_str}")
         
         else:
             # ==================== NO HAY CACHE ====================
@@ -1593,73 +1619,32 @@ class Dashboard:
         # TAB 0: DASHBOARD (LANDING PAGE)
         # ==========================================================
         with tab_dashboard:
-            # Header
+            # Header compacto
             st.markdown("""
-            <div style='text-align: center; margin-bottom: 2em;'>
-                <h1 style='color: #1976D2; font-size: 2.5em; margin-bottom: 0.2em;'>📊 Sistema de Recomendación de Producción</h1>
-                <p style='color: #666; font-size: 1.1em; margin-top: 0;'>Pronósticos inteligentes basados en Baselines, ETS y Random Forest</p>
+            <div style='text-align: center; margin-bottom: 1em;'>
+                <h2 style='color: #1976D2; font-size: 2em; margin-bottom: 0;'>📊 Sistema de Recomendación</h2>
             </div>
             """, unsafe_allow_html=True)
             
-            # Descripción
-            st.markdown("""
-            ### 🎯 ¿Qué encontrarás aquí?
+            # Descripción colapsable
+            with st.expander("**🎯 ¿Qué encontrarás aquí? / Flujo recomendado**", expanded=True):
+                st.markdown("""
+                **Este sistema te ayuda a:**
+                - 📈 Analizar tendencias de demanda por producto
+                - 🔮 Pronosticar demanda futura con tres modelos
+                - 📦 Tomar decisiones de producción basadas en datos
+                - ✅ Validar predicciones contra datos reales
+                
+                **Flujo recomendado:**
+                1. **Análisis Individual** → Visualiza demanda histórica y próximos pasos
+                2. **Comparador de Modelos** → Compara precisión de modelos
+                3. **Recomendación** → Obtén cantidad a producir
+                4. **Análisis de Grupo** → Valida múltiples productos
+                """)
             
-            Este sistema te ayuda a:
-            - **📈 Analizar tendencias** de demanda por producto
-            - **🔮 Pronosticar demanda futura** con tres modelos complementarios
-            - **📦 Tomar decisiones de producción** basadas en datos
-            - **✅ Validar predicciones** contra datos reales
+            # Gráfico Demo compacto
+            st.markdown("#### 📈 Ejemplo de Predicción")
             
-            **Flujo recomendado:**
-            1. **Análisis Individual** → Elige un producto, visualiza su demanda histórica y próximos pasos
-            2. **Comparador de Modelos** → Compara Baselines vs ETS vs Random Forest para ese producto
-            3. **Recomendación** → Obten la cantidad sugerida a producir el próximo mes
-            4. **Análisis de Grupo** → Valida y compara múltiples productos simultáneamente
-            """)
-            
-            st.divider()
-            
-            # KPIs
-            st.markdown("### 📊 Resumen de Datos Cargados")
-            
-            # Calcular métricas
-            n_productos = res_demand["Codigo"].nunique()
-            min_mes = res_demand["Mes"].min()
-            max_mes = res_demand["Mes"].max()
-            n_meses = len(res_demand["Mes"].unique())
-            n_movimientos = len(res_movements)
-            
-            # Clasificación ABC
-            n_a = len(abc_df[abc_df["ABC"] == "A"])
-            n_b = len(abc_df[abc_df["ABC"] == "B"])
-            n_c = len(abc_df[abc_df["ABC"] == "C"])
-            
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("📦 Productos", n_productos)
-            with col2:
-                st.metric("📅 Meses de Datos", n_meses)
-            with col3:
-                st.metric("📋 Movimientos", f"{n_movimientos:,}")
-            with col4:
-                st.metric("Período", f"{min_mes.strftime('%Y-%m')} a {max_mes.strftime('%Y-%m')}")
-            
-            # Clasificación ABC
-            col_a, col_b, col_c = st.columns(3)
-            with col_a:
-                st.metric("🔴 Clase A", n_a)
-            with col_b:
-                st.metric("🟡 Clase B", n_b)
-            with col_c:
-                st.metric("🟢 Clase C", n_c)
-            
-            st.divider()
-            
-            # Gráfico Demo: Tomar un producto aleatorio o el primero disponible
-            st.markdown("### 📈 Ejemplo: Predicción de Demanda")
-            
-            # Crear gráfico de ejemplo con datos sintéticos (referencial)
             import numpy as np
             
             # Datos sintéticos de demanda histórica (24 meses)
@@ -1677,26 +1662,24 @@ class Dashboard:
                 "Tipo": ["Real"] * 24
             })
             
-            # Pronóstico para el siguiente mes (media móvil simple de ejemplo)
             forecast_valor = int(np.mean(demanda_historica[-6:]))
             next_mes_demo = meses_demo[-1] + pd.DateOffset(months=1)
             
-            # Gráfico de ejemplo
             fig_demo = px.line(
                 demo_df,
                 x="Mes", y="Demanda",
-                title="Ejemplo: Histórico de Demanda vs Pronóstico",
+                title="Histórico vs Pronóstico",
                 markers=True,
-                line_shape="linear"
+                line_shape="linear",
+                height=300
             )
             
-            # Agregar pronóstico como estrella roja
             fig_demo.add_scatter(
                 x=[next_mes_demo],
                 y=[forecast_valor],
                 mode="markers+text",
-                name="Pronóstico t+1",
-                marker=dict(size=15, color="red", symbol="star"),
+                name="Pronóstico",
+                marker=dict(size=12, color="red", symbol="star"),
                 text=[f"{forecast_valor}"],
                 textposition="top center"
             )
@@ -1704,23 +1687,12 @@ class Dashboard:
             fig_demo.update_layout(
                 hovermode="x unified",
                 template="plotly_white",
-                yaxis_title="Unidades de Demanda",
-                xaxis_title="Fecha"
+                yaxis_title="Unidades",
+                xaxis_title="",
+                showlegend=False
             )
             
             st.plotly_chart(fig_demo, use_container_width=True)
-            
-            st.info(f"""
-            **¿Cómo funciona?** 
-            
-            Este es un ejemplo referencial que muestra cómo el sistema predice demanda futura:
-            - 📊 La **línea azul** representa los datos históricos de demanda
-            - ⭐ La **estrella roja** es el pronóstico para el próximo mes (**{forecast_valor} unidades**)
-            
-            Cuando navegues a **Análisis Individual** y selecciones un producto real, 
-            verás este mismo análisis pero con tus datos, comparando 3 modelos (Baselines, ETS, Random Forest) 
-            para elegir el mejor pronóstico según la precisión histórica.
-            """)
 
         # TAB 1: DEMANDA Y COMPONENTES
         # ==========================================================
