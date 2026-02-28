@@ -1620,22 +1620,6 @@ class Dashboard:
         </style>
         """, unsafe_allow_html=True)
 
-        # Inicializar session_state para navegación desde botones
-        if "navigate_to_section" not in st.session_state:
-            st.session_state.navigate_to_section = None
-
-        # Diccionario de mapeo para navegación: nombre -> (tab_index, subtab_index)
-        navigation_map = {
-            "demanda": (1, 0),           # Análisis Individual -> Demanda
-            "stock": (1, 1),             # Análisis Individual -> Stock
-            "comparador": (1, 2),        # Análisis Individual -> Comparador
-            "reco_indiv": (1, 3),        # Análisis Individual -> Recomendación
-            "resumen_global": (2, 0),   # Análisis de Grupo -> Resumen
-            "validacion": (2, 1),        # Análisis de Grupo -> Validación
-            "comparativa": (2, 2),      # Análisis de Grupo -> Comparativa
-            "reco_masiva": (2, 3),      # Análisis de Grupo -> Recomendación Masiva
-        }
-
         # ------------------------------
         # TABS - Todos ven el mismo contenido (excepto Panel Admin)
         # ------------------------------
@@ -1681,157 +1665,6 @@ class Dashboard:
                 admin = AdminPanel(get_db())
                 admin.render()
 
-        # ======================== NAVEGACIÓN DESDE BOTONES ========================
-        # Si el usuario hizo click en un botón de la guía, navegamos automáticamente
-        if st.session_state.navigate_to_section is not None:
-            section_name = st.session_state.navigate_to_section
-            
-            # Crear button para volver al dashboard
-            col_back = st.columns([1, 10])
-            with col_back[0]:
-                if st.button("← Volver", key="btn_volver_dashboard", use_container_width=True):
-                    st.session_state.navigate_to_section = None
-                    st.rerun()
-            
-            st.divider()
-
-            # Renderizar secciones según lo solicitado
-            if section_name == "demanda":
-                # TAB 1: DEMANDA Y COMPONENTES
-                st.subheader("🧩 Componentes de demanda por mes (producto seleccionado)")
-                comp = build_monthly_components(res_movements, prod_sel)
-
-                cA, cB = st.columns([1, 1])
-                with cA:
-                    st.dataframe(comp, use_container_width=True, height=380)
-
-                with cB:
-                    fig_total = px.line(
-                        comp, x="Mes", y="Demanda_Total", markers=True,
-                        title=f"Demanda total (suma de componentes) - Producto {prod_sel}"
-                    )
-                    st.plotly_chart(fig_total, use_container_width=True)
-
-                st.subheader("📊 Componentes (Venta / Consumo / Guía externa)")
-                comp_long = comp.melt(
-                    id_vars=["Mes"],
-                    value_vars=["Venta_Tienda", "Consumo", "Guia_Externa"],
-                    var_name="Componente",
-                    value_name="Unidades"
-                )
-                fig_comp = px.line(
-                    comp_long, x="Mes", y="Unidades", color="Componente", markers=True,
-                    title=f"Componentes de demanda - Producto {prod_sel}"
-                )
-                st.plotly_chart(fig_comp, use_container_width=True)
-
-                with st.expander("🔍 Debug: detalle de guías externas por mes", expanded=False):
-                    dfp = res_movements[res_movements["Codigo"] == str(prod_sel)].copy()
-                    if not dfp.empty:
-                        dfp["Documento"] = _normalize_text(dfp["Documento"])
-                        dfp["Numero"] = _normalize_text(dfp["Numero"])
-                        dfp["Mes"] = dfp["Fecha"].dt.to_period("M").dt.to_timestamp()
-                        det = dfp[(dfp["Documento"] == config.GUIDE_DOC)].copy()
-                        if not det.empty:
-                            det = det[["Fecha", "Mes", "Numero", "Bodega", "Entrada_unid", "Salida_unid", "Tipo_Guia", "Guia_Salida_Externa_Unid"]]
-                            det = det.sort_values(["Mes", "Fecha", "Numero"])
-                            st.dataframe(det, use_container_width=True, height=350)
-                        else:
-                            st.info("No hay guías externas para este producto.")
-                    else:
-                        st.warning(f"No hay movimientos para el producto {prod_sel}.")
-            
-            elif section_name == "stock":
-                # TAB 2: STOCK Y DIAGNÓSTICO
-                st.subheader("🏢 Stock histórico (Cierre de mes) - Producto seleccionado")
-                
-                if res_stock is None or res_stock.empty:
-                    st.warning("No se generó stock mensual.")
-                else:
-                    stock_data = res_stock[res_stock["Codigo"] == str(prod_sel)].copy()
-                    
-                    if stock_data.empty:
-                        st.info(f"No hay stock para el producto {prod_sel}.")
-                    else:
-                        comp = build_monthly_components(res_movements, prod_sel)
-                        
-                        cA, cB = st.columns([1, 1])
-
-                        with cA:
-                            st.dataframe(stock_data[["Mes", "Stock_Unid"]], use_container_width=True, height=380)
-
-                        with cB:
-                            fig_stock = px.line(
-                                stock_data, x="Mes", y="Stock_Unid", markers=True,
-                                title=f"Stock histórico - Producto {prod_sel}"
-                            )
-                            st.plotly_chart(fig_stock, use_container_width=True)
-
-                        st.subheader("📊 Diagnóstico de stock")
-                        current_stock = stock_data.iloc[-1]["Stock_Unid"] if not stock_data.empty else 0
-                        avg_demand = comp["Demanda_Total"].mean() if not comp.empty else 0
-                        
-                        kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
-                        with kpi_col1:
-                            st.metric("Stock actual", f"{current_stock:.0f}", delta=None)
-                        with kpi_col2:
-                            st.metric("Demanda promedio", f"{avg_demand:.0f}", delta=None)
-                        with kpi_col3:
-                            coverage = current_stock / avg_demand if avg_demand > 0 else 0
-                            st.metric("Cobertura (meses)", f"{coverage:.1f}", delta=None)
-            
-            elif section_name == "comparador":
-                # TAB 3: COMPARADOR DE MODELOS
-                st.subheader("🏆 Comparador de Modelos")
-                st.info("Compara la precisión de Baselines, ETS y Random Forest para el producto seleccionado.")
-                
-                # Mostrar comparativa
-                try:
-                    comparison_data = {
-                        "Modelo": ["Baseline (Naive Last)", "Seasonal Naive", "Moving Average", "ETS", "Random Forest"],
-                        "RMSE": [0.85, 0.72, 0.68, 0.55, 0.52],
-                        "MAE": [0.65, 0.58, 0.52, 0.40, 0.38],
-                        "MAPE": ["14%", "12%", "11%", "8%", "7%"],
-                    }
-                    comp_df = pd.DataFrame(comparison_data)
-                    st.dataframe(comp_df, use_container_width=True, hide_index=True)
-                    
-                    fig_comp = px.bar(comp_df, x="Modelo", y="RMSE", title="Comparativa RMSE")
-                    st.plotly_chart(fig_comp, use_container_width=True)
-                except Exception as e:
-                    st.error(f"Error al cargar comparativa: {e}")
-            
-            elif section_name == "reco_indiv":
-                # TAB 4: RECOMENDACIÓN INDIVIDUAL
-                st.title("🎯 Recomendación Individual")
-                comp = build_monthly_components(res_movements, prod_sel)
-                avg_demand = comp["Demanda_Total"].mean() if not comp.empty else 0
-                st.success(f"**Cantidad recomendada para el próximo mes: {int(avg_demand * 1.1)} unidades**")
-            
-            elif section_name == "resumen_global":
-                # TAB 1: RESUMEN COMPARATIVA GLOBAL
-                st.subheader("📊 Resumen Comparativa Global")
-                st.info("Análisis comparativo de todos los productos.")
-            
-            elif section_name == "validacion":
-                # TAB 2: VALIDACIÓN RETROSPECTIVA
-                st.subheader("✅ Validación Retrospectiva")
-                st.info("Simulación de la política de producción en el histórico.")
-            
-            elif section_name == "comparativa":
-                # TAB 3: COMPARATIVA RETROSPECTIVA
-                st.subheader("📉 Comparativa Retrospectiva")
-                st.info("Comparación de costos: sin sistema vs con sistema.")
-            
-            elif section_name == "reco_masiva":
-                # TAB 4: RECOMENDACIÓN MASIVA
-                st.subheader("📑 Recomendación Masiva")
-                st.info("Recomendaciones para todos los productos.")
-            
-            st.stop()  # Detener aquí para no mostrar los tabs normales
-        
-        # ============= Si NO hay navegación, mostrar tabs normales ============
-
         # ==========================================================
         # TAB 0: DASHBOARD (LANDING PAGE)
         # ==========================================================
@@ -1857,9 +1690,8 @@ class Dashboard:
                     
                     Visualiza desglose de demanda: venta, consumo y guía externa.
                     """)
-                    if st.button("📊 Ver Demanda", key="btn_demanda", use_container_width=True):
-                        st.session_state.navigate_to_section = "demanda"
-                        st.rerun()
+                    st.button("📊 Ver Demanda", key="btn_demanda", use_container_width=True, disabled=True)
+                    st.caption("👉 Ve a: Análisis Individual → Demanda y Componentes")
                 
                 with col2:
                     st.markdown("""
@@ -1867,9 +1699,8 @@ class Dashboard:
                     
                     Analiza niveles de stock histórico y diagnóstico actual.
                     """)
-                    if st.button("📦 Ver Stock", key="btn_stock", use_container_width=True):
-                        st.session_state.navigate_to_section = "stock"
-                        st.rerun()
+                    st.button("📦 Ver Stock", key="btn_stock", use_container_width=True, disabled=True)
+                    st.caption("👉 Ve a: Análisis Individual → Stock y Diagnóstico")
                 
                 with col3:
                     st.markdown("""
@@ -1877,9 +1708,8 @@ class Dashboard:
                     
                     Compara Baselines vs ETS vs Random Forest.
                     """)
-                    if st.button("⚖️ Comparar Modelos", key="btn_comparador", use_container_width=True):
-                        st.session_state.navigate_to_section = "comparador"
-                        st.rerun()
+                    st.button("⚖️ Comparar Modelos", key="btn_comparador", use_container_width=True, disabled=True)
+                    st.caption("👉 Ve a: Análisis Individual → Comparador de Modelos")
                 
                 with col4:
                     st.markdown("""
@@ -1887,9 +1717,8 @@ class Dashboard:
                     
                     Obtén cantidad exacta a producir el próximo mes.
                     """)
-                    if st.button("📢 Recomendación", key="btn_reco_indiv", use_container_width=True):
-                        st.session_state.navigate_to_section = "reco_indiv"
-                        st.rerun()
+                    st.button("📢 Recomendación", key="btn_reco_indiv", use_container_width=True, disabled=True)
+                    st.caption("👉 Ve a: Análisis Individual → Recomendación Individual")
                 
                 st.divider()
                 
@@ -1903,9 +1732,8 @@ class Dashboard:
                     
                     Comparar rendimiento de todos los productos globalmente.
                     """)
-                    if st.button("🌍 Resumen Global", key="btn_resumen", use_container_width=True):
-                        st.session_state.navigate_to_section = "resumen_global"
-                        st.rerun()
+                    st.button("🌍 Resumen Global", key="btn_resumen", use_container_width=True, disabled=True)
+                    st.caption("👉 Ve a: Análisis de Grupo → Resumen Comparativa Global")
                 
                 with col6:
                     st.markdown("""
@@ -1913,9 +1741,8 @@ class Dashboard:
                     
                     Simula la política de producción en el histórico.
                     """)
-                    if st.button("🧪 Validación", key="btn_validacion", use_container_width=True):
-                        st.session_state.navigate_to_section = "validacion"
-                        st.rerun()
+                    st.button("🧪 Validación", key="btn_validacion", use_container_width=True, disabled=True)
+                    st.caption("👉 Ve a: Análisis de Grupo → Validación Retrospectiva")
                 
                 with col7:
                     st.markdown("""
@@ -1923,9 +1750,8 @@ class Dashboard:
                     
                     Compara costos: sin sistema vs con sistema.
                     """)
-                    if st.button("⚖️ Comparativa Costos", key="btn_comparativa", use_container_width=True):
-                        st.session_state.navigate_to_section = "comparativa"
-                        st.rerun()
+                    st.button("⚖️ Comparativa Costos", key="btn_comparativa", use_container_width=True, disabled=True)
+                    st.caption("👉 Ve a: Análisis de Grupo → Comparativa Retrospectiva")
                 
                 with col8:
                     st.markdown("""
@@ -1933,9 +1759,8 @@ class Dashboard:
                     
                     Obtén recomendaciones para todos los productos.
                     """)
-                    if st.button("📋 Rec. Masiva", key="btn_reco_masiva", use_container_width=True):
-                        st.session_state.navigate_to_section = "reco_masiva"
-                        st.rerun()
+                    st.button("📋 Rec. Masiva", key="btn_reco_masiva", use_container_width=True, disabled=True)
+                    st.caption("👉 Ve a: Análisis de Grupo → Recomendación Masiva")
             
             # Gráfico Demo compacto
             st.markdown("#### 📈 Ejemplo de Predicción")
