@@ -1620,6 +1620,30 @@ class Dashboard:
         </style>
         """, unsafe_allow_html=True)
 
+        # ======================== SISTEMA DE NAVEGACIÓN VÍA QUERY PARAMS ========================
+        # Leer parámetros de URL para determinar qué tab mostrar
+        query_params = st.query_params
+        active_main_tab = query_params.get("tab", "dashboard")  # dashboard, individual, grupo, admin
+        active_sub_tab = int(query_params.get("subtab", "0")) if query_params.get("subtab") else 0
+
+        # Mapeo de names a índices de tabs principales
+        main_tab_names = ["🏠 Dashboard", "📊 Análisis Individual", "📊 Análisis de Grupo"]
+        if is_admin:
+            main_tab_names.append("⚙️ Panel Admin")
+        
+        main_tab_index = {
+            "dashboard": 0,
+            "individual": 1,
+            "grupo": 2,
+            "admin": 3 if is_admin else None
+        }
+
+        # Convertir nombre a índice
+        current_main_tab_idx = main_tab_index.get(active_main_tab, 0)
+        if current_main_tab_idx is None:
+            current_main_tab_idx = 0
+            active_main_tab = "dashboard"
+
         # ------------------------------
         # TABS - Todos ven el mismo contenido (excepto Panel Admin)
         # ------------------------------
@@ -1685,40 +1709,28 @@ class Dashboard:
                 col1, col2, col3, col4 = st.columns(4)
                 
                 with col1:
+                    st.link_button("📈 Demanda y Componentes", "/?tab=individual&subtab=0", use_container_width=True)
                     st.markdown("""
-                    **📈 Demanda y Componentes**
-                    
                     Visualiza desglose de demanda: venta, consumo y guía externa.
                     """)
-                    st.button("📊 Ver Demanda", key="btn_demanda", use_container_width=True, disabled=True)
-                    st.caption("👉 Ve a: Análisis Individual → Demanda y Componentes")
                 
                 with col2:
+                    st.link_button("🏢 Stock y Diagnóstico", "/?tab=individual&subtab=1", use_container_width=True)
                     st.markdown("""
-                    **🏢 Stock y Diagnóstico**
-                    
                     Analiza niveles de stock histórico y diagnóstico actual.
                     """)
-                    st.button("📦 Ver Stock", key="btn_stock", use_container_width=True, disabled=True)
-                    st.caption("👉 Ve a: Análisis Individual → Stock y Diagnóstico")
                 
                 with col3:
+                    st.link_button("🏆 Comparador de Modelos", "/?tab=individual&subtab=2", use_container_width=True)
                     st.markdown("""
-                    **🏆 Comparador de Modelos**
-                    
                     Compara Baselines vs ETS vs Random Forest.
                     """)
-                    st.button("⚖️ Comparar Modelos", key="btn_comparador", use_container_width=True, disabled=True)
-                    st.caption("👉 Ve a: Análisis Individual → Comparador de Modelos")
                 
                 with col4:
+                    st.link_button("🎯 Recomendación Individual", "/?tab=individual&subtab=3", use_container_width=True)
                     st.markdown("""
-                    **🎯 Recomendación Individual**
-                    
                     Obtén cantidad exacta a producir el próximo mes.
                     """)
-                    st.button("📢 Recomendación", key="btn_reco_indiv", use_container_width=True, disabled=True)
-                    st.caption("👉 Ve a: Análisis Individual → Recomendación Individual")
                 
                 st.divider()
                 
@@ -1727,40 +1739,28 @@ class Dashboard:
                 col5, col6, col7, col8 = st.columns(4)
                 
                 with col5:
+                    st.link_button("📊 Resumen Comparativa", "/?tab=grupo&subtab=0", use_container_width=True)
                     st.markdown("""
-                    **📊 Resumen Comparativa**
-                    
                     Comparar rendimiento de todos los productos globalmente.
                     """)
-                    st.button("🌍 Resumen Global", key="btn_resumen", use_container_width=True, disabled=True)
-                    st.caption("👉 Ve a: Análisis de Grupo → Resumen Comparativa Global")
                 
                 with col6:
+                    st.link_button("✅ Validación Retrospectiva", "/?tab=grupo&subtab=1", use_container_width=True)
                     st.markdown("""
-                    **✅ Validación Retrospectiva**
-                    
                     Simula la política de producción en el histórico.
                     """)
-                    st.button("🧪 Validación", key="btn_validacion", use_container_width=True, disabled=True)
-                    st.caption("👉 Ve a: Análisis de Grupo → Validación Retrospectiva")
                 
                 with col7:
+                    st.link_button("📉 Comparativa Retrospectiva", "/?tab=grupo&subtab=2", use_container_width=True)
                     st.markdown("""
-                    **📉 Comparativa Retrospectiva**
-                    
                     Compara costos: sin sistema vs con sistema.
                     """)
-                    st.button("⚖️ Comparativa Costos", key="btn_comparativa", use_container_width=True, disabled=True)
-                    st.caption("👉 Ve a: Análisis de Grupo → Comparativa Retrospectiva")
                 
                 with col8:
+                    st.link_button("📑 Recomendación Masiva", "/?tab=grupo&subtab=3", use_container_width=True)
                     st.markdown("""
-                    **📑 Recomendación Masiva**
-                    
                     Obtén recomendaciones para todos los productos.
                     """)
-                    st.button("📋 Rec. Masiva", key="btn_reco_masiva", use_container_width=True, disabled=True)
-                    st.caption("👉 Ve a: Análisis de Grupo → Recomendación Masiva")
             
             # Gráfico Demo compacto
             st.markdown("#### 📈 Ejemplo de Predicción")
