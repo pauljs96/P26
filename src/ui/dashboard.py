@@ -1169,6 +1169,49 @@ class Dashboard:
             
             return fig_demo
 
+        # ========================================
+        # FUNCIÓN CACHEADA: Componentes por producto
+        # ========================================
+        @st.cache_data(ttl=3600)
+        def get_demanda_components(prod_sel):
+            """Cachea los componentes de demanda por producto"""
+            return build_monthly_components(res_movements, prod_sel)
+
+        # ========================================
+        # FUNCIÓN CACHEADA: Backtests del comparador
+        # ========================================
+        @st.cache_data(ttl=3600)
+        def get_comparador_backtests(prod_sel, test_months: int, sort_metric: str):
+            """Ejecuta y cachea todos los backtests (Baselines, ETS, RF) para un producto"""
+            dm = res_demand.copy()
+            dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
+            hist_cmp = dm[dm["Codigo"] == str(prod_sel)][["Mes", "Demanda_Unid"]].copy().sort_values("Mes")
+            
+            if hist_cmp.empty:
+                return None, None, None, None, None
+            
+            # Auto-optimizar MA (3 vs 6)
+            bt_ma3 = backtest_baselines_1step(hist_cmp, y_col="Demanda_Unid", test_months=int(test_months), ma_window=3)
+            bt_ma6 = backtest_baselines_1step(hist_cmp, y_col="Demanda_Unid", test_months=int(test_months), ma_window=6)
+            
+            mae_ma3 = float(bt_ma3.metrics.iloc[0]["MAE"]) if not bt_ma3.metrics.empty else float("inf")
+            mae_ma6 = float(bt_ma6.metrics.iloc[0]["MAE"]) if not bt_ma6.metrics.empty else float("inf")
+            ma_window_cmp = 3 if mae_ma3 < mae_ma6 else 6
+            bt_base_cmp = bt_ma3 if ma_window_cmp == 3 else bt_ma6
+            
+            # ETS
+            ets = ETSForecaster(seasonal_periods=12, trend="add", seasonal="add", damped_trend=False, min_obs=24)
+            bt_ets_cmp = backtest_ets_1step(hist_cmp, y_col="Demanda_Unid", test_months=int(test_months), ets=ets)
+            
+            # RF
+            rf = RFForecaster(n_estimators=400, min_obs=24, min_samples_leaf=1, random_state=42)
+            bt_rf_cmp = backtest_rf_1step(hist_cmp, y_col="Demanda_Unid", test_months=int(test_months), rf=rf)
+            
+            # Comparar
+            cmp = compare_models_metrics(bt_base_cmp.metrics, bt_ets_cmp.metrics, bt_rf_cmp.metrics, sort_by=sort_metric)
+            
+            return (bt_base_cmp, bt_ets_cmp, bt_rf_cmp, cmp, {"ma_window": ma_window_cmp, "mae_ma3": mae_ma3, "mae_ma6": mae_ma6})
+
         st.set_page_config(
             page_title="Predicast - Sistema de Planificación",
             layout="wide",
@@ -1827,7 +1870,7 @@ class Dashboard:
         # ==========================================================
         with tab_demanda:
             st.subheader("🧩 Componentes de demanda por mes (producto seleccionado)")
-            comp = build_monthly_components(res_movements, prod_sel)
+            comp = get_demanda_components(prod_sel)
 
             cA, cB = st.columns([1, 1])
             with cA:
@@ -1904,133 +1947,115 @@ class Dashboard:
 
                 st.divider()
 
-                with st.spinner("🔄 Auto-optimizando ventana MA y ejecutando backtests de los 3 modelos..."):
-                    # 0) Auto-optimizar MA (3 vs 6) evaluando Baselines
-                    bt_ma3 = backtest_baselines_1step(hist_cmp, y_col="Demanda_Unid", test_months=int(test_months_cmp), ma_window=3)
-                    bt_ma6 = backtest_baselines_1step(hist_cmp, y_col="Demanda_Unid", test_months=int(test_months_cmp), ma_window=6)
-                    
-                    mae_ma3 = float(bt_ma3.metrics.iloc[0]["MAE"]) if not bt_ma3.metrics.empty else float("inf")
-                    mae_ma6 = float(bt_ma6.metrics.iloc[0]["MAE"]) if not bt_ma6.metrics.empty else float("inf")
-                    ma_window_cmp = 3 if mae_ma3 < mae_ma6 else 6
-                    
-                    # 1) Baselines (ya evaluado, reutilizar)
-                    bt_base_cmp = bt_ma3 if ma_window_cmp == 3 else bt_ma6
-
-                    # 2) ETS
-                    ets = ETSForecaster(seasonal_periods=12, trend="add", seasonal="add", damped_trend=False, min_obs=24)
-                    bt_ets_cmp = backtest_ets_1step(
-                        hist_cmp,
-                        y_col="Demanda_Unid",
+                with st.spinner("🔄 Cargando resultados de backtests cacheados..."):
+                    # Usar función cacheada para backtests
+                    bt_base_cmp, bt_ets_cmp, bt_rf_cmp, cmp, bt_info = get_comparador_backtests(
+                        prod_sel, 
                         test_months=int(test_months_cmp),
-                        ets=ets
+                        sort_metric=metric_to_sort
                     )
-
-                    # 3) RF
-                    rf = RFForecaster(n_estimators=400, min_obs=24, min_samples_leaf=1, random_state=42)
-                    bt_rf_cmp = backtest_rf_1step(
-                        hist_cmp,
-                        y_col="Demanda_Unid",
-                        test_months=int(test_months_cmp),
-                        rf=rf
-                    )
-
-                    # Unir métricas
-                    cmp = compare_models_metrics(bt_base_cmp.metrics, bt_ets_cmp.metrics, bt_rf_cmp.metrics, sort_by=metric_to_sort)
-
-                # ========== RESULTADO PRINCIPAL ==========
-                winner = str(cmp.iloc[0]["Modelo"]) if not cmp.empty else "N/A"
                 
-                # Mostrar MA seleccionado
-                st.markdown(f"**✅ Ventana MA seleccionada:** MA{ma_window_cmp} (MAE: {min(mae_ma3, mae_ma6):.2f}) | MA3 MAE: {mae_ma3:.2f} | MA6 MAE: {mae_ma6:.2f}")
-                
-                # Destacar ganador visualmente
-                st.markdown(f"## 🥇 **Ganador: {winner}**")
-                st.dataframe(cmp, use_container_width=True)
+                if bt_base_cmp is None:
+                    st.info("No hay serie mensual para ejecutar backtests.")
+                else:
+                    ma_window_cmp = bt_info["ma_window"]
+                    mae_ma3 = bt_info["mae_ma3"]
+                    mae_ma6 = bt_info["mae_ma6"]
 
-                # Plot ganador vs real
-                if not cmp.empty:
-                    if winner == "ETS(Holt-Winters)":
-                        pred_best = bt_ets_cmp.predictions[["Mes_target", "y_true", "ETS"]].rename(columns={"ETS": "y_pred"})
-                    elif winner == "RandomForest":
-                        pred_best = bt_rf_cmp.predictions[["Mes_target", "y_true", "RF"]].rename(columns={"RF": "y_pred"})
-                    else:
-                        pred_best = bt_base_cmp.predictions[["Mes_target", "y_true", winner]].rename(columns={winner: "y_pred"})
-
-                    fig_best = px.line(
-                        pred_best, x="Mes_target", y=["y_true", "y_pred"], markers=True,
-                        title=f"Ganador vs Real (Backtest) - {winner} - Producto {prod_sel}"
-                    )
-                    st.plotly_chart(fig_best, use_container_width=True)
-
-                st.divider()
-
-                # ========== EXPANDIBLES PARA DETALLES AVANZADOS ==========
-                st.markdown("### 📊 Detalles por Modelo (Usuarios Avanzados)")
-
-                with st.expander("📈 Baselines - Detalles y predicciones"):
-                    col1, col2 = st.columns([1, 1])
-                    with col1:
-                        st.markdown("**Métricas Baselines**")
-                        st.dataframe(bt_base_cmp.metrics, use_container_width=True)
-                    with col2:
-                        st.markdown("**Predicciones Baselines (últimos 12 meses)**")
-                        st.dataframe(
-                            bt_base_cmp.predictions.tail(min(12, len(bt_base_cmp.predictions))),
-                            use_container_width=True,
-                            height=300
-                        )
+                    # ========== RESULTADO PRINCIPAL ==========
+                    winner = str(cmp.iloc[0]["Modelo"]) if not cmp.empty else "N/A"
                     
-                    # Gráfico Baselines
-                    plot = bt_base_cmp.predictions.copy()
-                    plot_long = plot.melt(
-                        id_vars=["Mes_target", "y_true"],
-                        value_vars=[c for c in plot.columns if c not in ["Mes_target", "y_true"]],
-                        var_name="Modelo",
-                        value_name="y_pred"
-                    )
-                    fig_base = px.line(
-                        plot_long, x="Mes_target", y="y_pred", color="Modelo", markers=True,
-                        title=f"Predicciones Baselines - Producto {prod_sel}"
-                    )
-                    st.plotly_chart(fig_base, use_container_width=True)
-
-                with st.expander("🌀 ETS (Holt-Winters) - Detalles y predicciones"):
-                    col1, col2 = st.columns([1, 1])
-                    with col1:
-                        st.markdown("**Métricas ETS**")
-                        st.dataframe(bt_ets_cmp.metrics, use_container_width=True)
-                    with col2:
-                        st.markdown("**Predicciones ETS (últimos 12 meses)**")
-                        st.dataframe(
-                            bt_ets_cmp.predictions.tail(min(12, len(bt_ets_cmp.predictions))),
-                            use_container_width=True,
-                            height=300
-                        )
+                    # Mostrar MA seleccionado
+                    st.markdown(f"**✅ Ventana MA seleccionada:** MA{ma_window_cmp} (MAE: {min(mae_ma3, mae_ma6):.2f}) | MA3 MAE: {mae_ma3:.2f} | MA6 MAE: {mae_ma6:.2f}")
                     
-                    fig_ets = px.line(
-                        bt_ets_cmp.predictions, x="Mes_target", y=["y_true", "ETS"], markers=True,
-                        title=f"ETS vs Real (Backtest) - Producto {prod_sel}"
-                    )
-                    st.plotly_chart(fig_ets, use_container_width=True)
+                    # Destacar ganador visualmente
+                    st.markdown(f"## 🥇 **Ganador: {winner}**")
+                    st.dataframe(cmp, use_container_width=True)
 
-                with st.expander("🤖 Random Forest (RF) - Detalles y predicciones"):
-                    col1, col2 = st.columns([1, 1])
-                    with col1:
-                        st.markdown("**Métricas RF**")
-                        st.dataframe(bt_rf_cmp.metrics, use_container_width=True)
-                    with col2:
-                        st.markdown("**Predicciones RF (últimos 12 meses)**")
-                        st.dataframe(
-                            bt_rf_cmp.predictions.tail(min(12, len(bt_rf_cmp.predictions))),
-                            use_container_width=True,
-                            height=300
+                    # Plot ganador vs real
+                    if not cmp.empty:
+                        if winner == "ETS(Holt-Winters)":
+                            pred_best = bt_ets_cmp.predictions[["Mes_target", "y_true", "ETS"]].rename(columns={"ETS": "y_pred"})
+                        elif winner == "RandomForest":
+                            pred_best = bt_rf_cmp.predictions[["Mes_target", "y_true", "RF"]].rename(columns={"RF": "y_pred"})
+                        else:
+                            pred_best = bt_base_cmp.predictions[["Mes_target", "y_true", winner]].rename(columns={winner: "y_pred"})
+
+                        fig_best = px.line(
+                            pred_best, x="Mes_target", y=["y_true", "y_pred"], markers=True,
+                            title=f"Ganador vs Real (Backtest) - {winner} - Producto {prod_sel}"
                         )
-                    
-                    fig_rf = px.line(
-                        bt_rf_cmp.predictions, x="Mes_target", y=["y_true", "RF"], markers=True,
-                        title=f"RF vs Real (Backtest) - Producto {prod_sel}"
-                    )
-                    st.plotly_chart(fig_rf, use_container_width=True)
+                        st.plotly_chart(fig_best, use_container_width=True)
+
+                    st.divider()
+
+                    # ========== EXPANDIBLES PARA DETALLES AVANZADOS ==========
+                    st.markdown("### 📊 Detalles por Modelo (Usuarios Avanzados)")
+
+                    with st.expander("📈 Baselines - Detalles y predicciones"):
+                        col1, col2 = st.columns([1, 1])
+                        with col1:
+                            st.markdown("**Métricas Baselines**")
+                            st.dataframe(bt_base_cmp.metrics, use_container_width=True)
+                        with col2:
+                            st.markdown("**Predicciones Baselines (últimos 12 meses)**")
+                            st.dataframe(
+                                bt_base_cmp.predictions.tail(min(12, len(bt_base_cmp.predictions))),
+                                use_container_width=True,
+                                height=300
+                            )
+                        
+                        # Gráfico Baselines
+                        plot = bt_base_cmp.predictions.copy()
+                        plot_long = plot.melt(
+                            id_vars=["Mes_target", "y_true"],
+                            value_vars=[c for c in plot.columns if c not in ["Mes_target", "y_true"]],
+                            var_name="Modelo",
+                            value_name="y_pred"
+                        )
+                        fig_base = px.line(
+                            plot_long, x="Mes_target", y="y_pred", color="Modelo", markers=True,
+                            title=f"Predicciones Baselines - Producto {prod_sel}"
+                        )
+                        st.plotly_chart(fig_base, use_container_width=True)
+
+                    with st.expander("🌀 ETS (Holt-Winters) - Detalles y predicciones"):
+                        col1, col2 = st.columns([1, 1])
+                        with col1:
+                            st.markdown("**Métricas ETS**")
+                            st.dataframe(bt_ets_cmp.metrics, use_container_width=True)
+                        with col2:
+                            st.markdown("**Predicciones ETS (últimos 12 meses)**")
+                            st.dataframe(
+                                bt_ets_cmp.predictions.tail(min(12, len(bt_ets_cmp.predictions))),
+                                use_container_width=True,
+                                height=300
+                            )
+                        
+                        fig_ets = px.line(
+                            bt_ets_cmp.predictions, x="Mes_target", y=["y_true", "ETS"], markers=True,
+                            title=f"ETS vs Real (Backtest) - Producto {prod_sel}"
+                        )
+                        st.plotly_chart(fig_ets, use_container_width=True)
+
+                    with st.expander("🤖 Random Forest (RF) - Detalles y predicciones"):
+                        col1, col2 = st.columns([1, 1])
+                        with col1:
+                            st.markdown("**Métricas RF**")
+                            st.dataframe(bt_rf_cmp.metrics, use_container_width=True)
+                        with col2:
+                            st.markdown("**Predicciones RF (últimos 12 meses)**")
+                            st.dataframe(
+                                bt_rf_cmp.predictions.tail(min(12, len(bt_rf_cmp.predictions))),
+                                use_container_width=True,
+                                height=300
+                            )
+                        
+                        fig_rf = px.line(
+                            bt_rf_cmp.predictions, x="Mes_target", y=["y_true", "RF"], markers=True,
+                            title=f"RF vs Real (Backtest) - Producto {prod_sel}"
+                        )
+                        st.plotly_chart(fig_rf, use_container_width=True)
 
 
 
