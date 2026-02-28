@@ -1680,40 +1680,95 @@ class Dashboard:
             with st.expander("**🎯 ¿Qué encontrarás aquí? / Funciones disponibles**", expanded=True):
                 st.markdown("**Elige una sección para comenzar:**")
                 
-                # 4 columnas para las opciones
+                # ========== FILA 1: ANÁLISIS INDIVIDUAL ==========
+                st.markdown("##### 📊 Análisis Individual (por producto)")
                 col1, col2, col3, col4 = st.columns(4)
                 
                 with col1:
                     st.markdown("""
-                    #### 📈 Análisis Individual
+                    **📈 Demanda y Componentes**
                     
-                    Visualiza demanda histórica, compara modelos y obtén recomendaciones para un producto.
+                    Visualiza desglose de demanda: venta, consumo y guía externa.
                     """)
-                    st.info("👉 Selecciona el tab 'Análisis Individual' arriba para comenzar", icon="🔗")
+                    if st.button("📊 Ver Demanda", key="btn_demanda", use_container_width=True):
+                        st.markdown("👉 **Ir a:** Análisis Individual → Demanda y Componentes")
+                        st.info("Haz click en la pestaña 'Análisis Individual' arriba → Demanda y Componentes", icon="🔗")
                 
                 with col2:
                     st.markdown("""
-                    #### 🏆 Comparador de Modelos
+                    **🏢 Stock y Diagnóstico**
                     
-                    Compara precisión de Baselines, ETS y Random Forest para elegir el mejor.
+                    Analiza niveles de stock histórico y diagnóstico actual.
                     """)
-                    st.info("👉 Disponible dentro de 'Análisis Individual'", icon="🔗")
+                    if st.button("📦 Ver Stock", key="btn_stock", use_container_width=True):
+                        st.markdown("👉 **Ir a:** Análisis Individual → Stock y Diagnóstico")
+                        st.info("Haz click en la pestaña 'Análisis Individual' arriba → Stock y Diagnóstico", icon="🔗")
                 
                 with col3:
                     st.markdown("""
-                    #### 🎯 Recomendación
+                    **🏆 Comparador de Modelos**
                     
-                    Obtén cantidad exacta a producir el próximo mes basada en datos históricos.
+                    Compara Baselines vs ETS vs Random Forest.
                     """)
-                    st.info("👉 Disponible dentro de 'Análisis Individual'", icon="🔗")
+                    if st.button("⚖️ Comparar Modelos", key="btn_comparador", use_container_width=True):
+                        st.markdown("👉 **Ir a:** Análisis Individual → Comparador de Modelos")
+                        st.info("Haz click en la pestaña 'Análisis Individual' arriba → Comparador de Modelos", icon="🔗")
                 
                 with col4:
                     st.markdown("""
-                    #### 📊 Análisis de Grupo
+                    **🎯 Recomendación Individual**
                     
-                    Valida y compara múltiples productos para decisiones estratégicas.
+                    Obtén cantidad exacta a producir el próximo mes.
                     """)
-                    st.info("👉 Selecciona el tab 'Análisis de Grupo' arriba", icon="🔗")
+                    if st.button("📢 Recomendación", key="btn_reco_indiv", use_container_width=True):
+                        st.markdown("👉 **Ir a:** Análisis Individual → Recomendación Individual")
+                        st.info("Haz click en la pestaña 'Análisis Individual' arriba → Recomendación Individual", icon="🔗")
+                
+                st.divider()
+                
+                # ========== FILA 2: ANÁLISIS DE GRUPO ==========
+                st.markdown("##### 📊 Análisis de Grupo (múltiples productos)")
+                col5, col6, col7, col8 = st.columns(4)
+                
+                with col5:
+                    st.markdown("""
+                    **📊 Resumen Comparativa**
+                    
+                    Comparar rendimiento de todos los productos globalmente.
+                    """)
+                    if st.button("🌍 Resumen Global", key="btn_resumen", use_container_width=True):
+                        st.markdown("👉 **Ir a:** Análisis de Grupo → Resumen Comparativa Global")
+                        st.info("Haz click en la pestaña 'Análisis de Grupo' arriba → Resumen Comparativa Global", icon="🔗")
+                
+                with col6:
+                    st.markdown("""
+                    **✅ Validación Retrospectiva**
+                    
+                    Simula la política de producción en el histórico.
+                    """)
+                    if st.button("🧪 Validación", key="btn_validacion", use_container_width=True):
+                        st.markdown("👉 **Ir a:** Análisis de Grupo → Validación Retrospectiva")
+                        st.info("Haz click en la pestaña 'Análisis de Grupo' arriba → Validación Retrospectiva", icon="🔗")
+                
+                with col7:
+                    st.markdown("""
+                    **📉 Comparativa Retrospectiva**
+                    
+                    Compara costos: sin sistema vs con sistema.
+                    """)
+                    if st.button("⚖️ Comparativa Costos", key="btn_comparativa", use_container_width=True):
+                        st.markdown("👉 **Ir a:** Análisis de Grupo → Comparativa Retrospectiva")
+                        st.info("Haz click en la pestaña 'Análisis de Grupo' arriba → Comparativa Retrospectiva", icon="🔗")
+                
+                with col8:
+                    st.markdown("""
+                    **📑 Recomendación Masiva**
+                    
+                    Obtén recomendaciones para todos los productos.
+                    """)
+                    if st.button("📋 Rec. Masiva", key="btn_reco_masiva", use_container_width=True):
+                        st.markdown("👉 **Ir a:** Análisis de Grupo → Recomendación Masiva")
+                        st.info("Haz click en la pestaña 'Análisis de Grupo' arriba → Recomendación Masiva", icon="🔗")
             
             # Gráfico Demo compacto
             st.markdown("#### 📈 Ejemplo de Predicción")
