@@ -1690,7 +1690,8 @@ class Dashboard:
                     
                     Visualiza desglose de demanda: venta, consumo y guía externa.
                     """)
-                    st.button("📊 Ver Demanda", key="btn_demanda", use_container_width=True, disabled=True)
+                    if st.button("📊 Ver Demanda", key="btn_demanda", use_container_width=True):
+                        st.toast("👉 Análisis Individual → Demanda y Componentes", icon="🔗")
                 
                 with col2:
                     st.markdown("""
@@ -1698,7 +1699,8 @@ class Dashboard:
                     
                     Analiza niveles de stock histórico y diagnóstico actual.
                     """)
-                    st.button("📦 Ver Stock", key="btn_stock", use_container_width=True, disabled=True)
+                    if st.button("📦 Ver Stock", key="btn_stock", use_container_width=True):
+                        st.toast("👉 Análisis Individual → Stock y Diagnóstico", icon="🔗")
                 
                 with col3:
                     st.markdown("""
@@ -1706,7 +1708,8 @@ class Dashboard:
                     
                     Compara Baselines vs ETS vs Random Forest.
                     """)
-                    st.button("⚖️ Comparar Modelos", key="btn_comparador", use_container_width=True, disabled=True)
+                    if st.button("⚖️ Comparar Modelos", key="btn_comparador", use_container_width=True):
+                        st.toast("👉 Análisis Individual → Comparador de Modelos", icon="🔗")
                 
                 with col4:
                     st.markdown("""
@@ -1714,7 +1717,8 @@ class Dashboard:
                     
                     Obtén cantidad exacta a producir el próximo mes.
                     """)
-                    st.button("📢 Recomendación", key="btn_reco_indiv", use_container_width=True, disabled=True)
+                    if st.button("📢 Recomendación", key="btn_reco_indiv", use_container_width=True):
+                        st.toast("👉 Análisis Individual → Recomendación Individual", icon="🔗")
                 
                 st.divider()
                 
@@ -1728,7 +1732,8 @@ class Dashboard:
                     
                     Comparar rendimiento de todos los productos globalmente.
                     """)
-                    st.button("🌍 Resumen Global", key="btn_resumen", use_container_width=True, disabled=True)
+                    if st.button("🌍 Resumen Global", key="btn_resumen", use_container_width=True):
+                        st.toast("👉 Análisis de Grupo → Resumen Comparativa Global", icon="🔗")
                 
                 with col6:
                     st.markdown("""
@@ -1736,7 +1741,8 @@ class Dashboard:
                     
                     Simula la política de producción en el histórico.
                     """)
-                    st.button("🧪 Validación", key="btn_validacion", use_container_width=True, disabled=True)
+                    if st.button("🧪 Validación", key="btn_validacion", use_container_width=True):
+                        st.toast("👉 Análisis de Grupo → Validación Retrospectiva", icon="🔗")
                 
                 with col7:
                     st.markdown("""
@@ -1744,7 +1750,8 @@ class Dashboard:
                     
                     Compara costos: sin sistema vs con sistema.
                     """)
-                    st.button("⚖️ Comparativa Costos", key="btn_comparativa", use_container_width=True, disabled=True)
+                    if st.button("⚖️ Comparativa Costos", key="btn_comparativa", use_container_width=True):
+                        st.toast("👉 Análisis de Grupo → Comparativa Retrospectiva", icon="🔗")
                 
                 with col8:
                     st.markdown("""
@@ -1752,7 +1759,8 @@ class Dashboard:
                     
                     Obtén recomendaciones para todos los productos.
                     """)
-                    st.button("📋 Rec. Masiva", key="btn_reco_masiva", use_container_width=True, disabled=True)
+                    if st.button("📋 Rec. Masiva", key="btn_reco_masiva", use_container_width=True):
+                        st.toast("👉 Análisis de Grupo → Recomendación Masiva", icon="🔗")
             
             # Gráfico Demo compacto
             st.markdown("#### 📈 Ejemplo de Predicción")
