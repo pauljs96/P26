@@ -1313,17 +1313,17 @@ class Dashboard:
             return  # Muestra login screen y retorna
         
         # ==================== DASHBOARD PRINCIPAL ====================
-        # Título limpio y centrado
-        st.markdown("""
-        <div style='text-align: center; padding: 1em 0;'>
-            <h1 style='color: #0D47A1; font-size: 2.8em; font-weight: 800; margin: 0; letter-spacing: 1px;'>🔮 PREDICAST</h1>
-            <p style='color: #666; font-size: 0.95em; margin: 0.5em 0 0;'>Inteligencia Predictiva en Demanda</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-
+        # (Título movido al sidebar para ganar espacio)
 
         # Información de usuario y organización en sidebar
+        # Agregar título compacto al inicio del sidebar
+        st.sidebar.markdown("""
+        <div style='text-align: center; padding: 0.5em 0;'>
+            <h2 style='color: #0D47A1; font-size: 1.5em; font-weight: 800; margin: 0;'>🔮 PREDICAST</h2>
+            <p style='color: #666; font-size: 0.75em; margin: 0.3em 0 0;'>Predicción de Demanda</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
         st.sidebar.divider()
         st.sidebar.write("**👤 Información de Sesión**")
         st.sidebar.write(f"Email: {st.session_state.email}")
