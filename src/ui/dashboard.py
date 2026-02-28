@@ -1787,36 +1787,80 @@ class Dashboard:
                     **📈 Demanda y Componentes**
                     
                     Visualiza desglose de demanda: venta, consumo y guía externa.
-                    """)
-                    if st.button("📊 Ver Demanda", key="btn_demanda", use_container_width=True):
-                        st.toast("👉 Análisis Individual → Demanda y Componentes", icon="🔗")
+                    
+                    <div style="
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: white;
+                        padding: 10px;
+                        border-radius: 8px;
+                        text-align: center;
+                        margin-top: 10px;
+                        font-weight: 600;
+                        font-size: 0.9em;
+                    ">
+                    📌 Análisis Individual → 📈 Demanda
+                    </div>
+                    """, unsafe_allow_html=True)
                 
                 with col2:
                     st.markdown("""
                     **🏢 Stock y Diagnóstico**
                     
                     Analiza niveles de stock histórico y diagnóstico actual.
-                    """)
-                    if st.button("📦 Ver Stock", key="btn_stock", use_container_width=True):
-                        st.toast("👉 Análisis Individual → Stock y Diagnóstico", icon="🔗")
+                    
+                    <div style="
+                        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                        color: white;
+                        padding: 10px;
+                        border-radius: 8px;
+                        text-align: center;
+                        margin-top: 10px;
+                        font-weight: 600;
+                        font-size: 0.9em;
+                    ">
+                    📌 Análisis Individual → 🏢 Stock
+                    </div>
+                    """, unsafe_allow_html=True)
                 
                 with col3:
                     st.markdown("""
                     **🏆 Comparador de Modelos**
                     
                     Compara Baselines vs ETS vs Random Forest.
-                    """)
-                    if st.button("⚖️ Comparar Modelos", key="btn_comparador", use_container_width=True):
-                        st.toast("👉 Análisis Individual → Comparador de Modelos", icon="🔗")
+                    
+                    <div style="
+                        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+                        color: white;
+                        padding: 10px;
+                        border-radius: 8px;
+                        text-align: center;
+                        margin-top: 10px;
+                        font-weight: 600;
+                        font-size: 0.9em;
+                    ">
+                    📌 Análisis Individual → 🏆 Comparador
+                    </div>
+                    """, unsafe_allow_html=True)
                 
                 with col4:
                     st.markdown("""
                     **🎯 Recomendación Individual**
                     
                     Obtén cantidad exacta a producir el próximo mes.
-                    """)
-                    if st.button("📢 Recomendación", key="btn_reco_indiv", use_container_width=True):
-                        st.toast("👉 Análisis Individual → Recomendación Individual", icon="🔗")
+                    
+                    <div style="
+                        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+                        color: white;
+                        padding: 10px;
+                        border-radius: 8px;
+                        text-align: center;
+                        margin-top: 10px;
+                        font-weight: 600;
+                        font-size: 0.9em;
+                    ">
+                    📌 Análisis Individual → 🎯 Recomendación
+                    </div>
+                    """, unsafe_allow_html=True)
                 
                 st.divider()
                 
@@ -1829,36 +1873,80 @@ class Dashboard:
                     **📊 Resumen Comparativa**
                     
                     Comparar rendimiento de todos los productos globalmente.
-                    """)
-                    if st.button("🌍 Resumen Global", key="btn_resumen", use_container_width=True):
-                        st.toast("👉 Análisis de Grupo → Resumen Comparativa Global", icon="🔗")
+                    
+                    <div style="
+                        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+                        color: white;
+                        padding: 10px;
+                        border-radius: 8px;
+                        text-align: center;
+                        margin-top: 10px;
+                        font-weight: 600;
+                        font-size: 0.9em;
+                    ">
+                    📌 Análisis de Grupo → 📊 Resumen
+                    </div>
+                    """, unsafe_allow_html=True)
                 
                 with col6:
                     st.markdown("""
                     **✅ Validación Retrospectiva**
                     
                     Simula la política de producción en el histórico.
-                    """)
-                    if st.button("🧪 Validación", key="btn_validacion", use_container_width=True):
-                        st.toast("👉 Análisis de Grupo → Validación Retrospectiva", icon="🔗")
+                    
+                    <div style="
+                        background: linear-gradient(135deg, #ee0979 0%, #ff6a00 100%);
+                        color: white;
+                        padding: 10px;
+                        border-radius: 8px;
+                        text-align: center;
+                        margin-top: 10px;
+                        font-weight: 600;
+                        font-size: 0.9em;
+                    ">
+                    📌 Análisis de Grupo → ✅ Validación
+                    </div>
+                    """, unsafe_allow_html=True)
                 
                 with col7:
                     st.markdown("""
                     **📉 Comparativa Retrospectiva**
                     
                     Compara costos: sin sistema vs con sistema.
-                    """)
-                    if st.button("⚖️ Comparativa Costos", key="btn_comparativa", use_container_width=True):
-                        st.toast("👉 Análisis de Grupo → Comparativa Retrospectiva", icon="🔗")
+                    
+                    <div style="
+                        background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+                        color: #333;
+                        padding: 10px;
+                        border-radius: 8px;
+                        text-align: center;
+                        margin-top: 10px;
+                        font-weight: 600;
+                        font-size: 0.9em;
+                    ">
+                    📌 Análisis de Grupo → 📉 Comparativa
+                    </div>
+                    """, unsafe_allow_html=True)
                 
                 with col8:
                     st.markdown("""
                     **📑 Recomendación Masiva**
                     
                     Obtén recomendaciones para todos los productos.
-                    """)
-                    if st.button("📋 Rec. Masiva", key="btn_reco_masiva", use_container_width=True):
-                        st.toast("👉 Análisis de Grupo → Recomendación Masiva", icon="🔗")
+                    
+                    <div style="
+                        background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+                        color: #333;
+                        padding: 10px;
+                        border-radius: 8px;
+                        text-align: center;
+                        margin-top: 10px;
+                        font-weight: 600;
+                        font-size: 0.9em;
+                    ">
+                    📌 Análisis de Grupo → 📑 Masiva
+                    </div>
+                    """, unsafe_allow_html=True)
             
             # Gráfico Demo compacto
             st.markdown("#### 📈 Ejemplo de Predicción")
