@@ -1690,9 +1690,7 @@ class Dashboard:
                     
                     Visualiza desglose de demanda: venta, consumo y guía externa.
                     """)
-                    if st.button("📊 Ver Demanda", key="btn_demanda", use_container_width=True):
-                        st.markdown("👉 **Ir a:** Análisis Individual → Demanda y Componentes")
-                        st.info("Haz click en la pestaña 'Análisis Individual' arriba → Demanda y Componentes", icon="🔗")
+                    st.button("📊 Ver Demanda", key="btn_demanda", use_container_width=True, disabled=True)
                 
                 with col2:
                     st.markdown("""
@@ -1700,9 +1698,7 @@ class Dashboard:
                     
                     Analiza niveles de stock histórico y diagnóstico actual.
                     """)
-                    if st.button("📦 Ver Stock", key="btn_stock", use_container_width=True):
-                        st.markdown("👉 **Ir a:** Análisis Individual → Stock y Diagnóstico")
-                        st.info("Haz click en la pestaña 'Análisis Individual' arriba → Stock y Diagnóstico", icon="🔗")
+                    st.button("📦 Ver Stock", key="btn_stock", use_container_width=True, disabled=True)
                 
                 with col3:
                     st.markdown("""
@@ -1710,9 +1706,7 @@ class Dashboard:
                     
                     Compara Baselines vs ETS vs Random Forest.
                     """)
-                    if st.button("⚖️ Comparar Modelos", key="btn_comparador", use_container_width=True):
-                        st.markdown("👉 **Ir a:** Análisis Individual → Comparador de Modelos")
-                        st.info("Haz click en la pestaña 'Análisis Individual' arriba → Comparador de Modelos", icon="🔗")
+                    st.button("⚖️ Comparar Modelos", key="btn_comparador", use_container_width=True, disabled=True)
                 
                 with col4:
                     st.markdown("""
@@ -1720,9 +1714,7 @@ class Dashboard:
                     
                     Obtén cantidad exacta a producir el próximo mes.
                     """)
-                    if st.button("📢 Recomendación", key="btn_reco_indiv", use_container_width=True):
-                        st.markdown("👉 **Ir a:** Análisis Individual → Recomendación Individual")
-                        st.info("Haz click en la pestaña 'Análisis Individual' arriba → Recomendación Individual", icon="🔗")
+                    st.button("📢 Recomendación", key="btn_reco_indiv", use_container_width=True, disabled=True)
                 
                 st.divider()
                 
@@ -1736,9 +1728,7 @@ class Dashboard:
                     
                     Comparar rendimiento de todos los productos globalmente.
                     """)
-                    if st.button("🌍 Resumen Global", key="btn_resumen", use_container_width=True):
-                        st.markdown("👉 **Ir a:** Análisis de Grupo → Resumen Comparativa Global")
-                        st.info("Haz click en la pestaña 'Análisis de Grupo' arriba → Resumen Comparativa Global", icon="🔗")
+                    st.button("🌍 Resumen Global", key="btn_resumen", use_container_width=True, disabled=True)
                 
                 with col6:
                     st.markdown("""
@@ -1746,9 +1736,7 @@ class Dashboard:
                     
                     Simula la política de producción en el histórico.
                     """)
-                    if st.button("🧪 Validación", key="btn_validacion", use_container_width=True):
-                        st.markdown("👉 **Ir a:** Análisis de Grupo → Validación Retrospectiva")
-                        st.info("Haz click en la pestaña 'Análisis de Grupo' arriba → Validación Retrospectiva", icon="🔗")
+                    st.button("🧪 Validación", key="btn_validacion", use_container_width=True, disabled=True)
                 
                 with col7:
                     st.markdown("""
@@ -1756,9 +1744,7 @@ class Dashboard:
                     
                     Compara costos: sin sistema vs con sistema.
                     """)
-                    if st.button("⚖️ Comparativa Costos", key="btn_comparativa", use_container_width=True):
-                        st.markdown("👉 **Ir a:** Análisis de Grupo → Comparativa Retrospectiva")
-                        st.info("Haz click en la pestaña 'Análisis de Grupo' arriba → Comparativa Retrospectiva", icon="🔗")
+                    st.button("⚖️ Comparativa Costos", key="btn_comparativa", use_container_width=True, disabled=True)
                 
                 with col8:
                     st.markdown("""
@@ -1766,9 +1752,7 @@ class Dashboard:
                     
                     Obtén recomendaciones para todos los productos.
                     """)
-                    if st.button("📋 Rec. Masiva", key="btn_reco_masiva", use_container_width=True):
-                        st.markdown("👉 **Ir a:** Análisis de Grupo → Recomendación Masiva")
-                        st.info("Haz click en la pestaña 'Análisis de Grupo' arriba → Recomendación Masiva", icon="🔗")
+                    st.button("📋 Rec. Masiva", key="btn_reco_masiva", use_container_width=True, disabled=True)
             
             # Gráfico Demo compacto
             st.markdown("#### 📈 Ejemplo de Predicción")
