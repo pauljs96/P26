@@ -1787,25 +1787,21 @@ class Dashboard:
                     <div style="
                         display: flex;
                         flex-direction: column;
-                        height: 100%;
-                        justify-content: space-between;
                     ">
-                        <div>
-                            <h4 style="margin-top: 0; margin-bottom: 0.5em;">📈 Demanda y Componentes</h4>
-                            <p style="margin: 0; font-size: 0.9em; color: #555;">Visualiza desglose de demanda: venta, consumo y guía externa.</p>
-                        </div>
+                        <h4 style="margin-top: 0; margin-bottom: 0.3em;">📈 Demanda y Componentes</h4>
                         <div style="
                             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                             color: white;
                             padding: 10px;
                             border-radius: 8px;
                             text-align: center;
-                            margin-top: 15px;
+                            margin-bottom: 10px;
                             font-weight: 600;
                             font-size: 0.9em;
                         ">
                         📌 Análisis Individual → 📈 Demanda
                         </div>
+                        <p style="margin: 0; font-size: 0.9em; color: #555;">Visualiza desglose de demanda: venta, consumo y guía externa.</p>
                     </div>
                     """, unsafe_allow_html=True)
                 
@@ -1814,25 +1810,21 @@ class Dashboard:
                     <div style="
                         display: flex;
                         flex-direction: column;
-                        height: 100%;
-                        justify-content: space-between;
                     ">
-                        <div>
-                            <h4 style="margin-top: 0; margin-bottom: 0.5em;">🏢 Stock y Diagnóstico</h4>
-                            <p style="margin: 0; font-size: 0.9em; color: #555;">Analiza niveles de stock histórico y diagnóstico actual.</p>
-                        </div>
+                        <h4 style="margin-top: 0; margin-bottom: 0.3em;">🏢 Stock y Diagnóstico</h4>
                         <div style="
                             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
                             color: white;
                             padding: 10px;
                             border-radius: 8px;
                             text-align: center;
-                            margin-top: 15px;
+                            margin-bottom: 10px;
                             font-weight: 600;
                             font-size: 0.9em;
                         ">
                         📌 Análisis Individual → 🏢 Stock
                         </div>
+                        <p style="margin: 0; font-size: 0.9em; color: #555;">Analiza niveles de stock histórico y diagnóstico actual.</p>
                     </div>
                     """, unsafe_allow_html=True)
                 
@@ -1841,25 +1833,21 @@ class Dashboard:
                     <div style="
                         display: flex;
                         flex-direction: column;
-                        height: 100%;
-                        justify-content: space-between;
                     ">
-                        <div>
-                            <h4 style="margin-top: 0; margin-bottom: 0.5em;">🏆 Comparador de Modelos</h4>
-                            <p style="margin: 0; font-size: 0.9em; color: #555;">Compara Baselines vs ETS vs Random Forest.</p>
-                        </div>
+                        <h4 style="margin-top: 0; margin-bottom: 0.3em;">🏆 Comparador de Modelos</h4>
                         <div style="
                             background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
                             color: white;
                             padding: 10px;
                             border-radius: 8px;
                             text-align: center;
-                            margin-top: 15px;
+                            margin-bottom: 10px;
                             font-weight: 600;
                             font-size: 0.9em;
                         ">
                         📌 Análisis Individual → 🏆 Comparador
                         </div>
+                        <p style="margin: 0; font-size: 0.9em; color: #555;">Compara Baselines vs ETS vs Random Forest.</p>
                     </div>
                     """, unsafe_allow_html=True)
                 
@@ -1868,25 +1856,21 @@ class Dashboard:
                     <div style="
                         display: flex;
                         flex-direction: column;
-                        height: 100%;
-                        justify-content: space-between;
                     ">
-                        <div>
-                            <h4 style="margin-top: 0; margin-bottom: 0.5em;">🎯 Recomendación Individual</h4>
-                            <p style="margin: 0; font-size: 0.9em; color: #555;">Obtén cantidad exacta a producir el próximo mes.</p>
-                        </div>
+                        <h4 style="margin-top: 0; margin-bottom: 0.3em;">🎯 Recomendación Individual</h4>
                         <div style="
                             background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
                             color: white;
                             padding: 10px;
                             border-radius: 8px;
                             text-align: center;
-                            margin-top: 15px;
+                            margin-bottom: 10px;
                             font-weight: 600;
                             font-size: 0.9em;
                         ">
                         📌 Análisis Individual → 🎯 Recomendación
                         </div>
+                        <p style="margin: 0; font-size: 0.9em; color: #555;">Obtén cantidad exacta a producir el próximo mes.</p>
                     </div>
                     """, unsafe_allow_html=True)
                 
@@ -1901,25 +1885,21 @@ class Dashboard:
                     <div style="
                         display: flex;
                         flex-direction: column;
-                        height: 100%;
-                        justify-content: space-between;
                     ">
-                        <div>
-                            <h4 style="margin-top: 0; margin-bottom: 0.5em;">📊 Resumen Comparativa</h4>
-                            <p style="margin: 0; font-size: 0.9em; color: #555;">Comparar rendimiento de todos los productos globalmente.</p>
-                        </div>
+                        <h4 style="margin-top: 0; margin-bottom: 0.3em;">📊 Resumen Comparativa</h4>
                         <div style="
                             background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
                             color: white;
                             padding: 10px;
                             border-radius: 8px;
                             text-align: center;
-                            margin-top: 15px;
+                            margin-bottom: 10px;
                             font-weight: 600;
                             font-size: 0.9em;
                         ">
                         📌 Análisis de Grupo → 📊 Resumen
                         </div>
+                        <p style="margin: 0; font-size: 0.9em; color: #555;">Comparar rendimiento de todos los productos globalmente.</p>
                     </div>
                     """, unsafe_allow_html=True)
                 
@@ -1928,25 +1908,21 @@ class Dashboard:
                     <div style="
                         display: flex;
                         flex-direction: column;
-                        height: 100%;
-                        justify-content: space-between;
                     ">
-                        <div>
-                            <h4 style="margin-top: 0; margin-bottom: 0.5em;">✅ Validación Retrospectiva</h4>
-                            <p style="margin: 0; font-size: 0.9em; color: #555;">Simula la política de producción en el histórico.</p>
-                        </div>
+                        <h4 style="margin-top: 0; margin-bottom: 0.3em;">✅ Validación Retrospectiva</h4>
                         <div style="
                             background: linear-gradient(135deg, #ee0979 0%, #ff6a00 100%);
                             color: white;
                             padding: 10px;
                             border-radius: 8px;
                             text-align: center;
-                            margin-top: 15px;
+                            margin-bottom: 10px;
                             font-weight: 600;
                             font-size: 0.9em;
                         ">
                         📌 Análisis de Grupo → ✅ Validación
                         </div>
+                        <p style="margin: 0; font-size: 0.9em; color: #555;">Simula la política de producción en el histórico.</p>
                     </div>
                     """, unsafe_allow_html=True)
                 
@@ -1955,25 +1931,21 @@ class Dashboard:
                     <div style="
                         display: flex;
                         flex-direction: column;
-                        height: 100%;
-                        justify-content: space-between;
                     ">
-                        <div>
-                            <h4 style="margin-top: 0; margin-bottom: 0.5em;">📉 Comparativa Retrospectiva</h4>
-                            <p style="margin: 0; font-size: 0.9em; color: #555;">Compara costos: sin sistema vs con sistema.</p>
-                        </div>
+                        <h4 style="margin-top: 0; margin-bottom: 0.3em;">📉 Comparativa Retrospectiva</h4>
                         <div style="
                             background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
                             color: #333;
                             padding: 10px;
                             border-radius: 8px;
                             text-align: center;
-                            margin-top: 15px;
+                            margin-bottom: 10px;
                             font-weight: 600;
                             font-size: 0.9em;
                         ">
                         📌 Análisis de Grupo → 📉 Comparativa
                         </div>
+                        <p style="margin: 0; font-size: 0.9em; color: #555;">Compara costos: sin sistema vs con sistema.</p>
                     </div>
                     """, unsafe_allow_html=True)
                 
@@ -1982,25 +1954,21 @@ class Dashboard:
                     <div style="
                         display: flex;
                         flex-direction: column;
-                        height: 100%;
-                        justify-content: space-between;
                     ">
-                        <div>
-                            <h4 style="margin-top: 0; margin-bottom: 0.5em;">📑 Recomendación Masiva</h4>
-                            <p style="margin: 0; font-size: 0.9em; color: #555;">Obtén recomendaciones para todos los productos.</p>
-                        </div>
+                        <h4 style="margin-top: 0; margin-bottom: 0.3em;">📑 Recomendación Masiva</h4>
                         <div style="
                             background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
                             color: #333;
                             padding: 10px;
                             border-radius: 8px;
                             text-align: center;
-                            margin-top: 15px;
+                            margin-bottom: 10px;
                             font-weight: 600;
                             font-size: 0.9em;
                         ">
                         📌 Análisis de Grupo → 📑 Masiva
                         </div>
+                        <p style="margin: 0; font-size: 0.9em; color: #555;">Obtén recomendaciones para todos los productos.</p>
                     </div>
                     """, unsafe_allow_html=True)
             
