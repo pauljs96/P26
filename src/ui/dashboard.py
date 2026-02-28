@@ -1620,18 +1620,6 @@ class Dashboard:
         </style>
         """, unsafe_allow_html=True)
 
-        # ======================== SISTEMA DE NAVEGACIÓN =========================
-        # Inicializar variable para saber si mostrar instrucción de navegación
-        if "show_nav_hint" not in st.session_state:
-            st.session_state.show_nav_hint = None
-        if "hint_text" not in st.session_state:
-            st.session_state.hint_text = ""
-
-        # Mostrar aviso de navegación si fue presionado un botón
-        if st.session_state.show_nav_hint:
-            st.warning(f"🔗 {st.session_state.hint_text}", icon="👆")
-            st.session_state.show_nav_hint = False
-
         # ------------------------------
         # TABS - Todos ven el mismo contenido (excepto Panel Admin)
         # ------------------------------
@@ -1697,40 +1685,44 @@ class Dashboard:
                 col1, col2, col3, col4 = st.columns(4)
                 
                 with col1:
-                    if st.button("📈 Demanda y Componentes", key="btn_nav_demanda", use_container_width=True):
-                        st.session_state.show_nav_hint = True
-                        st.session_state.hint_text = "Haz click en la pestaña '📊 Análisis Individual' arriba → '🧩 Demanda y Componentes'"
-                        st.rerun()
                     st.markdown("""
+                    **📈 Demanda y Componentes**
+                    
                     Visualiza desglose de demanda: venta, consumo y guía externa.
                     """)
+                    if st.button("📊 Ver Demanda", key="btn_demanda", use_container_width=True):
+                        st.markdown("👉 **Ir a:** Análisis Individual → Demanda y Componentes")
+                        st.info("Haz click en la pestaña 'Análisis Individual' arriba → Demanda y Componentes", icon="🔗")
                 
                 with col2:
-                    if st.button("🏢 Stock y Diagnóstico", key="btn_nav_stock", use_container_width=True):
-                        st.session_state.show_nav_hint = True
-                        st.session_state.hint_text = "Haz click en la pestaña '📊 Análisis Individual' arriba → '🏢 Stock y Diagnóstico'"
-                        st.rerun()
                     st.markdown("""
+                    **🏢 Stock y Diagnóstico**
+                    
                     Analiza niveles de stock histórico y diagnóstico actual.
                     """)
+                    if st.button("📦 Ver Stock", key="btn_stock", use_container_width=True):
+                        st.markdown("👉 **Ir a:** Análisis Individual → Stock y Diagnóstico")
+                        st.info("Haz click en la pestaña 'Análisis Individual' arriba → Stock y Diagnóstico", icon="🔗")
                 
                 with col3:
-                    if st.button("🏆 Comparador de Modelos", key="btn_nav_comparador", use_container_width=True):
-                        st.session_state.show_nav_hint = True
-                        st.session_state.hint_text = "Haz click en la pestaña '📊 Análisis Individual' arriba → '🏆 Comparador de Modelos'"
-                        st.rerun()
                     st.markdown("""
+                    **🏆 Comparador de Modelos**
+                    
                     Compara Baselines vs ETS vs Random Forest.
                     """)
+                    if st.button("⚖️ Comparar Modelos", key="btn_comparador", use_container_width=True):
+                        st.markdown("👉 **Ir a:** Análisis Individual → Comparador de Modelos")
+                        st.info("Haz click en la pestaña 'Análisis Individual' arriba → Comparador de Modelos", icon="🔗")
                 
                 with col4:
-                    if st.button("🎯 Recomendación Individual", key="btn_nav_reco_indiv", use_container_width=True):
-                        st.session_state.show_nav_hint = True
-                        st.session_state.hint_text = "Haz click en la pestaña '📊 Análisis Individual' arriba → '🎯 Recomendación Individual'"
-                        st.rerun()
                     st.markdown("""
+                    **🎯 Recomendación Individual**
+                    
                     Obtén cantidad exacta a producir el próximo mes.
                     """)
+                    if st.button("📢 Recomendación", key="btn_reco_indiv", use_container_width=True):
+                        st.markdown("👉 **Ir a:** Análisis Individual → Recomendación Individual")
+                        st.info("Haz click en la pestaña 'Análisis Individual' arriba → Recomendación Individual", icon="🔗")
                 
                 st.divider()
                 
@@ -1739,40 +1731,44 @@ class Dashboard:
                 col5, col6, col7, col8 = st.columns(4)
                 
                 with col5:
-                    if st.button("📊 Resumen Comparativa", key="btn_nav_resumen", use_container_width=True):
-                        st.session_state.show_nav_hint = True
-                        st.session_state.hint_text = "Haz click en la pestaña '📊 Análisis de Grupo' arriba → '📊 Resumen Comparativa Global'"
-                        st.rerun()
                     st.markdown("""
+                    **📊 Resumen Comparativa**
+                    
                     Comparar rendimiento de todos los productos globalmente.
                     """)
+                    if st.button("🌍 Resumen Global", key="btn_resumen", use_container_width=True):
+                        st.markdown("👉 **Ir a:** Análisis de Grupo → Resumen Comparativa Global")
+                        st.info("Haz click en la pestaña 'Análisis de Grupo' arriba → Resumen Comparativa Global", icon="🔗")
                 
                 with col6:
-                    if st.button("✅ Validación Retrospectiva", key="btn_nav_validacion", use_container_width=True):
-                        st.session_state.show_nav_hint = True
-                        st.session_state.hint_text = "Haz click en la pestaña '📊 Análisis de Grupo' arriba → '✅ Validación Retrospectiva'"
-                        st.rerun()
                     st.markdown("""
+                    **✅ Validación Retrospectiva**
+                    
                     Simula la política de producción en el histórico.
                     """)
+                    if st.button("🧪 Validación", key="btn_validacion", use_container_width=True):
+                        st.markdown("👉 **Ir a:** Análisis de Grupo → Validación Retrospectiva")
+                        st.info("Haz click en la pestaña 'Análisis de Grupo' arriba → Validación Retrospectiva", icon="🔗")
                 
                 with col7:
-                    if st.button("📉 Comparativa Retrospectiva", key="btn_nav_comparativa", use_container_width=True):
-                        st.session_state.show_nav_hint = True
-                        st.session_state.hint_text = "Haz click en la pestaña '📊 Análisis de Grupo' arriba → '📉 Comparativa Retrospectiva'"
-                        st.rerun()
                     st.markdown("""
+                    **📉 Comparativa Retrospectiva**
+                    
                     Compara costos: sin sistema vs con sistema.
                     """)
+                    if st.button("⚖️ Comparativa Costos", key="btn_comparativa", use_container_width=True):
+                        st.markdown("👉 **Ir a:** Análisis de Grupo → Comparativa Retrospectiva")
+                        st.info("Haz click en la pestaña 'Análisis de Grupo' arriba → Comparativa Retrospectiva", icon="🔗")
                 
                 with col8:
-                    if st.button("📑 Recomendación Masiva", key="btn_nav_reco_masiva", use_container_width=True):
-                        st.session_state.show_nav_hint = True
-                        st.session_state.hint_text = "Haz click en la pestaña '📊 Análisis de Grupo' arriba → '📑 Recomendación Masiva'"
-                        st.rerun()
                     st.markdown("""
+                    **📑 Recomendación Masiva**
+                    
                     Obtén recomendaciones para todos los productos.
                     """)
+                    if st.button("📋 Rec. Masiva", key="btn_reco_masiva", use_container_width=True):
+                        st.markdown("👉 **Ir a:** Análisis de Grupo → Recomendación Masiva")
+                        st.info("Haz click en la pestaña 'Análisis de Grupo' arriba → Recomendación Masiva", icon="🔗")
             
             # Gráfico Demo compacto
             st.markdown("#### 📈 Ejemplo de Predicción")
