@@ -1776,7 +1776,7 @@ class Dashboard:
             
             # Descripción colapsable con botones interactivos
             with st.expander("**🎯 ¿Qué encontrarás aquí? / Funciones disponibles**", expanded=True):
-                st.markdown("**Elige una sección para comenzar:**")
+                
                 
                 # ========== FILA 1: ANÁLISIS INDIVIDUAL ==========
                 st.markdown("##### 📊 Análisis Individual (por producto)")
@@ -1973,10 +1973,25 @@ class Dashboard:
                     """, unsafe_allow_html=True)
             
             # Gráfico Demo compacto
-            st.markdown("#### 📈 Ejemplo de Predicción")
             
             fig_demo = crear_grafico_demo()
             st.plotly_chart(fig_demo, use_container_width=True)
+            
+            # Resumen del objetivo del sistema
+            st.markdown("""
+            <div style="
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                padding: 15px;
+                border-radius: 10px;
+                border-left: 4px solid #1976D2;
+                margin-top: 15px;
+            ">
+                <p style="margin: 0; font-size: 0.95em; color: #333; line-height: 1.6;">
+                    <strong>🎯 Objetivo del Sistema:</strong> Optimizar la planificación de producción mediante pronósticos precisos de demanda, 
+                    análisis de stock y recomendaciones inteligentes para minimizar costos y maximizar eficiencia operativa.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
 
         # TAB 1: DEMANDA Y COMPONENTES
         # ==========================================================
