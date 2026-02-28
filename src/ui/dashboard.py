@@ -1534,14 +1534,17 @@ class Dashboard:
         dm_abc["Codigo"] = dm_abc["Codigo"].astype(str).str.strip()
         abc_df = build_abc_from_demand(dm_abc)  # columnas: Codigo, Demanda_Total, Share, CumShare, ABC
 
-        # === FILTROS MOVIDOS DEL SIDEBAR A EXPANDER EN UI ===
-        with st.expander("🔍 **Filtros** (Selecciona Producto)", expanded=False):
+        # === FILTROS EN SIDEBAR (compacto) ===
+        st.sidebar.divider()
+        with st.sidebar.expander("🔍 **Filtros de Producto**", expanded=False):
             col_abc, col_prod = st.columns(2)
             
             with col_abc:
                 # 1) Filtro ABC
                 abc_options = ["A", "B", "C", "Todos"]
-                abc_sel = st.selectbox("Categoría ABC", options=abc_options, index=0)
+                abc_sel = st.selectbox("Categoría ABC", options=abc_options, index=0, key="sidebar_abc")
+
+
 
             with col_prod:
                 # 2) Productos filtrados por ABC
@@ -1563,7 +1566,39 @@ class Dashboard:
                     st.warning("No hay productos en esa categoría ABC.")
                     prod_sel = None
                 else:
-                    prod_sel = st.selectbox("Producto (Código)", options=productos)
+                    prod_sel = st.selectbox("Producto (Código)", options=productos, key="sidebar_prod")
+
+        # === BOTÓN FLOTANTE VISUAL EN SIDEBAR ===
+        st.sidebar.markdown("""
+        <style>
+        .floating-filter-badge {
+            position: fixed;
+            bottom: 30px;
+            right: 20px;
+            background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+            color: white;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            cursor: pointer;
+            z-index: 1000;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+            50% { box-shadow: 0 4px 20px rgba(25, 118, 210, 0.4); }
+        }
+        .floating-filter-badge:hover {
+            transform: scale(1.1);
+        }
+        </style>
+        <div class='floating-filter-badge' title='Filtros disponibles en el sidebar'>🔍</div>
+        """, unsafe_allow_html=True)
 
 
         # Verificar si es admin para mostrar tab de administración
