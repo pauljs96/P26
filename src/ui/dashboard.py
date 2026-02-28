@@ -1620,36 +1620,17 @@ class Dashboard:
         </style>
         """, unsafe_allow_html=True)
 
-        # ======================== SISTEMA DE NAVEGACIÓN INTERNA ========================
-        # Inicializar variable de navegación si no existe
-        if "nav_to_tab" not in st.session_state:
-            st.session_state.nav_to_tab = None
+        # ======================== SISTEMA DE NAVEGACIÓN =========================
+        # Inicializar variable para saber si mostrar instrucción de navegación
+        if "show_nav_hint" not in st.session_state:
+            st.session_state.show_nav_hint = None
+        if "hint_text" not in st.session_state:
+            st.session_state.hint_text = ""
 
-        # Si hay navegación pendiente, agregar script para auto-seleccionar el tab
-        if st.session_state.nav_to_tab is not None:
-            main_tab_idx, sub_tab_idx = st.session_state.nav_to_tab
-            # JavaScript para simular click en el tab correspondiente después de renderizar
-            st.markdown(f"""
-            <script>
-            setTimeout(function() {{
-                // Intentar encontrar y hacer click en el tab correspondiente
-                const tabs = document.querySelectorAll('button[role="tab"]');
-                if (tabs.length > {main_tab_idx}) {{
-                    tabs[{main_tab_idx}].click();
-                    // Esperar un momento para que el tab se abra, luego click en el sub-tab si es necesario
-                    setTimeout(function() {{
-                        const subTabs = document.querySelectorAll('button[role="tab"]');
-                        if (subTabs.length > {sub_tab_idx}) {{
-                            subTabs[{sub_tab_idx}].click();
-                        }}
-                    }}, 100);
-                }}
-            }}, 300);
-            </script>
-            """, unsafe_allow_html=True)
-            
-            # Limpiar el flag de navegación para evitar que se repita
-            st.session_state.nav_to_tab = None
+        # Mostrar aviso de navegación si fue presionado un botón
+        if st.session_state.show_nav_hint:
+            st.warning(f"🔗 {st.session_state.hint_text}", icon="👆")
+            st.session_state.show_nav_hint = False
 
         # ------------------------------
         # TABS - Todos ven el mismo contenido (excepto Panel Admin)
@@ -1717,7 +1698,8 @@ class Dashboard:
                 
                 with col1:
                     if st.button("📈 Demanda y Componentes", key="btn_nav_demanda", use_container_width=True):
-                        st.session_state.nav_to_tab = (1, 0)  # (main_tab, sub_tab)
+                        st.session_state.show_nav_hint = True
+                        st.session_state.hint_text = "Haz click en la pestaña '📊 Análisis Individual' arriba → '🧩 Demanda y Componentes'"
                         st.rerun()
                     st.markdown("""
                     Visualiza desglose de demanda: venta, consumo y guía externa.
@@ -1725,7 +1707,8 @@ class Dashboard:
                 
                 with col2:
                     if st.button("🏢 Stock y Diagnóstico", key="btn_nav_stock", use_container_width=True):
-                        st.session_state.nav_to_tab = (1, 1)
+                        st.session_state.show_nav_hint = True
+                        st.session_state.hint_text = "Haz click en la pestaña '📊 Análisis Individual' arriba → '🏢 Stock y Diagnóstico'"
                         st.rerun()
                     st.markdown("""
                     Analiza niveles de stock histórico y diagnóstico actual.
@@ -1733,7 +1716,8 @@ class Dashboard:
                 
                 with col3:
                     if st.button("🏆 Comparador de Modelos", key="btn_nav_comparador", use_container_width=True):
-                        st.session_state.nav_to_tab = (1, 2)
+                        st.session_state.show_nav_hint = True
+                        st.session_state.hint_text = "Haz click en la pestaña '📊 Análisis Individual' arriba → '🏆 Comparador de Modelos'"
                         st.rerun()
                     st.markdown("""
                     Compara Baselines vs ETS vs Random Forest.
@@ -1741,7 +1725,8 @@ class Dashboard:
                 
                 with col4:
                     if st.button("🎯 Recomendación Individual", key="btn_nav_reco_indiv", use_container_width=True):
-                        st.session_state.nav_to_tab = (1, 3)
+                        st.session_state.show_nav_hint = True
+                        st.session_state.hint_text = "Haz click en la pestaña '📊 Análisis Individual' arriba → '🎯 Recomendación Individual'"
                         st.rerun()
                     st.markdown("""
                     Obtén cantidad exacta a producir el próximo mes.
@@ -1755,7 +1740,8 @@ class Dashboard:
                 
                 with col5:
                     if st.button("📊 Resumen Comparativa", key="btn_nav_resumen", use_container_width=True):
-                        st.session_state.nav_to_tab = (2, 0)
+                        st.session_state.show_nav_hint = True
+                        st.session_state.hint_text = "Haz click en la pestaña '📊 Análisis de Grupo' arriba → '📊 Resumen Comparativa Global'"
                         st.rerun()
                     st.markdown("""
                     Comparar rendimiento de todos los productos globalmente.
@@ -1763,7 +1749,8 @@ class Dashboard:
                 
                 with col6:
                     if st.button("✅ Validación Retrospectiva", key="btn_nav_validacion", use_container_width=True):
-                        st.session_state.nav_to_tab = (2, 1)
+                        st.session_state.show_nav_hint = True
+                        st.session_state.hint_text = "Haz click en la pestaña '📊 Análisis de Grupo' arriba → '✅ Validación Retrospectiva'"
                         st.rerun()
                     st.markdown("""
                     Simula la política de producción en el histórico.
@@ -1771,7 +1758,8 @@ class Dashboard:
                 
                 with col7:
                     if st.button("📉 Comparativa Retrospectiva", key="btn_nav_comparativa", use_container_width=True):
-                        st.session_state.nav_to_tab = (2, 2)
+                        st.session_state.show_nav_hint = True
+                        st.session_state.hint_text = "Haz click en la pestaña '📊 Análisis de Grupo' arriba → '📉 Comparativa Retrospectiva'"
                         st.rerun()
                     st.markdown("""
                     Compara costos: sin sistema vs con sistema.
@@ -1779,7 +1767,8 @@ class Dashboard:
                 
                 with col8:
                     if st.button("📑 Recomendación Masiva", key="btn_nav_reco_masiva", use_container_width=True):
-                        st.session_state.nav_to_tab = (2, 3)
+                        st.session_state.show_nav_hint = True
+                        st.session_state.hint_text = "Haz click en la pestaña '📊 Análisis de Grupo' arriba → '📑 Recomendación Masiva'"
                         st.rerun()
                     st.markdown("""
                     Obtén recomendaciones para todos los productos.
