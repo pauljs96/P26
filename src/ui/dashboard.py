@@ -1620,29 +1620,36 @@ class Dashboard:
         </style>
         """, unsafe_allow_html=True)
 
-        # ======================== SISTEMA DE NAVEGACIÓN VÍA QUERY PARAMS ========================
-        # Leer parámetros de URL para determinar qué tab mostrar
-        query_params = st.query_params
-        active_main_tab = query_params.get("tab", "dashboard")  # dashboard, individual, grupo, admin
-        active_sub_tab = int(query_params.get("subtab", "0")) if query_params.get("subtab") else 0
+        # ======================== SISTEMA DE NAVEGACIÓN INTERNA ========================
+        # Inicializar variable de navegación si no existe
+        if "nav_to_tab" not in st.session_state:
+            st.session_state.nav_to_tab = None
 
-        # Mapeo de names a índices de tabs principales
-        main_tab_names = ["🏠 Dashboard", "📊 Análisis Individual", "📊 Análisis de Grupo"]
-        if is_admin:
-            main_tab_names.append("⚙️ Panel Admin")
-        
-        main_tab_index = {
-            "dashboard": 0,
-            "individual": 1,
-            "grupo": 2,
-            "admin": 3 if is_admin else None
-        }
-
-        # Convertir nombre a índice
-        current_main_tab_idx = main_tab_index.get(active_main_tab, 0)
-        if current_main_tab_idx is None:
-            current_main_tab_idx = 0
-            active_main_tab = "dashboard"
+        # Si hay navegación pendiente, agregar script para auto-seleccionar el tab
+        if st.session_state.nav_to_tab is not None:
+            main_tab_idx, sub_tab_idx = st.session_state.nav_to_tab
+            # JavaScript para simular click en el tab correspondiente después de renderizar
+            st.markdown(f"""
+            <script>
+            setTimeout(function() {{
+                // Intentar encontrar y hacer click en el tab correspondiente
+                const tabs = document.querySelectorAll('button[role="tab"]');
+                if (tabs.length > {main_tab_idx}) {{
+                    tabs[{main_tab_idx}].click();
+                    // Esperar un momento para que el tab se abra, luego click en el sub-tab si es necesario
+                    setTimeout(function() {{
+                        const subTabs = document.querySelectorAll('button[role="tab"]');
+                        if (subTabs.length > {sub_tab_idx}) {{
+                            subTabs[{sub_tab_idx}].click();
+                        }}
+                    }}, 100);
+                }}
+            }}, 300);
+            </script>
+            """, unsafe_allow_html=True)
+            
+            # Limpiar el flag de navegación para evitar que se repita
+            st.session_state.nav_to_tab = None
 
         # ------------------------------
         # TABS - Todos ven el mismo contenido (excepto Panel Admin)
@@ -1709,25 +1716,33 @@ class Dashboard:
                 col1, col2, col3, col4 = st.columns(4)
                 
                 with col1:
-                    st.link_button("📈 Demanda y Componentes", "/?tab=individual&subtab=0", use_container_width=True)
+                    if st.button("📈 Demanda y Componentes", key="btn_nav_demanda", use_container_width=True):
+                        st.session_state.nav_to_tab = (1, 0)  # (main_tab, sub_tab)
+                        st.rerun()
                     st.markdown("""
                     Visualiza desglose de demanda: venta, consumo y guía externa.
                     """)
                 
                 with col2:
-                    st.link_button("🏢 Stock y Diagnóstico", "/?tab=individual&subtab=1", use_container_width=True)
+                    if st.button("🏢 Stock y Diagnóstico", key="btn_nav_stock", use_container_width=True):
+                        st.session_state.nav_to_tab = (1, 1)
+                        st.rerun()
                     st.markdown("""
                     Analiza niveles de stock histórico y diagnóstico actual.
                     """)
                 
                 with col3:
-                    st.link_button("🏆 Comparador de Modelos", "/?tab=individual&subtab=2", use_container_width=True)
+                    if st.button("🏆 Comparador de Modelos", key="btn_nav_comparador", use_container_width=True):
+                        st.session_state.nav_to_tab = (1, 2)
+                        st.rerun()
                     st.markdown("""
                     Compara Baselines vs ETS vs Random Forest.
                     """)
                 
                 with col4:
-                    st.link_button("🎯 Recomendación Individual", "/?tab=individual&subtab=3", use_container_width=True)
+                    if st.button("🎯 Recomendación Individual", key="btn_nav_reco_indiv", use_container_width=True):
+                        st.session_state.nav_to_tab = (1, 3)
+                        st.rerun()
                     st.markdown("""
                     Obtén cantidad exacta a producir el próximo mes.
                     """)
@@ -1739,25 +1754,33 @@ class Dashboard:
                 col5, col6, col7, col8 = st.columns(4)
                 
                 with col5:
-                    st.link_button("📊 Resumen Comparativa", "/?tab=grupo&subtab=0", use_container_width=True)
+                    if st.button("📊 Resumen Comparativa", key="btn_nav_resumen", use_container_width=True):
+                        st.session_state.nav_to_tab = (2, 0)
+                        st.rerun()
                     st.markdown("""
                     Comparar rendimiento de todos los productos globalmente.
                     """)
                 
                 with col6:
-                    st.link_button("✅ Validación Retrospectiva", "/?tab=grupo&subtab=1", use_container_width=True)
+                    if st.button("✅ Validación Retrospectiva", key="btn_nav_validacion", use_container_width=True):
+                        st.session_state.nav_to_tab = (2, 1)
+                        st.rerun()
                     st.markdown("""
                     Simula la política de producción en el histórico.
                     """)
                 
                 with col7:
-                    st.link_button("📉 Comparativa Retrospectiva", "/?tab=grupo&subtab=2", use_container_width=True)
+                    if st.button("📉 Comparativa Retrospectiva", key="btn_nav_comparativa", use_container_width=True):
+                        st.session_state.nav_to_tab = (2, 2)
+                        st.rerun()
                     st.markdown("""
                     Compara costos: sin sistema vs con sistema.
                     """)
                 
                 with col8:
-                    st.link_button("📑 Recomendación Masiva", "/?tab=grupo&subtab=3", use_container_width=True)
+                    if st.button("📑 Recomendación Masiva", key="btn_nav_reco_masiva", use_container_width=True):
+                        st.session_state.nav_to_tab = (2, 3)
+                        st.rerun()
                     st.markdown("""
                     Obtén recomendaciones para todos los productos.
                     """)
