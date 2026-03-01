@@ -2939,8 +2939,8 @@ class Dashboard:
             if run_port:
                 with st.spinner("Calculando portafolio ABC A (puede tardar)..."):
                     resumenA, detalleA = run_portfolio_cost_comparison_abcA(
-                        demand_monthly=res.demand_monthly,
-                        stock_monthly=res.stock_monthly,
+                        demand_monthly=res_demand,
+                        stock_monthly=res_stock,
                         abc_df=abc_df,   # ya existe arriba en tu render
                         eval_months=int(eval_months_port),
                         cost_stock_unit=float(cost_stock_unit_port),
