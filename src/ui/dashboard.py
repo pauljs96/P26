@@ -2902,6 +2902,29 @@ class Dashboard:
 
                 st.dataframe(df_cmp, use_container_width=True, height=420)
 
+                # Explicación de columnas
+                with st.expander("📋 Significado de las columnas en la tabla comparativa", expanded=False):
+                    st.markdown("""
+                    | Columna | Significado |
+                    |---------|------------|
+                    | **Mes** | Mes del período evaluado |
+                    | **Base_Stock** | Stock mensual si usas el método tradicional (producción = demanda real anterior) |
+                    | **Base_Produccion** | Producción mes a mes con método baseline/reactivo |
+                    | **Base_Faltante** | Unidades NO satisfechas sin sistema (quiebre) |
+                    | **Base_Inventario** | Inventario promedio mantenido en baseline |
+                    | **Base_Costo_stock** | Costo de mantener inventario en baseline |
+                    | **Base_Costo_stockout** | Costo de quiebres en baseline |
+                    | **Base_Costo_total** | Costo total (inventario + quiebres) en baseline |
+                    | **Sys_Stock** | Stock mensual con la política inteligente (sistema) |
+                    | **Sys_Produccion** | Producción recomendada por política inteligente |
+                    | **Sys_Faltante** | Unidades NO satisfechas con sistema (quiebre reducido) |
+                    | **Sys_Inventario** | Inventario promedio mantenido con sistema |
+                    | **Sys_Costo_stock** | Costo de inventario con sistema |
+                    | **Sys_Costo_stockout** | Costo de quiebres con sistema (menor) |
+                    | **Sys_Costo_total** | Costo total (inventario + quiebres) con sistema |
+                    | **Ahorro_Costo** | Diferencia: Base_Costo_total - Sys_Costo_total (positivo = ahorro) |
+                    """)
+
                 fig_cost = px.line(df_cmp, x="Mes", y=["Base_Costo_total", "Sys_Costo_total"], markers=True,
                                 title="Costo total mensual: Baseline vs Sistema")
                 st.plotly_chart(fig_cost, use_container_width=True)
