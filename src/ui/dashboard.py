@@ -2873,12 +2873,46 @@ class Dashboard:
             row = abc_df[abc_df["Codigo"] == str(prod_sel)]
             abc_class = str(row.iloc[0]["ABC"]) if not row.empty else "C"
 
-            winner = st.session_state.get("winner_model", "ETS(Holt-Winters)")  # si guardas winner, sino pon uno fijo
-
+            # ==================== AUTO-CALCULAR eval_months Y winner ====================
+            # Esto se calcula UNA SOLA VEZ de forma automática para ese producto
             eval_months = max(6, int(len(hist) * 0.25))
-            st.info(f"📊 Evaluando con **{eval_months} meses** (25% de {len(hist)}) para máxima comparabilidad")
+            
+            # AUTO-calcular ganador para este producto (para máxima consistencia)
+            ets_params_auto = dict(seasonal_periods=12, trend="add", seasonal="add", damped_trend=False, min_obs=24)
+            rf_params_auto = dict(n_estimators=400, min_obs=24, min_samples_leaf=1, random_state=42)
+            
+            bt_base_auto = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(eval_months), ma_window=3)
+            ets_auto = ETSForecaster(**ets_params_auto)
+            bt_ets_auto = backtest_ets_1step(hist, y_col="Demanda_Unid", test_months=int(eval_months), ets=ets_auto)
+            rf_auto = RFForecaster(**rf_params_auto)
+            bt_rf_auto = backtest_rf_1step(hist, y_col="Demanda_Unid", test_months=int(eval_months), rf=rf_auto)
+            
+            cmp_auto = compare_models_metrics(bt_base_auto.metrics, bt_ets_auto.metrics, bt_rf_auto.metrics, sort_by="MAE")
+            winner = str(cmp_auto.iloc[0]["Modelo"]) if not cmp_auto.empty else "ETS(Holt-Winters)"
+            
+            # 💾 Guardar parámetros sincronizados en session_state
+            st.session_state.sync_eval_months = eval_months
+            st.session_state.sync_winner_model = winner
+            st.session_state.sync_product_code = str(prod_sel)
+
+            # Mostrar parámetros sincronizados
+            col_info1, col_info2, col_info3 = st.columns(3)
+            with col_info1:
+                st.metric("📅 Meses a evaluar (AUTO)", f"{eval_months}", delta=f"25% de {len(hist)}")
+            with col_info2:
+                st.metric("🏆 Modelo ganador (AUTO)", winner.split("(")[0].strip())
+            with col_info3:
+                st.metric("📊 Producto", str(prod_sel))
+            
+            st.info(f"✅ **Parámetros sincronizados:** Todos los tabs usarán **{eval_months} meses** y modelo **{winner}** para {prod_sel}")
+            
+            # Inputs de costos (se guardan también)
             cost_stock_unit = st.number_input("Costo inventario por unidad (proxy)", min_value=0.0, value=1.0, step=0.5)
             cost_stockout_unit = st.number_input("Costo quiebre por unidad (proxy)", min_value=0.0, value=5.0, step=0.5)
+            
+            # 💾 Guardar costos sincronizados
+            st.session_state.sync_cost_stock_unit = cost_stock_unit
+            st.session_state.sync_cost_stockout_unit = cost_stockout_unit
 
             run_cmp = st.button("▶️ Ejecutar comparativa", type="primary", key="run_cmp")
 
@@ -2950,16 +2984,42 @@ class Dashboard:
             st.divider()
             st.subheader("📦 Portafolio: Comparativa costos SOLO ABC A (agregado)")
 
-            eval_months_port = st.slider("Meses a evaluar portafolio (últimos)", 6, 24, 12, 1, key="port_eval")
-            cost_stock_unit_port = st.number_input("Costo inventario por unidad (proxy) - Portafolio", min_value=0.0, value=1.0, step=0.5, key="port_cinv")
-            cost_stockout_unit_port = st.number_input("Costo quiebre por unidad (proxy) - Portafolio", min_value=0.0, value=5.0, step=0.5, key="port_cbrk")
-
-            winner_mode = st.selectbox(
-                "Modelo en portafolio",
-                options=["AUTO", "ETS(Holt-Winters)", "RandomForest", "Naive", "Seasonal12", "MA3", "MA6"],
-                index=0,
-                key="port_winner_mode"
-            )
+            # ==================== SINCRONIZAR PARÁMETROS DESDE COMPARATIVA INDIVIDUAL ====================
+            # Si el usuario ya evaluó un producto en la sección Individual, usamos esos parámetros
+            has_sync_params = st.session_state.get("sync_eval_months") is not None
+            
+            if has_sync_params:
+                eval_months_port = st.session_state.get("sync_eval_months")
+                cost_stock_unit_port = st.session_state.get("sync_cost_stock_unit", 1.0)
+                cost_stockout_unit_port = st.session_state.get("sync_cost_stockout_unit", 5.0)
+                winner_mode = st.session_state.get("sync_winner_model", "ETS(Holt-Winters)")
+                prod_individual = st.session_state.get("sync_product_code", "N/A")
+                
+                # Mostrar parámetros sincronizados
+                st.success(f"🔗 **Parámetros sincronizados desde Comparativa Individual**")
+                col_sync1, col_sync2, col_sync3, col_sync4 = st.columns(4)
+                with col_sync1:
+                    st.metric("📅 Meses", eval_months_port)
+                with col_sync2:
+                    st.metric("🏆 Modelo", winner_mode.split("(")[0].strip())
+                with col_sync3:
+                    st.metric("Costo Inv", f"{cost_stock_unit_port:.1f}")
+                with col_sync4:
+                    st.metric("Costo Quiebre", f"{cost_stockout_unit_port:.1f}")
+                
+                st.info(f"📊 Evaluando portafolio ABC A usando los mismos parámetros que se usaron para **{prod_individual}** en la sección Individual.")
+            else:
+                # Si NO hay parámetros sincronizados, permitir que el usuario los defina
+                st.warning("⚠️ Primero ejecuta 'Comparativa Retrospectiva' en la sección Individual para sincronizar parámetros automáticamente.")
+                eval_months_port = st.slider("Meses a evaluar portafolio (últimos)", 6, 24, 12, 1, key="port_eval")
+                cost_stock_unit_port = st.number_input("Costo inventario por unidad (proxy) - Portafolio", min_value=0.0, value=1.0, step=0.5, key="port_cinv")
+                cost_stockout_unit_port = st.number_input("Costo quiebre por unidad (proxy) - Portafolio", min_value=0.0, value=5.0, step=0.5, key="port_cbrk")
+                winner_mode = st.selectbox(
+                    "Modelo en portafolio",
+                    options=["AUTO", "ETS(Holt-Winters)", "RandomForest", "Naive", "Seasonal12", "MA3", "MA6"],
+                    index=0,
+                    key="port_winner_mode"
+                )
 
             max_products_port = st.selectbox(
                 "Cantidad de productos ABC A a procesar (performance)",
