@@ -2830,15 +2830,16 @@ class Dashboard:
                         | Columna | Significado |
                         |---------|------------|
                         | **Mes_target** | Mes de la simulación que se está evaluando |
-                        | **Demanda** | Unidades que los clientes pidieron ese mes |
-                        | **Stock_ini** | Stock disponible al INICIO del mes |
-                        | **Pronostico** | Predicción de demanda para el siguiente mes (usada para calcular producción) |
+                        | **Stock_inicio** | Stock disponible al INICIO del mes |
+                        | **Forecast** | Predicción de demanda para el siguiente mes (usada para calcular producción) |
+                        | **Sigma_proxy** | Error promedio del modelo (usado para calcular stock de seguridad) |
                         | **SS** | Stock de seguridad calculado según la política (protección contra variaciones) |
-                        | **Produccion** | Cantidad que DEBISTE PRODUCIR ese mes (según la política) |
-                        | **Venta_real** | Lo que efectivamente se vendió (demanda satisfecha) |
-                        | **Stock_fin** | Stock disponible al FINAL del mes (después de ventas y producción) |
+                        | **Produccion_Q** | Cantidad que DEBISTE PRODUCIR ese mes (según la política) |
+                        | **Demand_real** | Unidades que los clientes solicitaron ese mes |
+                        | **Servido** | Lo que efectivamente se pudo servir/vender |
                         | **Faltante** | Unidades que NO se pudieron vender (quiebre de stock) |
-                        | **Fill_Rate** | % de demanda satisfecha ese mes (si es 100% = sin quiebre) |
+                        | **Stock_fin** | Stock disponible al FINAL del mes (después de ventas y producción) |
+                        | **Quiebre** | Indicador (1=sí hay quiebre, 0=no hay) |
                         """)
                     
                     st.markdown("#### 📊 Detalle completo por mes")
