@@ -2740,19 +2740,109 @@ class Dashboard:
                             sigma_fixed=mae_win,   # 👈 CLAVE
                         )
 
+                    # ========== RESUMEN DE LA SIMULACIÓN ==========
+                    st.markdown("---")
+                    st.markdown("### 📊 Resultados de la Simulación")
+                    
+                    # Resumen explicativo
+                    st.markdown(f"""
+                    **¿Qué se simuló?** Se ejecutó la política de producción día a día durante {eval_months} meses 
+                    usando el modelo ganador (**{winner}**) para pronosticar la demanda y calcular stock de seguridad.
+                    
+                    **Lógica de la política:**
+                    - 📈 Cada mes se pronostica la demanda esperada
+                    - 🛡️ Se suma stock de seguridad (protección ante variaciones)
+                    - 📦 Se resta stock disponible
+                    - ✅ El resultado es lo que debes producir
+                    
+                    **Beneficios esperados:**
+                    - Reducción de quiebres (faltantes de stock)
+                    - Optimización del inventario promedio
+                    - Mayor fill rate (cumplimiento de demanda)
+                    """)
+                    
+                    # KPIs principales con mejor visual
                     c1, c2, c3, c4 = st.columns(4)
-                    c1.metric("Meses con quiebre", f"{kpis['Meses_con_quiebre']}/{kpis['Meses_evaluados']}")
-                    c2.metric("Fill Rate", f"{kpis['FillRate_%']:.1f}%")
-                    c3.metric("Unidades faltantes", f"{kpis['Unidades_faltantes']:,.0f}")
-                    c4.metric("Inventario promedio", f"{kpis['Inventario_promedio']:,.0f}")
-
-                    st.dataframe(df_sim, use_container_width=True, height=420)
-
-                    fig_stock = px.line(df_sim, x="Mes_target", y="Stock_fin", markers=True, title="Stock fin mensual (simulado)")
+                    
+                    with c1:
+                        quiebres = kpis['Meses_con_quiebre']
+                        total_meses = kpis['Meses_evaluados']
+                        st.metric(
+                            "🚨 Meses con quiebre",
+                            f"{quiebres}",
+                            delta=f"de {total_meses}" if total_meses > 0 else "N/A"
+                        )
+                    
+                    with c2:
+                        fill_rate = kpis['FillRate_%']
+                        st.metric(
+                            "✅ Fill Rate",
+                            f"{fill_rate:.1f}%",
+                            delta="Cumplimiento de demanda" if fill_rate >= 90 else "Requiere mejora"
+                        )
+                    
+                    with c3:
+                        faltantes = kpis['Unidades_faltantes']
+                        st.metric(
+                            "📉 Unidades faltantes",
+                            f"{faltantes:,.0f}",
+                            delta="Total en período" if faltantes > 0 else "Excelente"
+                        )
+                    
+                    with c4:
+                        inv_prom = kpis['Inventario_promedio']
+                        st.metric(
+                            "📦 Inventario promedio",
+                            f"{inv_prom:,.0f}",
+                            delta="unidades"
+                        )
+                    
+                    st.divider()
+                    
+                    # Gráfico de Stock con anotaciones
+                    st.markdown("#### 📈 Evolución del Stock")
+                    fig_stock = px.line(df_sim, x="Mes_target", y="Stock_fin", markers=True, 
+                                       title="Stock mensual resultante de la simulación")
+                    fig_stock.add_hline(
+                        y=0, line_dash="dash", line_color="red", 
+                        annotation_text="Punto de quiebre (stock = 0)", 
+                        annotation_position="right"
+                    )
+                    fig_stock.update_yaxes(title_text="Unidades")
+                    fig_stock.update_xaxes(title_text="Mes")
                     st.plotly_chart(fig_stock, use_container_width=True)
-
-                    fig_lost = px.bar(df_sim, x="Mes_target", y="Faltante", title="Unidades faltantes por mes (quiebres)")
+                    
+                    # Gráfico de Faltantes
+                    st.markdown("#### 📉 Quiebres (Faltantes por mes)")
+                    fig_lost = px.bar(df_sim, x="Mes_target", y="Faltante", 
+                                     title="Unidades NO satisfechas por mes (quiebres)",
+                                     color="Faltante",
+                                     color_continuous_scale=["green", "yellow", "red"])
+                    fig_lost.update_yaxes(title_text="Unidades faltantes")
+                    fig_lost.update_xaxes(title_text="Mes")
                     st.plotly_chart(fig_lost, use_container_width=True)
+                    
+                    st.divider()
+                    
+                    # Explicación de variables
+                    with st.expander("📋 Significado de las columnas en la tabla detallada", expanded=False):
+                        st.markdown("""
+                        | Variable | Significado |
+                        |----------|-------------|
+                        | **Mes_target** | Mes de la simulación |
+                        | **Demanda** | Unidades que los clientes pidieron ese mes |
+                        | **Stock_ini** | Stock disponible al inicio del mes |
+                        | **Pronostico** | Predicción de demanda para el siguiente mes |
+                        | **SS** | Stock de seguridad calculado (protección) |
+                        | **Produccion** | Unidades que debiste producir (según política) |
+                        | **Venta_real** | Lo que efectivamente se vendió |
+                        | **Stock_fin** | Stock al final del mes (después de ventas) |
+                        | **Faltante** | Unidades que no pudiste vender (NO cumplir demanda) |
+                        | **Fill_Rate** | % de demanda satisfecha ese mes |
+                        """)
+                    
+                    st.markdown("#### 📊 Detalle completo por mes")
+                    st.dataframe(df_sim, use_container_width=True, height=420)
 
 
 
