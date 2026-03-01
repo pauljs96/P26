@@ -2315,11 +2315,8 @@ class Dashboard:
                 service_level = policy_service_level_by_abc(abc_class)
                 z = z_from_service_level(service_level)
 
-                st.caption(f"ABC del producto: **{abc_class}** → Nivel de servicio por política: **{int(service_level*100)}%** (Z≈{z}) | Lead time: **{lead_time} mes**")
-
                 # Parámetros de evaluación para elegir ganador (automáticos para máxima comparabilidad)
                 test_months = max(6, int(len(hist) * 0.25))
-                st.info(f"📊 Ganador elegido usando **{test_months} meses** de backtest (25% de {len(hist)}, estándar para todos los análisis)")
                 
                 # Auto-optimizar MA (3 vs 6) evaluando Baselines
                 bt_ma3 = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), ma_window=3)
@@ -2327,7 +2324,6 @@ class Dashboard:
                 mae_ma3 = float(bt_ma3.metrics.iloc[0]["MAE"]) if not bt_ma3.metrics.empty else float("inf")
                 mae_ma6 = float(bt_ma6.metrics.iloc[0]["MAE"]) if not bt_ma6.metrics.empty else float("inf")
                 ma_window = 3 if mae_ma3 < mae_ma6 else 6
-                st.caption(f"✅ Ventana MA auto-optimizada: **MA{ma_window}** (MAE: {min(mae_ma3, mae_ma6):.2f})")
 
                 ets_params = dict(seasonal_periods=12, trend="add", seasonal="add", damped_trend=False, min_obs=24)
                 rf_params = dict(n_estimators=400, min_obs=24, min_samples_leaf=1, random_state=42)
@@ -2438,23 +2434,50 @@ class Dashboard:
                     st.markdown(explanation, unsafe_allow_html=True)
                     
                     # INFORMACIÓN TÉCNICA ADICIONAL (desplegable)
-                    with st.expander("📋 Detalles técnicos", expanded=False):
-                        st.caption("ℹ️ Esta información es para equipos analíticos o de confiración")
+                    with st.expander("📋 Detalles técnicos (Variables y cálculos)", expanded=False):
+                        st.markdown("#### 📖 Significado de cada variable:")
                         
-                        det = pd.DataFrame([{
-                            "Producto": str(prod_sel),
-                            "ABC": abc_class,
-                            "Modelo ganador": winner,
-                            "Lead time": f"{lead_time} mes",
-                            "Nivel de servicio": f"{int(service_level*100)}%",
-                            "Error promedio (MAE)": f"{sigma:,.2f}",
-                            "Factor de seguridad (Z)": f"{z}",
-                            "Inversión en stock seg.": f"{ss:,.0f}",
-                            "Producción recomendada": f"{prod_reco_int:,.0f}"
-                        }])
-                        st.dataframe(det, use_container_width=True)
+                        st.markdown("""
+                        **Producto:** {prod_sel} 
+                        > El código/nombre del artículo que estás analizando
                         
-                        st.markdown("**Comparación de modelos usados:**")
+                        **ABC:** {abc}
+                        > Clasificación de importancia basada en demanda total. A=Críticos, B=Importantes, C=Bajos
+                        
+                        **Modelo ganador:** {modelo}
+                        > El método de pronóstico que mejor predice tu demanda histórica (Baselines, ETS o Random Forest)
+                        
+                        **Lead time:** {lt}
+                        > Días/meses que tarda la producción desde que la ordenas (fijo en política)
+                        
+                        **Nivel de servicio:** {sl}
+                        > % de veces que logras satisfacer la demanda (política según ABC: A=95%, B=90%, C=85%)
+                        
+                        **Factor de seguridad (Z):** {z_val}
+                        > Cuántas desviaciones estándar añades al pronóstico. Mayor Z = más stock de seguridad
+                        
+                        **Error promedio (MAE):** {mae}
+                        > Cuánto se desvía el modelo en promedio. Se usa para calcular el stock de seguridad
+                        
+                        **Inversión en stock de seguridad:** {ss}
+                        > Unidades extra que mantienes por si la demanda sube inesperadamente
+                        
+                        **Producción recomendada:** {prod}
+                        > = Demanda esperada + Stock de seguridad - Stock actual
+                        """.format(
+                            prod_sel=str(prod_sel),
+                            abc=abc_class,
+                            modelo=winner,
+                            lt=f"{lead_time} mes",
+                            sl=f"{int(service_level*100)}% (Z≈{z})",
+                            z_val=f"{z}",
+                            mae=f"{sigma:,.2f}",
+                            ss=f"{ss:,.0f}",
+                            prod=f"{prod_reco_int:,.0f}"
+                        ))
+                        
+                        st.divider()
+                        st.markdown("**Comparación detallada de modelos (backtest):")
                         st.dataframe(cmp, use_container_width=True)
                     
                     with st.expander("📈 Validación del modelo (gráfico)", expanded=False):
