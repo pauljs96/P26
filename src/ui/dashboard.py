@@ -2963,6 +2963,42 @@ class Dashboard:
                 s = st.session_state.comparativa_individual_summary
                 period_info = st.session_state.get("comparativa_individual_period", {})
                 
+                # Extraer nombre del usuario (de email)
+                user_email = st.session_state.get("email", "Estimado usuario")
+                user_name = user_email.split("@")[0].replace(".", " ").title() if "@" in user_email else "Estimado usuario"
+                
+                # ==================== RESUMEN EJECUTIVO (AMIGABLE PARA CLIENTE) ====================
+                st.markdown(f"""
+                <div style='
+                    background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
+                    padding: 25px;
+                    border-radius: 10px;
+                    border-left: 5px solid #4CAF50;
+                    margin-bottom: 25px;
+                '>
+                    <h3 style='color: #2E7D32; margin-top: 0; margin-bottom: 15px;'>📊 Resumen Ejecutivo para {user_name}</h3>
+                    
+                    <p style='margin: 10px 0; font-size: 1.05em; color: #333; line-height: 1.6;'>
+                    <strong>¿Qué significa este análisis?</strong><br>
+                    Hemos simulado cómo habría funcionado el producto <strong>{str(prod_sel)}</strong> durante los últimos <strong>{period_info.get("num_months", 0)} meses</strong> 
+                    con dos estrategias diferentes:
+                    </p>
+                    
+                    <ul style='color: #333; margin: 15px 0;'>
+                    <li><strong>❌ Sin el sistema:</strong> Produciendo solo lo que se vendió el mes anterior (método reactivo)</li>
+                    <li><strong>✅ Con el sistema:</strong> Usando pronósticos inteligentes + stock de seguridad (método proactivo)</li>
+                    </ul>
+                    
+                    <p style='margin: 15px 0; font-size: 1.0em; color: #333; line-height: 1.6;'>
+                    <strong>Los resultados muestran:</strong> Implementar el sistema inteligente habría generado un 
+                    <span style='background: #FFE082; padding: 2px 8px; border-radius: 4px; font-weight: bold;'>
+                    ahorro de {s['Ahorro_CostoTotal']:,.0f} unidades monetarias
+                    </span> 
+                    mientras se mejora el servicio (menos quiebres de stock).
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+                
                 # ==================== INFORMACIÓN DEL PERÍODO EVALUADO ====================
                 st.markdown("### 📅 Período Evaluado + Modelo Usado")
                 col_period1, col_period2, col_period3, col_period4, col_period5 = st.columns(5)
@@ -2990,7 +3026,119 @@ class Dashboard:
                         model_display = s.get("Winner", "N/A").split("(")[0].strip()
                         st.metric("🏆 Modelo (costos)", model_display)
                 
-                # ==================== VALIDACIÓN DE COSTOS ====================
+                # ==================== MÉTRICAS PRINCIPALES (AMIGABLES) ====================
+                st.markdown("### 💰 Impacto Financiero y Operativo")
+                
+                ahorro_total = float(s['Ahorro_CostoTotal'])
+                mejora_fillrate = float(s['Mejora_FillRate_pp'])
+                reduccion_faltantes = float(s['Reduccion_Faltantes'])
+                fill_rate_base = float(s['Base']['FillRate_%'])
+                fill_rate_sys = float(s['Sistema']['FillRate_%'])
+                
+                # Determinar interpretación
+                if ahorro_total > 0:
+                    ahorro_color = "🟢"
+                    ahorro_texto = "Ahorro positivo"
+                else:
+                    ahorro_color = "🔴"
+                    ahorro_texto = "Costo adicional"
+                
+                if mejora_fillrate > 0:
+                    fillrate_color = "🟢"
+                    fillrate_texto = f"Mejora en disponibilidad"
+                else:
+                    fillrate_color = "🟡"
+                    fillrate_texto = "Sin cambio significativo"
+                
+                col_m1, col_m2, col_m3 = st.columns(3)
+                
+                with col_m1:
+                    st.markdown(f"""
+                    <div style='
+                        background: linear-gradient(135deg, #FFF9C4 0%, #FFF59D 100%);
+                        padding: 20px;
+                        border-radius: 8px;
+                        text-align: center;
+                    '>
+                        <p style='margin: 0; font-size: 0.9em; color: #666;'>{ahorro_color} {ahorro_texto}</p>
+                        <h2 style='margin: 8px 0; color: #F57F17; font-size: 1.8em;'>{ahorro_total:,.0f}</h2>
+                        <p style='margin: 0; font-size: 0.85em; color: #666;'>unidades ahorradas</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col_m2:
+                    st.markdown(f"""
+                    <div style='
+                        background: linear-gradient(135deg, #E1BEE7 0%, #CE93D8 100%);
+                        padding: 20px;
+                        border-radius: 8px;
+                        text-align: center;
+                    '>
+                        <p style='margin: 0; font-size: 0.9em; color: #666;'>{fillrate_color} {fillrate_texto}</p>
+                        <h2 style='margin: 8px 0; color: #8E24AA; font-size: 1.8em;'>+{mejora_fillrate:.1f}%</h2>
+                        <p style='margin: 0; font-size: 0.85em; color: #666;'>en tasa de servicio</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col_m3:
+                    st.markdown(f"""
+                    <div style='
+                        background: linear-gradient(135deg, #BBDEFB 0%, #90CAF9 100%);
+                        padding: 20px;
+                        border-radius: 8px;
+                        text-align: center;
+                    '>
+                        <p style='margin: 0; font-size: 0.9em; color: #666;'>📦 Reducción de quiebres</p>
+                        <h2 style='margin: 8px 0; color: #1565C0; font-size: 1.8em;'>{reduccion_faltantes:,.0f}</h2>
+                        <p style='margin: 0; font-size: 0.85em; color: #666;'>unidades menos faltantes</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                st.divider()
+                
+                # ==================== INTERPRETACIÓN TEXTUAL ====================
+                st.markdown("### 📈 ¿Qué significa esto para tu negocio?")
+                
+                interpretacion = f"""
+                <div style='
+                    background-color: #FAFAFA;
+                    padding: 20px;
+                    border-left: 4px solid #1976D2;
+                    border-radius: 6px;
+                    line-height: 1.8;
+                    font-size: 0.95em;
+                '>
+                
+                <p>
+                <strong>{user_name},</strong> durante el período de <strong>{period_info.get("num_months", 0)} meses</strong>, 
+                tu estrategia anterior (producir lo que se vendió antes) habría costado aproximadamente 
+                <strong>{s['Base']['Costo_total']:,.0f}</strong> en inventario y quiebres.
+                </p>
+                
+                <p style='margin-top: 15px;'>
+                Si hubiera implementado el sistema inteligente desde entonces, el costo habría sido 
+                <strong>{s['Sistema']['Costo_total']:,.0f}</strong>, lo que representa un <strong>ahorro de {ahorro_total:,.0f}</strong>.
+                </p>
+                
+                <p style='margin-top: 15px;'>
+                <strong>Además:</strong>
+                <ul style='margin: 10px 0;'>
+                <li>✅ Tu disponibilidad de producto mejoraría de <strong>{fill_rate_base:.1f}%</strong> a <strong>{fill_rate_sys:.1f}%</strong></li>
+                <li>✅ Evitarías <strong>{reduccion_faltantes:,.0f} unidades</strong> de clientes insatisfechos</li>
+                <li>✅ Los costos de inventario se optimizarían automáticamente</li>
+                </ul>
+                </p>
+                
+                <p style='margin-top: 15px; color: #2E7D32; font-weight: bold;'>
+                ✨ En resumen: El sistema inteligente te permite ahorrar dinero Y servir mejor a tus clientes.
+                </p>
+                </div>
+                """
+                st.markdown(interpretacion, unsafe_allow_html=True)
+                
+                st.divider()
+                
+                # ==================== VALIDACIÓN TÉCNICA (DESPLEGABLE) ====================
                 st.markdown("### 🔍 Validación Manual de Costos (Suma de filas)")
                 col_cost1, col_cost2, col_cost3 = st.columns(3)
                 
@@ -3010,11 +3158,6 @@ class Dashboard:
                               delta=f"KPI: {s['Ahorro_CostoTotal']:,.1f}")
                 
                 st.divider()
-                
-                c1, c2, c3 = st.columns(3)
-                c1.metric("Ahorro costo total", f"{s['Ahorro_CostoTotal']:,.1f}")
-                c2.metric("Mejora Fill Rate (pp)", f"{s['Mejora_FillRate_pp']:.1f}")
-                c3.metric("Reducción faltantes", f"{s['Reduccion_Faltantes']:,.0f}")
 
                 st.dataframe(df_cmp, use_container_width=True, height=420)
 
