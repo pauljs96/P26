@@ -1996,19 +1996,33 @@ class Dashboard:
         # TAB 1: DEMANDA Y COMPONENTES
         # ==========================================================
         with tab_demanda:
-            st.subheader("📈 Demanda total por mes (producto seleccionado)")
+         
             comp = get_demanda_components(prod_sel)
 
             # Gráfico de demanda total (ancho completo)
             fig_total = px.line(
                 comp, x="Mes", y="Demanda_Total", markers=True,
-                title=f"Demanda total (suma de componentes) - Producto {prod_sel}"
+                title=f"Demanda total histórica - Producto {prod_sel}"
             )
             st.plotly_chart(fig_total, use_container_width=True)
 
             # Tabla de componentes colapsada
             with st.expander("🧩 Detalles: Componentes de demanda por mes", expanded=False):
                 st.dataframe(comp, use_container_width=True, height=380)
+
+            st.divider()
+
+            st.subheader("🧾 Diagnóstico: Guías de remisión")
+            guia = res_movements[res_movements["Documento"].astype(str).str.strip() == config.GUIDE_DOC].copy()
+            if guia.empty:
+                st.info("No se encontraron guías de remisión en los archivos cargados.")
+            else:
+                with st.expander("🔎 Muestra de guías (filas)", expanded=False):
+                    cols = [
+                        "Fecha", "Codigo", "Bodega", "Documento", "Numero",
+                        "Entrada_unid", "Salida_unid", "Tipo_Guia", "Guia_Salida_Externa_Unid"
+                    ]
+                    st.dataframe(guia[cols].sort_values("Fecha").head(300), use_container_width=True)
 
         # ==========================================================
         # TAB: COMPARADOR DE MODELOS (CONSOLIDADO)
@@ -2234,7 +2248,7 @@ class Dashboard:
         # TAB 7: STOCK + DIAGNÓSTICO
         # ==========================================================
         with tab_stock_diag:
-            st.subheader("🏢 Stock mensual del producto (empresa consolidada)")
+            
 
             stock = res_stock
             if stock is None or stock.empty:
@@ -2246,25 +2260,13 @@ class Dashboard:
                 else:
                     fig_stock = px.line(
                         splot, x="Mes", y="Stock_Unid", markers=True,
-                        title=f"Stock mensual (Saldo_unid consolidado) - Producto {prod_sel}"
+                        title=f"Stock mensual histórico - Producto {prod_sel}"
                     )
                     st.plotly_chart(fig_stock, use_container_width=True)
 
             st.divider()
 
-            st.subheader("🧾 Diagnóstico: Guías de remisión")
-            guia = res_movements[res_movements["Documento"].astype(str).str.strip() == config.GUIDE_DOC].copy()
-            if guia.empty:
-                st.info("No se encontraron guías de remisión en los archivos cargados.")
-                return
-
-            with st.expander("🔎 Muestra de guías (filas)", expanded=False):
-                cols = [
-                    "Fecha", "Codigo", "Bodega", "Documento", "Numero",
-                    "Entrada_unid", "Salida_unid", "Tipo_Guia", "Guia_Salida_Externa_Unid"
-                ]
-                st.dataframe(guia[cols].sort_values("Fecha").head(300), use_container_width=True)
-
+            # (Diagnóstico de guías de remisión movido a tab Demanda y Componentes)
 
         # ==========================================================
         # TAB 8: RECOMENDACIÓN DE PRODUCCIÓN
