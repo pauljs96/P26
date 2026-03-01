@@ -2894,7 +2894,17 @@ class Dashboard:
                     ma_window=3,
                     test_months_for_mae=12,
                 )
+                
+                # 💾 Guardar en session_state para persistencia
+                st.session_state.comparativa_individual_cmp = df_cmp
+                st.session_state.comparativa_individual_summary = s
+                st.session_state.comparativa_individual_prod = str(prod_sel)
 
+            # 📊 Mostrar resultados guardados (si existen)
+            if st.session_state.get("comparativa_individual_cmp") is not None:
+                df_cmp = st.session_state.comparativa_individual_cmp
+                s = st.session_state.comparativa_individual_summary
+                
                 c1, c2, c3 = st.columns(3)
                 c1.metric("Ahorro costo total", f"{s['Ahorro_CostoTotal']:,.1f}")
                 c2.metric("Mejora Fill Rate (pp)", f"{s['Mejora_FillRate_pp']:.1f}")
@@ -2974,35 +2984,44 @@ class Dashboard:
                         max_products=max_products_port,
                     )
 
-                if resumenA.empty:
-                    st.warning("No se generó portafolio (revisa si hay productos ABC A con historia suficiente).")
-                else:
-                    st.success("✅ Portafolio ABC A generado.")
-                    st.dataframe(resumenA, use_container_width=True)
+                    if not resumenA.empty:
+                        # 💾 Guardar en session_state para persistencia
+                        st.session_state.portafolio_abc_a_resumen = resumenA
+                        st.session_state.portafolio_abc_a_detalle = detalleA
+                    else:
+                        st.warning("No se generó portafolio (revisa si hay productos ABC A con historia suficiente).")
 
-                    k1, k2, k3 = st.columns(3)
-                    k1.metric("Ahorro total", f"{float(resumenA.iloc[0]['Ahorro_total']):,.1f}")
-                    k2.metric("FillRate base", f"{float(resumenA.iloc[0]['FillRate_Base_%']):.1f}%")
-                    k3.metric("FillRate sistema", f"{float(resumenA.iloc[0]['FillRate_Sistema_%']):.1f}%")
+            # 📊 Mostrar resultados guardados (si existen)
+            if st.session_state.get("portafolio_abc_a_resumen") is not None:
+                resumenA = st.session_state.portafolio_abc_a_resumen
+                detalleA = st.session_state.portafolio_abc_a_detalle
+                
+                st.success("✅ Portafolio ABC A generado.")
+                st.dataframe(resumenA, use_container_width=True)
 
-                    st.markdown("### 🔝 Top productos (mayor ahorro)")
-                    st.dataframe(detalleA.head(30), use_container_width=True, height=420)
+                k1, k2, k3 = st.columns(3)
+                k1.metric("Ahorro total", f"{float(resumenA.iloc[0]['Ahorro_total']):,.1f}")
+                k2.metric("FillRate base", f"{float(resumenA.iloc[0]['FillRate_Base_%']):.1f}%")
+                k3.metric("FillRate sistema", f"{float(resumenA.iloc[0]['FillRate_Sistema_%']):.1f}%")
 
-                    with st.expander("⬇️ Exportar detalle portafolio (CSV)", expanded=False):
-                        csv_det = detalleA.to_csv(index=False).encode("utf-8-sig")  # utf-8-sig para Excel
-                        st.download_button(
-                            "Descargar detalle_portafolio_ABC_A.csv",
-                            data=csv_det,
-                            file_name="detalle_portafolio_ABC_A.csv",
-                            mime="text/csv",
-                            key="dl_detalle_portafolio_A"
-                        )
+                st.markdown("### 🔝 Top productos (mayor ahorro)")
+                st.dataframe(detalleA.head(30), use_container_width=True, height=420)
 
-                    fig_cost_port = px.bar(
-                        resumenA,
-                        x=["CostoTotal_Base", "CostoTotal_Sistema"],
-                        title="Costo total portafolio ABC A: Base vs Sistema"
+                with st.expander("⬇️ Exportar detalle portafolio (CSV)", expanded=False):
+                    csv_det = detalleA.to_csv(index=False).encode("utf-8-sig")  # utf-8-sig para Excel
+                    st.download_button(
+                        "Descargar detalle_portafolio_ABC_A.csv",
+                        data=csv_det,
+                        file_name="detalle_portafolio_ABC_A.csv",
+                        mime="text/csv",
+                        key="dl_detalle_portafolio_A"
                     )
-                    st.plotly_chart(fig_cost_port, use_container_width=True)
+
+                fig_cost_port = px.bar(
+                    resumenA,
+                    x=["CostoTotal_Base", "CostoTotal_Sistema"],
+                    title="Costo total portafolio ABC A: Base vs Sistema"
+                )
+                st.plotly_chart(fig_cost_port, use_container_width=True)
 
 
