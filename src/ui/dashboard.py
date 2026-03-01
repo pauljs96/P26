@@ -3190,32 +3190,134 @@ class Dashboard:
                 resumenA = st.session_state.portafolio_abc_a_resumen
                 detalleA = st.session_state.portafolio_abc_a_detalle
                 
-                st.success("✅ Portafolio ABC A generado.")
-                st.dataframe(resumenA, use_container_width=True)
-
-                k1, k2, k3 = st.columns(3)
-                k1.metric("Ahorro total", f"{float(resumenA.iloc[0]['Ahorro_total']):,.1f}")
-                k2.metric("FillRate base", f"{float(resumenA.iloc[0]['FillRate_Base_%']):.1f}%")
-                k3.metric("FillRate sistema", f"{float(resumenA.iloc[0]['FillRate_Sistema_%']):.1f}%")
-
-                st.markdown("### 🔝 Top productos (mayor ahorro)")
+                # ==================== RESUMEN EJECUTIVO PORTAFOLIO ====================
+                with st.container(border=True):
+                    st.markdown(f"### 📊 Análisis de Portafolio ABC A")
+                    st.markdown(f"**¿Qué es ABC A?** Son tus productos más importantes - los que generan el 80% de tu demanda. Esta sección simula el impacto de implementar el sistema inteligente en TODOS estos productos simultáneamente.")
+                    st.markdown(f"**Período analizado:** {eval_months_port} meses (consistente con tu análisis individual)")
+                    st.markdown(f"**Cobertura:** {detalleA['Codigo'].nunique():,} productos de clase ABC A")
+                
+                # ==================== IMPACTO FINANCIERO DEL PORTAFOLIO ====================
+                st.markdown("### 💰 Impacto Financiero en el Portafolio ABC A")
+                
+                ahorro_total_port = float(resumenA.iloc[0]['Ahorro_total'])
+                fillrate_base_port = float(resumenA.iloc[0]['FillRate_Base_%'])
+                fillrate_sys_port = float(resumenA.iloc[0]['FillRate_Sistema_%'])
+                mejora_fillrate_port = fillrate_sys_port - fillrate_base_port
+                costo_base_total_port = float(resumenA.iloc[0]['CostoTotal_Base'])
+                costo_sys_total_port = float(resumenA.iloc[0]['CostoTotal_Sistema'])
+                
+                col_p1, col_p2, col_p3 = st.columns(3)
+                
+                with col_p1:
+                    ahorro_icon = "🟢" if ahorro_total_port > 0 else "🔴"
+                    st.metric(f"{ahorro_icon} Ahorro Total Portafolio", f"{ahorro_total_port:,.0f}", delta="unidades monetarias")
+                
+                with col_p2:
+                    fillrate_icon = "🟢" if mejora_fillrate_port > 0 else "🟡"
+                    st.metric(f"{fillrate_icon} Mejora Fill Rate", f"+{mejora_fillrate_port:.1f}%", delta="puntos porcentuales")
+                
+                with col_p3:
+                    st.metric("📦 Cobertura", f"{detalleA['Codigo'].nunique():,} productos", delta="evaluados en ABC A")
+                
+                st.divider()
+                
+                # ==================== INTERPRETACIÓN NARRATIVA ====================
+                st.markdown("### 📈 ¿Qué significa esto para tu negocio?")
+                
+                with st.container(border=True):
+                    st.markdown(f"Analizando TODOS tus productos ABC A ({detalleA['Codigo'].nunique():,} productos) durante {eval_months_port} meses:")
+                    st.markdown(f"- **Sin el sistema:** Costo total de **{costo_base_total_port:,.0f}** (método reactivo)")
+                    st.markdown(f"- **Con el sistema:** Costo total de **{costo_sys_total_port:,.0f}** (método inteligente)")
+                    st.markdown(f"")
+                    st.markdown(f"**Resultado neto:** Ahorraría **{ahorro_total_port:,.0f} unidades monetarias** en {eval_months_port} meses")
+                    st.markdown(f"**Proyección anual:** {ahorro_total_port * (12/eval_months_port):,.0f} unidades (extrapolado a 12 meses)")
+                    st.markdown(f"")
+                    st.markdown(f"✅ Al mismo tiempo mejoraría tu disponibilidad de {fillrate_base_port:.1f}% a {fillrate_sys_port:.1f}% - significa **menos clientes insatisfechos**")
+                    st.markdown(f"✨ **En conclusión:** Implementar el sistema en tu portafolio ABC A te permite **reducir costos Y mejorar servicio simultáneamente**")
+                
+                st.divider()
+                
+                # ==================== RESUMEN NUMÉRICO ====================
+                st.markdown("### 📊 Resumen: Baseline vs Sistema")
+                
+                col_res1, col_res2, col_res3 = st.columns(3)
+                
+                with col_res1:
+                    st.metric("Costo Total (Baseline)", f"{costo_base_total_port:,.1f}")
+                
+                with col_res2:
+                    st.metric("Costo Total (Sistema)", f"{costo_sys_total_port:,.1f}")
+                
+                with col_res3:
+                    st.metric("Diferencia (Ahorro)", f"{ahorro_total_port:,.1f}")
+                
+                st.divider()
+                
+                # ==================== TABLA GENERAL Y TOP PRODUCTOS ====================
+                with st.expander("📋 Resumen agregado del portafolio", expanded=True):
+                    st.dataframe(resumenA, use_container_width=True)
+                
+                st.markdown("### 🔝 Top 30 productos por mayor ahorro")
+                st.markdown("*Estos productos son los que más beneficio tendrían con el sistema inteligente*")
                 st.dataframe(detalleA.head(30), use_container_width=True, height=420)
 
-                with st.expander("⬇️ Exportar detalle portafolio (CSV)", expanded=False):
-                    csv_det = detalleA.to_csv(index=False).encode("utf-8-sig")  # utf-8-sig para Excel
+                st.divider()
+                
+                # ==================== GRÁFICAS ====================
+                st.markdown("### 📈 Visualización: Impacto en Costos y FillRate")
+                
+                col_g1, col_g2 = st.columns(2)
+                
+                with col_g1:
+                    fig_cost_port = px.bar(
+                        resumenA,
+                        x=["CostoTotal_Base", "CostoTotal_Sistema"],
+                        title="Costo Total Portafolio: Baseline vs Sistema",
+                        labels={"value": "Costo Total", "variable": "Estrategia"}
+                    )
+                    fig_cost_port.update_layout(height=400)
+                    st.plotly_chart(fig_cost_port, use_container_width=True)
+                
+                with col_g2:
+                    fig_fillrate_port = px.bar(
+                        resumenA,
+                        x=["FillRate_Base_%", "FillRate_Sistema_%"],
+                        title="Fill Rate Portafolio: Baseline vs Sistema",
+                        labels={"value": "Fill Rate (%)", "variable": "Estrategia"}
+                    )
+                    fig_fillrate_port.update_layout(height=400)
+                    st.plotly_chart(fig_fillrate_port, use_container_width=True)
+                
+                st.divider()
+                
+                # ==================== OPORTUNIDADES POR PRODUCTO ====================
+                st.markdown("### 💡 Distribución de Ahorros por Producto")
+                st.markdown("*Identifica qué productos ofrecen mayor potencial de ahorro*")
+                
+                detalleA_sorted = detalleA.nlargest(20, 'Ahorro_total')
+                fig_oportunidades = px.bar(
+                    detalleA_sorted,
+                    x='Ahorro_total',
+                    y='Codigo',
+                    orientation='h',
+                    title='Top 20 productos: Ahorro potencial',
+                    labels={'Ahorro_total': 'Ahorro Unitario', 'Codigo': 'Producto'}
+                )
+                fig_oportunidades.update_layout(height=500)
+                st.plotly_chart(fig_oportunidades, use_container_width=True)
+                
+                st.divider()
+                
+                # ==================== EXPORTACIÓN ====================
+                with st.expander("⬇️ Exportar detalle completo del portafolio (CSV)", expanded=False):
+                    csv_det = detalleA.to_csv(index=False).encode("utf-8-sig")
                     st.download_button(
-                        "Descargar detalle_portafolio_ABC_A.csv",
+                        "📥 Descargar detalle_portafolio_ABC_A.csv",
                         data=csv_det,
                         file_name="detalle_portafolio_ABC_A.csv",
                         mime="text/csv",
                         key="dl_detalle_portafolio_A"
                     )
-
-                fig_cost_port = px.bar(
-                    resumenA,
-                    x=["CostoTotal_Base", "CostoTotal_Sistema"],
-                    title="Costo total portafolio ABC A: Base vs Sistema"
-                )
-                st.plotly_chart(fig_cost_port, use_container_width=True)
 
 
