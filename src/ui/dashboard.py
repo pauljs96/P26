@@ -3295,6 +3295,10 @@ class Dashboard:
                 st.markdown("### 💡 Distribución de Ahorros por Producto")
                 st.markdown("*Identifica qué productos ofrecen mayor potencial de ahorro*")
                 
+                # Calcular ahorro si no existe en detalleA
+                if 'Ahorro_total' not in detalleA.columns:
+                    detalleA['Ahorro_total'] = detalleA.get('CostoTotal_Base', 0) - detalleA.get('CostoTotal_Sistema', 0)
+                
                 detalleA_sorted = detalleA.nlargest(20, 'Ahorro_total')
                 fig_oportunidades = px.bar(
                     detalleA_sorted,
