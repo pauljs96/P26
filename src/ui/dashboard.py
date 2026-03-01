@@ -2699,6 +2699,7 @@ class Dashboard:
                 st.caption(f"✅ Ventana MA auto-optimizada: **MA{ma_window}** (MAE: {min(mae_ma3, mae_ma6):.2f})")
                     
                 lead_time = 1  # Parámetro operacional fijo
+                eval_months = test_months  # Usar los mismos meses de evaluación para consistencia
 
                 run_sim = st.button("▶️ Ejecutar simulación (ganador automático por MAE)", type="primary", key="run_sim")
 
