@@ -2827,18 +2827,18 @@ class Dashboard:
                     # Explicación de variables
                     with st.expander("📋 Significado de las columnas en la tabla detallada", expanded=False):
                         st.markdown("""
-                        | Variable | Significado |
-                        |----------|-------------|
-                        | **Mes_target** | Mes de la simulación |
+                        | Columna | Significado |
+                        |---------|------------|
+                        | **Mes_target** | Mes de la simulación que se está evaluando |
                         | **Demanda** | Unidades que los clientes pidieron ese mes |
-                        | **Stock_ini** | Stock disponible al inicio del mes |
-                        | **Pronostico** | Predicción de demanda para el siguiente mes |
-                        | **SS** | Stock de seguridad calculado (protección) |
-                        | **Produccion** | Unidades que debiste producir (según política) |
-                        | **Venta_real** | Lo que efectivamente se vendió |
-                        | **Stock_fin** | Stock al final del mes (después de ventas) |
-                        | **Faltante** | Unidades que no pudiste vender (NO cumplir demanda) |
-                        | **Fill_Rate** | % de demanda satisfecha ese mes |
+                        | **Stock_ini** | Stock disponible al INICIO del mes |
+                        | **Pronostico** | Predicción de demanda para el siguiente mes (usada para calcular producción) |
+                        | **SS** | Stock de seguridad calculado según la política (protección contra variaciones) |
+                        | **Produccion** | Cantidad que DEBISTE PRODUCIR ese mes (según la política) |
+                        | **Venta_real** | Lo que efectivamente se vendió (demanda satisfecha) |
+                        | **Stock_fin** | Stock disponible al FINAL del mes (después de ventas y producción) |
+                        | **Faltante** | Unidades que NO se pudieron vender (quiebre de stock) |
+                        | **Fill_Rate** | % de demanda satisfecha ese mes (si es 100% = sin quiebre) |
                         """)
                     
                     st.markdown("#### 📊 Detalle completo por mes")
