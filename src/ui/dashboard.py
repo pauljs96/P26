@@ -2891,11 +2891,18 @@ class Dashboard:
             # Esto se calcula UNA SOLA VEZ de forma automática para ese producto
             eval_months = max(6, int(len(hist) * 0.25))
             
-            # AUTO-calcular ganador para este producto (para máxima consistencia)
+            # AUTO-optimizar MA (3 vs 6) para elegir la mejor ventana
             ets_params_auto = dict(seasonal_periods=12, trend="add", seasonal="add", damped_trend=False, min_obs=24)
             rf_params_auto = dict(n_estimators=400, min_obs=24, min_samples_leaf=1, random_state=42)
             
-            bt_base_auto = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(eval_months), ma_window=3)
+            bt_ma3_auto = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(eval_months), ma_window=3)
+            bt_ma6_auto = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(eval_months), ma_window=6)
+            mae_ma3_auto = float(bt_ma3_auto.metrics.iloc[0]["MAE"]) if not bt_ma3_auto.metrics.empty else float("inf")
+            mae_ma6_auto = float(bt_ma6_auto.metrics.iloc[0]["MAE"]) if not bt_ma6_auto.metrics.empty else float("inf")
+            ma_window_opt = 3 if mae_ma3_auto < mae_ma6_auto else 6
+            bt_base_auto = bt_ma3_auto if ma_window_opt == 3 else bt_ma6_auto
+            
+            # Luego ETS y RF
             ets_auto = ETSForecaster(**ets_params_auto)
             bt_ets_auto = backtest_ets_1step(hist, y_col="Demanda_Unid", test_months=int(eval_months), ets=ets_auto)
             rf_auto = RFForecaster(**rf_params_auto)
@@ -2907,6 +2914,7 @@ class Dashboard:
             # 💾 Guardar parámetros sincronizados en session_state
             st.session_state.sync_eval_months = eval_months
             st.session_state.sync_winner_model = winner
+            st.session_state.sync_ma_window = ma_window_opt  # ← IMPORTANTE: guardar la ventana MA optimizada
             st.session_state.sync_product_code = str(prod_sel)
 
             # Mostrar parámetros sincronizados
@@ -2939,8 +2947,8 @@ class Dashboard:
                     eval_months=int(eval_months),
                     cost_stock_unit=float(cost_stock_unit),
                     cost_stockout_unit=float(cost_stockout_unit),
-                    ma_window=3,
-                    test_months_for_mae=12,
+                    ma_window=int(ma_window_opt),  # ← CORRECCIÓN: usar la ventana optimizada en lugar de 3 fijo
+                    test_months_for_mae=int(eval_months),  # ← usar eval_months para consistencia
                 )
                 
                 # 💾 Guardar en session_state para persistencia
@@ -2956,8 +2964,8 @@ class Dashboard:
                 period_info = st.session_state.get("comparativa_individual_period", {})
                 
                 # ==================== INFORMACIÓN DEL PERÍODO EVALUADO ====================
-                st.markdown("### 📅 Período Evaluado")
-                col_period1, col_period2, col_period3, col_period4 = st.columns(4)
+                st.markdown("### 📅 Período Evaluado + Modelo Usado")
+                col_period1, col_period2, col_period3, col_period4, col_period5 = st.columns(5)
                 
                 if period_info:
                     start_date = period_info.get("start_date")
@@ -2977,6 +2985,10 @@ class Dashboard:
                     
                     with col_period4:
                         st.metric("✅ Rows", len(df_cmp))
+                    
+                    with col_period5:
+                        model_display = s.get("Winner", "N/A").split("(")[0].strip()
+                        st.metric("🏆 Modelo (costos)", model_display)
                 
                 # ==================== VALIDACIÓN DE COSTOS ====================
                 st.markdown("### 🔍 Validación Manual de Costos (Suma de filas)")
@@ -3052,34 +3064,35 @@ class Dashboard:
                 eval_months_port = st.session_state.get("sync_eval_months")
                 cost_stock_unit_port = st.session_state.get("sync_cost_stock_unit", 1.0)
                 cost_stockout_unit_port = st.session_state.get("sync_cost_stockout_unit", 5.0)
-                winner_mode = st.session_state.get("sync_winner_model", "ETS(Holt-Winters)")
+                ma_window_port = st.session_state.get("sync_ma_window", 3)  # ← Obtener la ventana optimizada
+                # 🔑 IMPORTANTE: Usar "AUTO" para que CADA PRODUCTO calcule su propio ganador (no reutilizar el modelo del producto Individual)
+                winner_mode = "AUTO"
                 prod_individual = st.session_state.get("sync_product_code", "N/A")
                 
                 # Mostrar parámetros sincronizados
                 st.success(f"🔗 **Parámetros sincronizados desde Comparativa Individual**")
-                col_sync1, col_sync2, col_sync3, col_sync4 = st.columns(4)
+                col_sync1, col_sync2, col_sync3, col_sync4, col_sync5 = st.columns(5)
                 with col_sync1:
                     st.metric("📅 Meses", eval_months_port)
                 with col_sync2:
-                    st.metric("🏆 Modelo", winner_mode.split("(")[0].strip())
+                    st.metric("🏆 Modelo (cada producto)", "AUTO")
                 with col_sync3:
-                    st.metric("Costo Inv", f"{cost_stock_unit_port:.1f}")
+                    st.metric("MA Window", ma_window_port)
                 with col_sync4:
+                    st.metric("Costo Inv", f"{cost_stock_unit_port:.1f}")
+                with col_sync5:
                     st.metric("Costo Quiebre", f"{cost_stockout_unit_port:.1f}")
                 
-                st.info(f"📊 Evaluando portafolio ABC A usando los mismos parámetros que se usaron para **{prod_individual}** en la sección Individual.")
+                st.info(f"📊 Evaluando portafolio ABC A:\n- Misma ventana que {prod_individual} en Individual ({eval_months_port} meses, MA{ma_window_port})\n- **Cada producto usa su propio modelo ganador** (AUTO per producto)")
             else:
                 # Si NO hay parámetros sincronizados, permitir que el usuario los defina
                 st.warning("⚠️ Primero ejecuta 'Comparativa Retrospectiva' en la sección Individual para sincronizar parámetros automáticamente.")
                 eval_months_port = st.slider("Meses a evaluar portafolio (últimos)", 6, 24, 12, 1, key="port_eval")
                 cost_stock_unit_port = st.number_input("Costo inventario por unidad (proxy) - Portafolio", min_value=0.0, value=1.0, step=0.5, key="port_cinv")
                 cost_stockout_unit_port = st.number_input("Costo quiebre por unidad (proxy) - Portafolio", min_value=0.0, value=5.0, step=0.5, key="port_cbrk")
-                winner_mode = st.selectbox(
-                    "Modelo en portafolio",
-                    options=["AUTO", "ETS(Holt-Winters)", "RandomForest", "Naive", "Seasonal12", "MA3", "MA6"],
-                    index=0,
-                    key="port_winner_mode"
-                )
+                ma_window_port = st.selectbox("Ventana MA para Baselines", options=[3, 6], index=0, key="port_ma_window")
+                # 🔑 IMPORTANTE: Por defecto usar "AUTO" para que cada producto tenga su ganador individual
+                winner_mode = "AUTO"
 
             max_products_port = st.selectbox(
                 "Cantidad de productos ABC A a procesar (performance)",
@@ -3101,8 +3114,8 @@ class Dashboard:
                         cost_stock_unit=float(cost_stock_unit_port),
                         cost_stockout_unit=float(cost_stockout_unit_port),
                         winner_mode=str(winner_mode),
-                        ma_window=3,
-                        test_months_for_mae=12,
+                        ma_window=int(ma_window_port),  # ← Usar la ventana sincronizada/seleccionada
+                        test_months_for_mae=int(eval_months_port),  # ← Usar eval_months para consistencia
                         max_products=max_products_port,
                     )
 
