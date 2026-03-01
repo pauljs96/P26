@@ -718,7 +718,18 @@ def simulate_compare_policy_vs_baseline(
         "Mejora_FillRate_pp": k_sys["FillRate_%"] - k_base["FillRate_%"],
         "Reduccion_Faltantes": k_base["Unidades_faltantes"] - k_sys["Unidades_faltantes"],
     }
-    return df, summary
+    
+    # ==================== INFORMACIÓN DEL PERÍODO EVALUADO ====================
+    period_info = {
+        "start_date": df.iloc[0]["Mes"] if not df.empty else None,
+        "end_date": df.iloc[-1]["Mes"] if not df.empty else None,
+        "num_months": len(df),
+        "num_rows_evaluated": len(df),
+        "costo_base_manual_sum": float(df["Base_Costo_total"].sum()) if not df.empty else 0.0,
+        "costo_sys_manual_sum": float(df["Sys_Costo_total"].sum()) if not df.empty else 0.0,
+    }
+    
+    return df, summary, period_info
 
 #C. Portafolio ABC A (Masivo)
 @st.cache_data(show_spinner=False)
@@ -812,7 +823,7 @@ def run_portfolio_cost_comparison_abcA(
             winner = winner_mode  # e.g. "ETS(Holt-Winters)"
 
         # correr tu simulación existente
-        df_cmp, s = simulate_compare_policy_vs_baseline(
+        df_cmp, s, period_info = simulate_compare_policy_vs_baseline(
             hist=hist,
             stock_series=stock_p,
             abc_class=abc_class,
@@ -848,6 +859,9 @@ def run_portfolio_cost_comparison_abcA(
         rows.append({
             "Codigo": str(cod),
             "Modelo_usado": winner,
+            "Periodos_evaluados": period_info.get("num_months", 0),
+            "Inicio": period_info.get("start_date").strftime("%Y-%m") if period_info.get("start_date") else "N/A",
+            "Fin": period_info.get("end_date").strftime("%Y-%m") if period_info.get("end_date") else "N/A",
             "Demanda_total_eval": demand,
             "FillRate_Base_%": fill_b,
             "FillRate_Sistema_%": fill_s,
@@ -2917,7 +2931,7 @@ class Dashboard:
             run_cmp = st.button("▶️ Ejecutar comparativa", type="primary", key="run_cmp")
 
             if run_cmp and not hist.empty:
-                df_cmp, s = simulate_compare_policy_vs_baseline(
+                df_cmp, s, period_info = simulate_compare_policy_vs_baseline(
                     hist=hist,
                     stock_series=stock_p,
                     abc_class=abc_class,
@@ -2933,11 +2947,57 @@ class Dashboard:
                 st.session_state.comparativa_individual_cmp = df_cmp
                 st.session_state.comparativa_individual_summary = s
                 st.session_state.comparativa_individual_prod = str(prod_sel)
+                st.session_state.comparativa_individual_period = period_info
 
             # 📊 Mostrar resultados guardados (si existen)
             if st.session_state.get("comparativa_individual_cmp") is not None:
                 df_cmp = st.session_state.comparativa_individual_cmp
                 s = st.session_state.comparativa_individual_summary
+                period_info = st.session_state.get("comparativa_individual_period", {})
+                
+                # ==================== INFORMACIÓN DEL PERÍODO EVALUADO ====================
+                st.markdown("### 📅 Período Evaluado")
+                col_period1, col_period2, col_period3, col_period4 = st.columns(4)
+                
+                if period_info:
+                    start_date = period_info.get("start_date")
+                    end_date = period_info.get("end_date")
+                    num_months = period_info.get("num_months", 0)
+                    
+                    with col_period1:
+                        start_str = start_date.strftime("%Y-%m") if start_date else "N/A"
+                        st.metric("📍 Inicio", start_str)
+                    
+                    with col_period2:
+                        end_str = end_date.strftime("%Y-%m") if end_date else "N/A"
+                        st.metric("📍 Fin", end_str)
+                    
+                    with col_period3:
+                        st.metric("📊 #Meses", num_months)
+                    
+                    with col_period4:
+                        st.metric("✅ Rows", len(df_cmp))
+                
+                # ==================== VALIDACIÓN DE COSTOS ====================
+                st.markdown("### 🔍 Validación Manual de Costos (Suma de filas)")
+                col_cost1, col_cost2, col_cost3 = st.columns(3)
+                
+                with col_cost1:
+                    costo_base_suma = float(df_cmp["Base_Costo_total"].sum())
+                    st.metric("Base_Costo_total (suma manual)", f"{costo_base_suma:,.1f}", 
+                              delta=f"KPI: {s['Base']['Costo_total']:,.1f}")
+                
+                with col_cost2:
+                    costo_sys_suma = float(df_cmp["Sys_Costo_total"].sum())
+                    st.metric("Sys_Costo_total (suma manual)", f"{costo_sys_suma:,.1f}",
+                              delta=f"KPI: {s['Sistema']['Costo_total']:,.1f}")
+                
+                with col_cost3:
+                    ahorro_suma = costo_base_suma - costo_sys_suma
+                    st.metric("Ahorro (calc manual)", f"{ahorro_suma:,.1f}",
+                              delta=f"KPI: {s['Ahorro_CostoTotal']:,.1f}")
+                
+                st.divider()
                 
                 c1, c2, c3 = st.columns(3)
                 c1.metric("Ahorro costo total", f"{s['Ahorro_CostoTotal']:,.1f}")
