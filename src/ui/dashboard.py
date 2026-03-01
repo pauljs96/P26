@@ -2969,29 +2969,23 @@ class Dashboard:
                 
                 # ==================== RESUMEN EJECUTIVO (AMIGABLE PARA CLIENTE) ====================
                 st.markdown(f"""
-                <div style='
-                    background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
-                    padding: 25px;
-                    border-radius: 10px;
-                    border-left: 5px solid #4CAF50;
-                    margin-bottom: 25px;
-                '>
-                    <h3 style='color: #2E7D32; margin-top: 0; margin-bottom: 15px;'>📊 Resumen Ejecutivo para {user_name}</h3>
+                <div style="background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%); padding: 25px; border-radius: 10px; border-left: 5px solid #4CAF50; margin-bottom: 25px;">
+                    <h3 style="color: #2E7D32; margin-top: 0; margin-bottom: 15px;">📊 Resumen Ejecutivo para {user_name}</h3>
                     
-                    <p style='margin: 10px 0; font-size: 1.05em; color: #333; line-height: 1.6;'>
+                    <p style="margin: 10px 0; font-size: 1.05em; color: #333; line-height: 1.6;">
                     <strong>¿Qué significa este análisis?</strong><br>
                     Hemos simulado cómo habría funcionado el producto <strong>{str(prod_sel)}</strong> durante los últimos <strong>{period_info.get("num_months", 0)} meses</strong> 
                     con dos estrategias diferentes:
                     </p>
                     
-                    <ul style='color: #333; margin: 15px 0;'>
+                    <ul style="color: #333; margin: 15px 0;">
                     <li><strong>❌ Sin el sistema:</strong> Produciendo solo lo que se vendió el mes anterior (método reactivo)</li>
                     <li><strong>✅ Con el sistema:</strong> Usando pronósticos inteligentes + stock de seguridad (método proactivo)</li>
                     </ul>
                     
-                    <p style='margin: 15px 0; font-size: 1.0em; color: #333; line-height: 1.6;'>
+                    <p style="margin: 15px 0; font-size: 1.0em; color: #333; line-height: 1.6;">
                     <strong>Los resultados muestran:</strong> Implementar el sistema inteligente habría generado un 
-                    <span style='background: #FFE082; padding: 2px 8px; border-radius: 4px; font-weight: bold;'>
+                    <span style="background: #FFE082; padding: 2px 8px; border-radius: 4px; font-weight: bold;">
                     ahorro de {s['Ahorro_CostoTotal']:,.0f} unidades monetarias
                     </span> 
                     mientras se mejora el servicio (menos quiebres de stock).
@@ -3054,43 +3048,28 @@ class Dashboard:
                 
                 with col_m1:
                     st.markdown(f"""
-                    <div style='
-                        background: linear-gradient(135deg, #FFF9C4 0%, #FFF59D 100%);
-                        padding: 20px;
-                        border-radius: 8px;
-                        text-align: center;
-                    '>
-                        <p style='margin: 0; font-size: 0.9em; color: #666;'>{ahorro_color} {ahorro_texto}</p>
-                        <h2 style='margin: 8px 0; color: #F57F17; font-size: 1.8em;'>{ahorro_total:,.0f}</h2>
-                        <p style='margin: 0; font-size: 0.85em; color: #666;'>unidades ahorradas</p>
+                    <div style="background: linear-gradient(135deg, #FFF9C4 0%, #FFF59D 100%); padding: 20px; border-radius: 8px; text-align: center;">
+                        <p style="margin: 0; font-size: 0.9em; color: #666;">{ahorro_color} {ahorro_texto}</p>
+                        <h2 style="margin: 8px 0; color: #F57F17; font-size: 1.8em;">{ahorro_total:,.0f}</h2>
+                        <p style="margin: 0; font-size: 0.85em; color: #666;">unidades ahorradas</p>
                     </div>
                     """, unsafe_allow_html=True)
                 
                 with col_m2:
                     st.markdown(f"""
-                    <div style='
-                        background: linear-gradient(135deg, #E1BEE7 0%, #CE93D8 100%);
-                        padding: 20px;
-                        border-radius: 8px;
-                        text-align: center;
-                    '>
-                        <p style='margin: 0; font-size: 0.9em; color: #666;'>{fillrate_color} {fillrate_texto}</p>
-                        <h2 style='margin: 8px 0; color: #8E24AA; font-size: 1.8em;'>+{mejora_fillrate:.1f}%</h2>
-                        <p style='margin: 0; font-size: 0.85em; color: #666;'>en tasa de servicio</p>
+                    <div style="background: linear-gradient(135deg, #E1BEE7 0%, #CE93D8 100%); padding: 20px; border-radius: 8px; text-align: center;">
+                        <p style="margin: 0; font-size: 0.9em; color: #666;">{fillrate_color} {fillrate_texto}</p>
+                        <h2 style="margin: 8px 0; color: #8E24AA; font-size: 1.8em;">+{mejora_fillrate:.1f}%</h2>
+                        <p style="margin: 0; font-size: 0.85em; color: #666;">en tasa de servicio</p>
                     </div>
                     """, unsafe_allow_html=True)
                 
                 with col_m3:
                     st.markdown(f"""
-                    <div style='
-                        background: linear-gradient(135deg, #BBDEFB 0%, #90CAF9 100%);
-                        padding: 20px;
-                        border-radius: 8px;
-                        text-align: center;
-                    '>
-                        <p style='margin: 0; font-size: 0.9em; color: #666;'>📦 Reducción de quiebres</p>
-                        <h2 style='margin: 8px 0; color: #1565C0; font-size: 1.8em;'>{reduccion_faltantes:,.0f}</h2>
-                        <p style='margin: 0; font-size: 0.85em; color: #666;'>unidades menos faltantes</p>
+                    <div style="background: linear-gradient(135deg, #BBDEFB 0%, #90CAF9 100%); padding: 20px; border-radius: 8px; text-align: center;">
+                        <p style="margin: 0; font-size: 0.9em; color: #666;">📦 Reducción de quiebres</p>
+                        <h2 style="margin: 8px 0; color: #1565C0; font-size: 1.8em;">{reduccion_faltantes:,.0f}</h2>
+                        <p style="margin: 0; font-size: 0.85em; color: #666;">unidades menos faltantes</p>
                     </div>
                     """, unsafe_allow_html=True)
                 
@@ -3100,14 +3079,7 @@ class Dashboard:
                 st.markdown("### 📈 ¿Qué significa esto para tu negocio?")
                 
                 interpretacion = f"""
-                <div style='
-                    background-color: #FAFAFA;
-                    padding: 20px;
-                    border-left: 4px solid #1976D2;
-                    border-radius: 6px;
-                    line-height: 1.8;
-                    font-size: 0.95em;
-                '>
+                <div style="background-color: #FAFAFA; padding: 20px; border-left: 4px solid #1976D2; border-radius: 6px; line-height: 1.8; font-size: 0.95em;">
                 
                 <p>
                 <strong>{user_name},</strong> durante el período de <strong>{period_info.get("num_months", 0)} meses</strong>, 
@@ -3115,21 +3087,21 @@ class Dashboard:
                 <strong>{s['Base']['Costo_total']:,.0f}</strong> en inventario y quiebres.
                 </p>
                 
-                <p style='margin-top: 15px;'>
+                <p style="margin-top: 15px;">
                 Si hubiera implementado el sistema inteligente desde entonces, el costo habría sido 
                 <strong>{s['Sistema']['Costo_total']:,.0f}</strong>, lo que representa un <strong>ahorro de {ahorro_total:,.0f}</strong>.
                 </p>
                 
-                <p style='margin-top: 15px;'>
+                <p style="margin-top: 15px;">
                 <strong>Además:</strong>
-                <ul style='margin: 10px 0;'>
+                <ul style="margin: 10px 0;">
                 <li>✅ Tu disponibilidad de producto mejoraría de <strong>{fill_rate_base:.1f}%</strong> a <strong>{fill_rate_sys:.1f}%</strong></li>
                 <li>✅ Evitarías <strong>{reduccion_faltantes:,.0f} unidades</strong> de clientes insatisfechos</li>
                 <li>✅ Los costos de inventario se optimizarían automáticamente</li>
                 </ul>
                 </p>
                 
-                <p style='margin-top: 15px; color: #2E7D32; font-weight: bold;'>
+                <p style="margin-top: 15px; color: #2E7D32; font-weight: bold;">
                 ✨ En resumen: El sistema inteligente te permite ahorrar dinero Y servir mejor a tus clientes.
                 </p>
                 </div>
