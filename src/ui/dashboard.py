@@ -2164,6 +2164,9 @@ class Dashboard:
 
             st.divider()
             st.subheader("🌍 Comparación global + ABC (todos los productos)")
+            
+            st.markdown("**Análisis:** Compara el desempeño de Baselines, ETS y Random Forest en TODOS los productos del portafolio. Muestra qué modelo gana por clase ABC y errores promedio.")
+            st.info(f"📊 Evaluando: **TODOS los productos** (sin filtro - evaluación global del portafolio)")
 
             sort_metric = st.selectbox(
                 "Métrica para elegir ganador",
@@ -2633,6 +2636,12 @@ class Dashboard:
         # ==========================================================
         with Valida_Retro:
             st.subheader("🧪 Validación retrospectiva de la política (simulación)")
+            
+            st.markdown("**Análisis:** Simula día a día cómo habría funcionado tu política de producción en el histórico. Muestra si habrías tenido quiebres, inventario y fill rate.")
+            if prod_sel is not None:
+                st.info(f"📊 Validando: **Producto {prod_sel}** (según filtro seleccionado)")
+            else:
+                st.warning("⚠️ Selecciona un producto en los Filtros de Producto del sidebar")
 
             dm = res_demand.copy()
             dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
@@ -2726,6 +2735,12 @@ class Dashboard:
         # ==========================================================
         with ComparaRetroEntreSistema:
             st.subheader("⚖️ Comparativa retrospectiva: Sin sistema vs Con sistema (costos)")
+            
+            st.markdown("**Análisis Individual:** Compara cuánto hubieras gastado sin sistema (produciendo lo vendido anteriormente) vs con sistema (inteligencia + stock de seguridad). Segundo: Analiza todo el portafolio ABC A mostrando ahorros.")
+            if prod_sel is not None:
+                st.info(f"📊 Comparando: **Producto {prod_sel}** (según filtro seleccionado) + Portafolio ABC A")
+            else:
+                st.warning("⚠️ Selecciona un producto en los Filtros de Producto del sidebar")
 
             dm = res_demand.copy()
             dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
