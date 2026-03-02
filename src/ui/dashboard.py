@@ -3293,16 +3293,21 @@ class Dashboard:
                 if 'Ahorro_total' not in detalleA.columns:
                     detalleA['Ahorro_total'] = detalleA.get('CostoTotal_Base', 0) - detalleA.get('CostoTotal_Sistema', 0)
                 
-                detalleA_sorted = detalleA.nlargest(20, 'Ahorro_total')
+                # Obtener los top 30 productos (o todos si hay menos), ordenados de mayor a menor
+                num_products_to_show = min(30, len(detalleA))
+                detalleA_sorted = detalleA.nlargest(num_products_to_show, 'Ahorro_total')
+                # Ordenar ascendente para que Plotly dibuje de mayor a menor (mayor en la parte superior)
+                detalleA_sorted = detalleA_sorted.sort_values('Ahorro_total', ascending=True)
+                
                 fig_oportunidades = px.bar(
                     detalleA_sorted,
                     x='Ahorro_total',
                     y='Codigo',
                     orientation='h',
-                    title='Top 20 productos: Ahorro potencial',
+                    title=f'Top {num_products_to_show} productos: Ahorro potencial',
                     labels={'Ahorro_total': 'Ahorro Unitario', 'Codigo': 'Producto'}
                 )
-                fig_oportunidades.update_layout(height=550, font=dict(size=11))
+                fig_oportunidades.update_layout(height=max(550, num_products_to_show * 20), font=dict(size=11))
                 st.plotly_chart(fig_oportunidades, use_container_width=True)
                 
                 st.divider()
