@@ -7,6 +7,7 @@ Esto permite reutilizar en FastAPI backend (Fase 2).
 from __future__ import annotations
 import pandas as pd
 import numpy as np
+from scipy.stats import norm
 
 from src.ml.baselines import naive_last, seasonal_naive_12, moving_average
 from src.ml.backtest import backtest_baselines_1step
@@ -131,6 +132,72 @@ def z_from_service_level(service_level: float) -> float:
     }
     closest = min(mapping.keys(), key=lambda k: abs(k - service_level))
     return mapping[closest]
+
+
+def z_from_cost_ratio(cost_stockout: float, cost_inv: float) -> float:
+    """
+    Convierte costos a Z-score usando método Newsvendor.
+    
+    Calcula Z = F^-1(cost_stockout / (cost_stockout + cost_inv))
+    donde F^-1 es la inversa acumulada de la normal estándar.
+    
+    Args:
+        cost_stockout: Costo unitario de quiebre
+        cost_inv: Costo unitario de inventario
+    
+    Returns:
+        float: Z-score óptimo según criterio costo-beneficio
+    
+    Example:
+        Z = z_from_cost_ratio(10, 1)  # Si quiebre es 10x más caro
+        # Retorna Z ≈ 1.34 (más conservador que Z=1.65)
+    """
+    # Evitar división por cero
+    total_cost = float(cost_stockout + cost_inv)
+    if total_cost <= 0:
+        # Fallback a service level conservador (95%)
+        return 1.65
+    
+    # Ratio de costo óptimo (Newsvendor)
+    critical_ratio = float(cost_stockout) / total_cost
+    
+    # Asegurar que está en [0, 1] para ppf
+    critical_ratio = np.clip(critical_ratio, 0.001, 0.999)
+    
+    # Inversa normal: Z tal que P(X <= Z) = critical_ratio
+    z_score = float(norm.ppf(critical_ratio))
+    
+    return z_score
+
+
+def calculate_safety_stock_newsvendor(
+    cost_stockout: float,
+    cost_inv: float,
+    sigma: float,
+    lead_time: int = 1
+) -> float:
+    """
+    Calcula stock de seguridad óptimo usando Newsvendor Problem.
+    
+    SS = Z * sigma * sqrt(lead_time)
+    donde Z se calcula dinámica según balance de costos.
+    
+    Args:
+        cost_stockout: Costo unitario de quiebre
+        cost_inv: Costo unitario de inventario
+        sigma: Desviación estándar (MAE del pronóstico)
+        lead_time: Lead time en períodos
+    
+    Returns:
+        float: Stock de seguridad óptimo
+    
+    Example:
+        SS = calculate_safety_stock_newsvendor(10, 1, 50, 1)
+        # Si quiebre cuesta 10x más → más stock protector
+    """
+    z_dynamic = z_from_cost_ratio(cost_stockout, cost_inv)
+    ss = float(z_dynamic * sigma * np.sqrt(float(lead_time)))
+    return float(max(0.0, ss))
 
 
 def service_level_by_abc(abc_class: str) -> float:

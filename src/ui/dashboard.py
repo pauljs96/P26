@@ -19,6 +19,8 @@ import pandas as pd
 import plotly.express as px
 import os
 from dotenv import load_dotenv
+import numpy as np
+from scipy.stats import norm
 
 # Cargar variables de entorno
 load_dotenv()
@@ -29,7 +31,6 @@ from src.ml.baselines import naive_last, seasonal_naive_12, moving_average
 from src.ml.backtest import backtest_baselines_1step
 from src.ml.ets_model import ETSForecaster
 from src.ml.backtest_ets import backtest_ets_1step
-import numpy as np
 from src.ml.rf_model import RFForecaster
 from src.ml.backtest_rf import backtest_rf_1step
 from src.db import get_db
@@ -604,7 +605,16 @@ def simulate_compare_policy_vs_baseline(
         mae_winner = float(metrics_all["MAE"].min()) if metrics_all["MAE"].notna().any() else 0.0
 
     sigma = float(max(0.0, mae_winner))
-    ss_const = float(z * sigma * np.sqrt(float(lead_time)))  # SS fijo para la simulación (simple y estable)
+    
+    # ==================== NEWSVENDOR: Stock de seguridad dinámico por costos ====================
+    from src.services.ml_service import calculate_safety_stock_newsvendor
+    ss_const = calculate_safety_stock_newsvendor(
+        cost_stockout=cost_stockout_unit,
+        cost_inv=cost_stock_unit,
+        sigma=sigma,
+        lead_time=lead_time
+    )
+    # ss_const ahora depende de la relación cost_stockout/cost_inv ✅
 
     # Modelos para forecast (re-entrena cada paso)
     ets_step = ETSForecaster(**ets_params)
@@ -2362,9 +2372,22 @@ class Dashboard:
                     # Pronóstico t+1 con el ganador
                     yhat = forecast_next_month_with_winner(hist, winner, int(ma_window), ets_params, rf_params)
 
-                    # Stock de seguridad usando MAE como proxy (σ ≈ MAE)
+                    # Stock de seguridad: NEWSVENDOR dinámico por costos
                     sigma = float(max(0.0, winner_mae))
-                    ss = float(z * sigma * np.sqrt(float(lead_time)))
+                    
+                    # Obtener costos del session_state (sincronizados desde Comparativa Retrospectiva)
+                    # Si no existen, usar defaults conservadores
+                    cost_stock_unit_reco = st.session_state.get("sync_cost_stock_unit", 1.0)
+                    cost_stockout_unit_reco = st.session_state.get("sync_cost_stockout_unit", 5.0)
+                    
+                    # ==================== NEWSVENDOR: dinámico por costos ====================
+                    from src.services.ml_service import calculate_safety_stock_newsvendor
+                    ss = calculate_safety_stock_newsvendor(
+                        cost_stockout=cost_stockout_unit_reco,
+                        cost_inv=cost_stock_unit_reco,
+                        sigma=sigma,
+                        lead_time=lead_time
+                    )
 
                     # Producción recomendada
                     prod_reco = max(0.0, yhat + ss - float(stock_actual))
@@ -2451,44 +2474,81 @@ class Dashboard:
                     with st.expander("📋 Detalles técnicos (Variables y cálculos)", expanded=False):
                         st.markdown("#### 📖 Significado de cada variable:")
                         
-                        st.markdown("""
-                        **Producto:** {prod_sel} 
-                        > El código/nombre del artículo que estás analizando
+                        # Obtener costos si existen
+                        cost_stock_reco_show = st.session_state.get("sync_cost_stock_unit", None)
+                        cost_stockout_reco_show = st.session_state.get("sync_cost_stockout_unit", None)
                         
-                        **ABC:** {abc}
-                        > Clasificación de importancia basada en demanda total. A=Críticos, B=Importantes, C=Bajos
-                        
-                        **Modelo ganador:** {modelo}
-                        > El método de pronóstico que mejor predice tu demanda histórica (Baselines, ETS o Random Forest)
-                        
-                        **Lead time:** {lt}
-                        > Días/meses que tarda la producción desde que la ordenas (fijo en política)
-                        
-                        **Nivel de servicio:** {sl}
-                        > % de veces que logras satisfacer la demanda (política según ABC: A=95%, B=90%, C=85%)
-                        
-                        **Factor de seguridad (Z):** {z_val}
-                        > Cuántas desviaciones estándar añades al pronóstico. Mayor Z = más stock de seguridad
-                        
-                        **Error promedio (MAE):** {mae}
-                        > Cuánto se desvía el modelo en promedio. Se usa para calcular el stock de seguridad
-                        
-                        **Inversión en stock de seguridad:** {ss}
-                        > Unidades extra que mantienes por si la demanda sube inesperadamente
-                        
-                        **Producción recomendada:** {prod}
-                        > = Demanda esperada + Stock de seguridad - Stock actual
-                        """.format(
-                            prod_sel=str(prod_sel),
-                            abc=abc_class,
-                            modelo=winner,
-                            lt=f"{lead_time} mes",
-                            sl=f"{int(service_level*100)}% (Z≈{z})",
-                            z_val=f"{z}",
-                            mae=f"{sigma:,.2f}",
-                            ss=f"{ss:,.0f}",
-                            prod=f"{prod_reco_int:,.0f}"
-                        ))
+                        if cost_stock_reco_show is not None and cost_stockout_reco_show is not None:
+                            # Mostrar método Newsvendor
+                            ratio_newsvendor = cost_stockout_reco_show / (cost_stockout_reco_show + cost_stock_reco_show)
+                            st.info("🎯 **Método: Newsvendor (costo-óptimo)**\n\nEl stock de seguridad se calcula balanceando costos de inventario vs quiebres de stock.")
+                            
+                            sigma_show = float(max(0.0, winner_mae))
+                            z_dynamic_show = float(norm.ppf(np.clip(ratio_newsvendor, 0.001, 0.999)))
+                            
+                            st.markdown(f"""
+                            **Producto:** {prod_sel} 
+                            > El código/nombre del artículo que estás analizando
+                            
+                            **ABC:** {abc_class}
+                            > Clasificación de importancia basada en demanda total. A=Críticos, B=Importantes, C=Bajos
+                            
+                            **Modelo ganador:** {winner}
+                            > El método de pronóstico que mejor predice tu demanda histórica
+                            
+                            **Lead time:** {lead_time} mes
+                            > Tiempo que tarda la producción desde que la ordenas
+                            
+                            **Error promedio (MAE):** {sigma_show:,.2f}
+                            > Cuánto se desvía el modelo en promedio
+                            
+                            **Costos de la política:**
+                            > - Costo mantener inventario: {cost_stock_reco_show:.2f} por unidad
+                            > - Costo quiebre/venta perdida: {cost_stockout_reco_show:.2f} por unidad
+                            > - Ratio crítico: {ratio_newsvendor:.2%}
+                            
+                            **Factor de seguridad dinámico (Z):** ≈{z_dynamic_show:.2f}
+                            > Se calcula automáticamente del balance de costos. Mayor cost_stockout → mayor Z
+                            
+                            **Inversión en stock de seguridad:** {ss:,.0f}
+                            > Unidades extra según el balance óptimo de costos
+                            
+                            **Producción recomendada:** {prod_reco_int:,.0f}
+                            > = Demanda esperada ({yhat:,.0f}) + Stock de seguridad ({ss:,.0f}) - Stock actual
+                            """)
+                        else:
+                            # Mostrar método legacy (service level)
+                            st.info("ℹ️ **Método: Service Level (basado en ABC)**\n\nEjecuta 'Comparativa Retrospectiva' para activar método Newsvendor optimizado por costos.")
+                            
+                            sigma_show_legacy = float(max(0.0, winner_mae))
+                            st.markdown(f"""
+                            **Producto:** {prod_sel} 
+                            > El código/nombre del artículo que estás analizando
+                            
+                            **ABC:** {abc_class}
+                            > Clasificación de importancia basada en demanda total. A=Críticos (95%), B=Importantes (90%), C=Bajos (85%)
+                            
+                            **Modelo ganador:** {winner}
+                            > El método de pronóstico que mejor predice tu demanda histórica
+                            
+                            **Lead time:** {lead_time} mes
+                            > Tiempo que tarda la producción desde que la ordenas
+                            
+                            **Nivel de servicio (por ABC):** {int(service_level*100)}%
+                            > % de veces que logras satisfacer la demanda
+                            
+                            **Factor de seguridad (Z):** {z:.2f}
+                            > Cuántas desviaciones estándar añades al pronóstico (fijo por ABC)
+                            
+                            **Error promedio (MAE):** {sigma_show_legacy:,.2f}
+                            > Cuánto se desvía el modelo en promedio
+                            
+                            **Inversión en stock de seguridad:** {ss:,.0f}
+                            > Unidades extra según el nivel de servicio del ABC
+                            
+                            **Producción recomendada:** {prod_reco_int:,.0f}
+                            > = Demanda esperada ({yhat:,.0f}) + Stock de seguridad ({ss:,.0f}) - Stock actual
+                            """)
                         
                         st.divider()
                         st.markdown("**Comparación detallada de modelos (backtest):")
