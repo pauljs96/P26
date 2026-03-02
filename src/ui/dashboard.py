@@ -3003,7 +3003,7 @@ class Dashboard:
                         model_display = s.get("Winner", "N/A").split("(")[0].strip()
                         st.metric("🏆 Modelo (costos)", model_display)
                 
-                # ==================== MÉTRICAS PRINCIPALES (AMIGABLES) ====================
+                # ==================== MÉTRICAS PRINCIPALES (TARJETAS VISUALES) ====================
                 st.markdown("### 💰 Impacto Financiero y Operativo")
                 
                 ahorro_total = float(s['Ahorro_CostoTotal'])
@@ -3012,38 +3012,59 @@ class Dashboard:
                 fill_rate_base = float(s['Base']['FillRate_%'])
                 fill_rate_sys = float(s['Sistema']['FillRate_%'])
                 
-                # Determinar interpretación
-                if ahorro_total > 0:
-                    ahorro_color = "🟢"
-                    ahorro_texto = "Ahorro positivo"
-                else:
-                    ahorro_color = "🔴"
-                    ahorro_texto = "Costo adicional"
+                # Tarjetas principales - Ahorro, Fill Rate, Quiebres
+                col_card1, col_card2, col_card3 = st.columns(3, gap="medium")
                 
-                if mejora_fillrate > 0:
-                    fillrate_color = "🟢"
-                    fillrate_texto = f"Mejora en disponibilidad"
-                else:
-                    fillrate_color = "🟡"
-                    fillrate_texto = "Sin cambio significativo"
+                with col_card1:
+                    st.markdown(f"""
+                    <div style='background: linear-gradient(135deg, #10B981 0%, #059669 100%); padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1);'>
+                        <p style='margin: 0; font-size: 0.85em; color: rgba(255,255,255,0.8);'>Ahorro Total</p>
+                        <p style='margin: 5px 0 0 0; font-size: 2em; font-weight: bold; color: white;'>{ahorro_total:,.0f}</p>
+                        <p style='margin: 5px 0 0 0; font-size: 0.75em; color: rgba(255,255,255,0.7);'>unidades monetarias</p>
+                    </div>
+                    """, unsafe_allow_html=True)
                 
-                col_m1, col_m2, col_m3 = st.columns(3)
+                with col_card2:
+                    st.markdown(f"""
+                    <div style='background: linear-gradient(135deg, #06B6D4 0%, #0891B2 100%); padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1);'>
+                        <p style='margin: 0; font-size: 0.85em; color: rgba(255,255,255,0.8);'>Mejora Fill Rate</p>
+                        <p style='margin: 5px 0 0 0; font-size: 2em; font-weight: bold; color: white;'>+{mejora_fillrate:.1f}%</p>
+                        <p style='margin: 5px 0 0 0; font-size: 0.75em; color: rgba(255,255,255,0.7);'>{fill_rate_base:.0f}% → {fill_rate_sys:.0f}%</p>
+                    </div>
+                    """, unsafe_allow_html=True)
                 
-                with col_m1:
-                    st.metric(f"{ahorro_color} Ahorro", f"{ahorro_total:,.0f}", delta="unidades monetarias")
+                with col_card3:
+                    st.markdown(f"""
+                    <div style='background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1);'>
+                        <p style='margin: 0; font-size: 0.85em; color: rgba(255,255,255,0.8);'>Quiebres Evitados</p>
+                        <p style='margin: 5px 0 0 0; font-size: 2em; font-weight: bold; color: white;'>{reduccion_faltantes:,.0f}</p>
+                        <p style='margin: 5px 0 0 0; font-size: 0.75em; color: rgba(255,255,255,0.7);'>menos faltantes</p>
+                    </div>
+                    """, unsafe_allow_html=True)
                 
-                with col_m2:
-                    st.metric(f"{fillrate_color} Fill Rate", f"+{mejora_fillrate:.1f}%", delta="mejora en disponibilidad")
-                
-                with col_m3:
-                    st.metric("📦 Quiebres evitados", f"{reduccion_faltantes:,.0f}", delta="menos faltantes")
                 
                 st.divider()
                 
-                # ==================== INTERPRETACIÓN TEXTUAL ====================
-                st.markdown("### 📈 ¿Qué significa esto para tu negocio?")
+                # ==================== GRÁFICOS PRINCIPALES (DESTACADOS) ====================
+                st.markdown("### 📊 Gráficos de Impacto")
                 
-                with st.container(border=True):
+                col_g1, col_g2 = st.columns(2, gap="medium")
+                
+                with col_g1:
+                    fig_cost = px.line(df_cmp, x="Mes", y=["Base_Costo_total", "Sys_Costo_total"], markers=True,
+                                    title="Costo total mensual: Baseline vs Sistema")
+                    fig_cost.update_traces(line=dict(width=3))
+                    st.plotly_chart(fig_cost, use_container_width=True)
+                
+                with col_g2:
+                    fig_lost = px.bar(df_cmp, x="Mes", y=["Base_Faltante", "Sys_Faltante"], barmode="group",
+                                    title="Quiebres por mes: Baseline vs Sistema")
+                    st.plotly_chart(fig_lost, use_container_width=True)
+                
+                st.divider()
+                
+                # ==================== INFORMACIÓN DETALLADA (COLAPSADA) ====================
+                with st.expander("📈 ¿Qué significa esto para tu negocio? (Explicación detallada)", expanded=False):
                     st.markdown(f"**{user_name},** durante el período de **{period_info.get('num_months', 0)} meses**, tu estrategia anterior (producir lo que se vendió antes) habría costado aproximadamente **{s['Base']['Costo_total']:,.0f}** en inventario y quiebres.")
                     st.markdown(f"Si hubiera implementado el sistema inteligente desde entonces, el costo habría sido **{s['Sistema']['Costo_total']:,.0f}**, lo que representa un **ahorro de {ahorro_total:,.0f}**.")
                     st.markdown("**Además:**")
@@ -3052,31 +3073,29 @@ class Dashboard:
                     st.markdown(f"✅ Los costos de inventario se optimizarían automáticamente")
                     st.markdown("✨ **En resumen: El sistema inteligente te permite ahorrar dinero Y servir mejor a tus clientes.**")
                 
-                st.divider()
+                with st.expander("🔍 Validación técnica y detalles de costos", expanded=False):
+                    st.markdown("#### Suma Manual de Costos (Validación)")
+                    col_cost1, col_cost2, col_cost3 = st.columns(3)
+                    
+                    with col_cost1:
+                        costo_base_suma = float(df_cmp["Base_Costo_total"].sum())
+                        st.metric("Base_Costo_total (suma manual)", f"{costo_base_suma:,.1f}", 
+                                  delta=f"KPI: {s['Base']['Costo_total']:,.1f}")
+                    
+                    with col_cost2:
+                        costo_sys_suma = float(df_cmp["Sys_Costo_total"].sum())
+                        st.metric("Sys_Costo_total (suma manual)", f"{costo_sys_suma:,.1f}",
+                                  delta=f"KPI: {s['Sistema']['Costo_total']:,.1f}")
+                    
+                    with col_cost3:
+                        ahorro_suma = costo_base_suma - costo_sys_suma
+                        st.metric("Ahorro (calc manual)", f"{ahorro_suma:,.1f}",
+                                  delta=f"KPI: {s['Ahorro_CostoTotal']:,.1f}")
+                    
+                    st.divider()
+                    st.markdown("#### Tabla Detallada Mes a Mes")
+                    st.dataframe(df_cmp, use_container_width=True, height=420)
                 
-                # ==================== VALIDACIÓN TÉCNICA (DESPLEGABLE) ====================
-                st.markdown("### 🔍 Validación Manual de Costos (Suma de filas)")
-                col_cost1, col_cost2, col_cost3 = st.columns(3)
-                
-                with col_cost1:
-                    costo_base_suma = float(df_cmp["Base_Costo_total"].sum())
-                    st.metric("Base_Costo_total (suma manual)", f"{costo_base_suma:,.1f}", 
-                              delta=f"KPI: {s['Base']['Costo_total']:,.1f}")
-                
-                with col_cost2:
-                    costo_sys_suma = float(df_cmp["Sys_Costo_total"].sum())
-                    st.metric("Sys_Costo_total (suma manual)", f"{costo_sys_suma:,.1f}",
-                              delta=f"KPI: {s['Sistema']['Costo_total']:,.1f}")
-                
-                with col_cost3:
-                    ahorro_suma = costo_base_suma - costo_sys_suma
-                    st.metric("Ahorro (calc manual)", f"{ahorro_suma:,.1f}",
-                              delta=f"KPI: {s['Ahorro_CostoTotal']:,.1f}")
-                
-                st.divider()
-
-                st.dataframe(df_cmp, use_container_width=True, height=420)
-
                 # Explicación de columnas
                 with st.expander("📋 Significado de las columnas en la tabla comparativa", expanded=False):
                     st.markdown("""
@@ -3197,7 +3216,7 @@ class Dashboard:
                     st.markdown(f"**Período analizado:** {eval_months_port} meses (consistente con tu análisis individual)")
                     st.markdown(f"**Cobertura:** {detalleA['Codigo'].nunique():,} productos de clase ABC A")
                 
-                # ==================== IMPACTO FINANCIERO DEL PORTAFOLIO ====================
+                # ==================== IMPACTO FINANCIERO DEL PORTAFOLIO - TARJETAS VISUALES ====================
                 st.markdown("### 💰 Impacto Financiero en el Portafolio ABC A")
                 
                 ahorro_total_port = float(resumenA.iloc[0]['Ahorro_total'])
@@ -3207,93 +3226,68 @@ class Dashboard:
                 costo_base_total_port = float(resumenA.iloc[0]['CostoTotal_Base'])
                 costo_sys_total_port = float(resumenA.iloc[0]['CostoTotal_Sistema'])
                 
-                col_p1, col_p2, col_p3 = st.columns(3)
+                # Tarjetas principales del Portafolio
+                col_pcard1, col_pcard2, col_pcard3 = st.columns(3, gap="medium")
                 
-                with col_p1:
-                    ahorro_icon = "🟢" if ahorro_total_port > 0 else "🔴"
-                    st.metric(f"{ahorro_icon} Ahorro Total Portafolio", f"{ahorro_total_port:,.0f}", delta="unidades monetarias")
+                with col_pcard1:
+                    ahorro_color = "#10B981" if ahorro_total_port > 0 else "#EF4444"
+                    st.markdown(f"""
+                    <div style='background: linear-gradient(135deg, {ahorro_color} 0%, {ahorro_color}CC 100%); padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1);'>
+                        <p style='margin: 0; font-size: 0.85em; color: rgba(255,255,255,0.8);'>Ahorro Total Portafolio</p>
+                        <p style='margin: 5px 0 0 0; font-size: 2em; font-weight: bold; color: white;'>{ahorro_total_port:,.0f}</p>
+                        <p style='margin: 5px 0 0 0; font-size: 0.75em; color: rgba(255,255,255,0.7);'>unidades monetarias</p>
+                    </div>
+                    """, unsafe_allow_html=True)
                 
-                with col_p2:
-                    fillrate_icon = "🟢" if mejora_fillrate_port > 0 else "🟡"
-                    st.metric(f"{fillrate_icon} Mejora Fill Rate", f"+{mejora_fillrate_port:.1f}%", delta="puntos porcentuales")
+                with col_pcard2:
+                    st.markdown(f"""
+                    <div style='background: linear-gradient(135deg, #06B6D4 0%, #0891B2 100%); padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1);'>
+                        <p style='margin: 0; font-size: 0.85em; color: rgba(255,255,255,0.8);'>Mejora Fill Rate</p>
+                        <p style='margin: 5px 0 0 0; font-size: 2em; font-weight: bold; color: white;'>+{mejora_fillrate_port:.1f}%</p>
+                        <p style='margin: 5px 0 0 0; font-size: 0.75em; color: rgba(255,255,255,0.7);'>{fillrate_base_port:.0f}% → {fillrate_sys_port:.0f}%</p>
+                    </div>
+                    """, unsafe_allow_html=True)
                 
-                with col_p3:
-                    st.metric("📦 Cobertura", f"{detalleA['Codigo'].nunique():,} productos", delta="evaluados en ABC A")
-                
-                st.divider()
-                
-                # ==================== INTERPRETACIÓN NARRATIVA ====================
-                st.markdown("### 📈 ¿Qué significa esto para tu negocio?")
-                
-                with st.container(border=True):
-                    st.markdown(f"Analizando TODOS tus productos ABC A ({detalleA['Codigo'].nunique():,} productos) durante {eval_months_port} meses:")
-                    st.markdown(f"- **Sin el sistema:** Costo total de **{costo_base_total_port:,.0f}** (método reactivo)")
-                    st.markdown(f"- **Con el sistema:** Costo total de **{costo_sys_total_port:,.0f}** (método inteligente)")
-                    st.markdown(f"")
-                    st.markdown(f"**Resultado neto:** Ahorraría **{ahorro_total_port:,.0f} unidades monetarias** en {eval_months_port} meses")
-                    st.markdown(f"**Proyección anual:** {ahorro_total_port * (12/eval_months_port):,.0f} unidades (extrapolado a 12 meses)")
-                    st.markdown(f"")
-                    st.markdown(f"✅ Al mismo tiempo mejoraría tu disponibilidad de {fillrate_base_port:.1f}% a {fillrate_sys_port:.1f}% - significa **menos clientes insatisfechos**")
-                    st.markdown(f"✨ **En conclusión:** Implementar el sistema en tu portafolio ABC A te permite **reducir costos Y mejorar servicio simultáneamente**")
-                
-                st.divider()
-                
-                # ==================== RESUMEN NUMÉRICO ====================
-                st.markdown("### 📊 Resumen: Baseline vs Sistema")
-                
-                col_res1, col_res2, col_res3 = st.columns(3)
-                
-                with col_res1:
-                    st.metric("Costo Total (Baseline)", f"{costo_base_total_port:,.1f}")
-                
-                with col_res2:
-                    st.metric("Costo Total (Sistema)", f"{costo_sys_total_port:,.1f}")
-                
-                with col_res3:
-                    st.metric("Diferencia (Ahorro)", f"{ahorro_total_port:,.1f}")
+                with col_pcard3:
+                    st.markdown(f"""
+                    <div style='background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1);'>
+                        <p style='margin: 0; font-size: 0.85em; color: rgba(255,255,255,0.8);'>Productos ABC A</p>
+                        <p style='margin: 5px 0 0 0; font-size: 2em; font-weight: bold; color: white;'>{detalleA['Codigo'].nunique():,}</p>
+                        <p style='margin: 5px 0 0 0; font-size: 0.75em; color: rgba(255,255,255,0.7);'>evaluados en portafolio</p>
+                    </div>
+                    """, unsafe_allow_html=True)
                 
                 st.divider()
                 
-                # ==================== TABLA GENERAL Y TOP PRODUCTOS ====================
-                with st.expander("📋 Resumen agregado del portafolio", expanded=True):
-                    st.dataframe(resumenA, use_container_width=True)
+                # ==================== GRÁFICOS PRINCIPALES (DESTACADOS) ====================
+                st.markdown("### 📊 Visualización: Impacto en Costos y Disponibilidad")
                 
-                st.markdown("### 🔝 Top 30 productos por mayor ahorro")
-                st.markdown("*Estos productos son los que más beneficio tendrían con el sistema inteligente*")
-                st.dataframe(detalleA.head(30), use_container_width=True, height=420)
-
-                st.divider()
+                col_pg1, col_pg2 = st.columns(2, gap="medium")
                 
-                # ==================== GRÁFICAS ====================
-                st.markdown("### 📈 Visualización: Impacto en Costos y FillRate")
-                
-                col_g1, col_g2 = st.columns(2)
-                
-                with col_g1:
+                with col_pg1:
                     fig_cost_port = px.bar(
                         resumenA,
                         x=["CostoTotal_Base", "CostoTotal_Sistema"],
                         title="Costo Total Portafolio: Baseline vs Sistema",
                         labels={"value": "Costo Total", "variable": "Estrategia"}
                     )
-                    fig_cost_port.update_layout(height=400)
+                    fig_cost_port.update_layout(height=450, font=dict(size=12))
                     st.plotly_chart(fig_cost_port, use_container_width=True)
                 
-                with col_g2:
+                with col_pg2:
                     fig_fillrate_port = px.bar(
                         resumenA,
                         x=["FillRate_Base_%", "FillRate_Sistema_%"],
                         title="Fill Rate Portafolio: Baseline vs Sistema",
                         labels={"value": "Fill Rate (%)", "variable": "Estrategia"}
                     )
-                    fig_fillrate_port.update_layout(height=400)
+                    fig_fillrate_port.update_layout(height=450, font=dict(size=12))
                     st.plotly_chart(fig_fillrate_port, use_container_width=True)
                 
                 st.divider()
                 
-                # ==================== OPORTUNIDADES POR PRODUCTO ====================
-                st.markdown("### 💡 Distribución de Ahorros por Producto")
-                st.markdown("*Identifica qué productos ofrecen mayor potencial de ahorro*")
+                # ==================== TOP OPORTUNIDADES POR PRODUCTO ====================
+                st.markdown("### 💡 Top Productos: Mayor Potencial de Ahorro")
                 
                 # Calcular ahorro si no existe en detalleA
                 if 'Ahorro_total' not in detalleA.columns:
@@ -3308,10 +3302,32 @@ class Dashboard:
                     title='Top 20 productos: Ahorro potencial',
                     labels={'Ahorro_total': 'Ahorro Unitario', 'Codigo': 'Producto'}
                 )
-                fig_oportunidades.update_layout(height=500)
+                fig_oportunidades.update_layout(height=550, font=dict(size=11))
                 st.plotly_chart(fig_oportunidades, use_container_width=True)
                 
                 st.divider()
+                
+                # ==================== INFORMACIÓN DETALLADA (COLAPSADA) ====================
+                with st.expander("📈 Análisis detallado de tu portafolio ABC A", expanded=False):
+                    st.markdown(f"**¿Qué ves aquí?** Analizando TODOS tus productos ABC A ({detalleA['Codigo'].nunique():,} productos) durante {eval_months_port} meses:")
+                    st.markdown(f"- **Sin el sistema:** Costo total de **{costo_base_total_port:,.0f}** (método reactivo)")
+                    st.markdown(f"- **Con el sistema:** Costo total de **{costo_sys_total_port:,.0f}** (método inteligente)")
+                    st.markdown(f"")
+                    st.markdown(f"**Resultado neto:** Ahorraría **{ahorro_total_port:,.0f} unidades monetarias** en {eval_months_port} meses")
+                    st.markdown(f"**Proyección anual:** {ahorro_total_port * (12/eval_months_port):,.0f} unidades (extrapolado a 12 meses)")
+                    st.markdown(f"")
+                    st.markdown(f"✅ Al mismo tiempo mejoraría tu disponibilidad de {fillrate_base_port:.1f}% a {fillrate_sys_port:.1f}% - significa **menos clientes insatisfechos**")
+                    st.markdown(f"✨ **En conclusión:** Implementar el sistema en tu portafolio ABC A te permite **reducir costos Y mejorar servicio simultáneamente**")
+                
+                with st.expander("📊 Resumen y tablas detalladas del portafolio", expanded=False):
+                    st.markdown("#### Resumen Agregado del Portafolio")
+                    st.dataframe(resumenA, use_container_width=True)
+                    
+                    st.divider()
+                    
+                    st.markdown("#### Top 30 productos por mayor ahorro")
+                    st.markdown("*Estos productos son los que más beneficio tendrían con el sistema inteligente*")
+                    st.dataframe(detalleA.head(30), use_container_width=True, height=420)
                 
                 # ==================== EXPORTACIÓN ====================
                 with st.expander("⬇️ Exportar detalle completo del portafolio (CSV)", expanded=False):
