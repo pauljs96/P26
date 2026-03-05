@@ -2201,7 +2201,7 @@ class Dashboard:
         with ResumenComparativa:
 
             st.divider()
-            st.subheader("🌍 Comparación global + ABC (todos los productos)")
+            st.subheader("🌍 Comparación global de modelos para ABC (todos los productos)")
             
             st.markdown("**Análisis:** Compara el desempeño de Baselines, ETS y Random Forest en TODOS los productos del portafolio. Muestra qué modelo gana por clase ABC y errores promedio.")
             st.info(f"📊 Evaluando: **TODOS los productos** (sin filtro - evaluación global del portafolio)")
@@ -2925,7 +2925,7 @@ class Dashboard:
         # TAB 11: COMPARATIVA RETROSPECTIVA SIN SISTEMA VS CON SISTEMA
         # ==========================================================
         with ComparaRetroEntreSistema:
-            st.subheader("⚖️ Comparativa retrospectiva: Sin sistema vs Con sistema (costos)")
+            st.subheader("⚖️ Comparativa de Costos por Producto: Sin sistema vs Con sistema")
             
             st.markdown("**Análisis Individual:** Compara cuánto hubieras gastado sin sistema (produciendo lo vendido anteriormente) vs con sistema (inteligencia + stock de seguridad). Segundo: Analiza todo el portafolio ABC A mostrando ahorros.")
             if prod_sel is not None:
@@ -2980,7 +2980,7 @@ class Dashboard:
             # Mostrar parámetros sincronizados
             col_info1, col_info2, col_info3 = st.columns(3)
             with col_info1:
-                st.metric("📅 Meses a evaluar (AUTO)", f"{eval_months}", delta=f"25% de {len(hist)}")
+                st.metric("📅 Meses evaluados (AUTO)", f"{eval_months}", delta=f"{eval_months + 1} filas (incluye mes base)")
             with col_info2:
                 st.metric("🏆 Modelo ganador (AUTO)", winner.split("(")[0].strip())
             with col_info3:
@@ -3054,10 +3054,11 @@ class Dashboard:
                         st.metric("📍 Fin", end_str)
                     
                     with col_period3:
-                        st.metric("📊 #Meses", num_months)
+                        st.metric("📊 Meses evaluados", num_months)
+                        st.caption("(+ 1 fila base inicial)")
                     
                     with col_period4:
-                        st.metric("✅ Rows", len(df_cmp))
+                        st.metric("✅ Filas resultado", len(df_cmp), delta=f"{num_months} evaluados + 1 base")
                     
                     with col_period5:
                         model_display = s.get("Winner", "N/A").split("(")[0].strip()
@@ -3181,18 +3182,11 @@ class Dashboard:
                     | **Sys_Costo_total** | Costo total (inventario + quiebres) con sistema inteligente |
                     """)
 
-                fig_cost = px.line(df_cmp, x="Mes", y=["Base_Costo_total", "Sys_Costo_total"], markers=True,
-                                title="Costo total mensual: Baseline vs Sistema")
-                st.plotly_chart(fig_cost, use_container_width=True)
-
-                fig_lost = px.bar(df_cmp, x="Mes", y=["Base_Faltante", "Sys_Faltante"], barmode="group",
-                                title="Faltantes (quiebre) por mes: Baseline vs Sistema")
-                st.plotly_chart(fig_lost, use_container_width=True)
 
 
 
             st.divider()
-            st.subheader("📦 Portafolio: Comparativa costos SOLO ABC A (agregado)")
+            st.subheader("📦 Comparativa de Costos por Portafolio A: Sin sistema vs Con sistema")
 
             # ==================== SINCRONIZAR PARÁMETROS DESDE COMPARATIVA INDIVIDUAL ====================
             # Si el usuario ya evaluó un producto en la sección Individual, usamos esos parámetros
