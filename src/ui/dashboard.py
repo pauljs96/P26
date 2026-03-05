@@ -2772,22 +2772,28 @@ class Dashboard:
                         
                         # Top 10 prioritarios
                         top_n = min(10, len(reco_df))
-                        reco_top = reco_df.head(top_n)
+                        reco_top = reco_df.head(top_n).copy()
+                        
+                        # Convertir booleano a string para Plotly
+                        reco_top['Estado_Riesgo'] = reco_top['RIESGO_QUIEBRE'].apply(
+                            lambda x: '🚨 RIESGO' if x else '✅ Seguro'
+                        )
                         
                         col_viz1, col_viz2 = st.columns(2)
                         
                         with col_viz1:
                             # Gráfico: Top productos por Producción Recomendada
+                            reco_top_sorted = reco_top.sort_values('Produccion_Recomendada', ascending=True)
                             fig_prod = px.barh(
-                                reco_top.sort_values('Produccion_Recomendada', ascending=True),
+                                reco_top_sorted,
                                 x='Produccion_Recomendada',
                                 y='Codigo',
-                                color='RIESGO_QUIEBRE',
-                                color_discrete_map={True: '#ef4444', False: '#10b981'},
+                                color='Estado_Riesgo',
+                                color_discrete_map={'🚨 RIESGO': '#ef4444', '✅ Seguro': '#10b981'},
                                 title=f'Top {top_n}: Producción Recomendada',
-                                labels={'Produccion_Recomendada': 'Unidades', 'Codigo': 'Producto'}
+                                labels={'Produccion_Recomendada': 'Unidades', 'Codigo': 'Producto', 'Estado_Riesgo': 'Estado'}
                             )
-                            fig_prod.update_layout(height=450, font=dict(size=11), showlegend=False)
+                            fig_prod.update_layout(height=450, font=dict(size=11), showlegend=True)
                             st.plotly_chart(fig_prod, use_container_width=True)
                         
                         with col_viz2:
