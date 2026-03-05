@@ -2790,11 +2790,12 @@ class Dashboard:
                                 st.warning("Sin datos para graficar producción recomendada")
                             else:
                                 try:
-                                    fig_prod = px.barh(
+                                    fig_prod = px.bar(
                                         reco_top_sorted,
                                         x='Produccion_Recomendada',
                                         y='Codigo',
                                         color='Estado_Riesgo',
+                                        orientation='h',
                                         color_discrete_map={'🚨 RIESGO': '#ef4444', '✅ Seguro': '#10b981'},
                                         title=f'Top {top_n}: Producción Recomendada',
                                         labels={'Produccion_Recomendada': 'Unidades', 'Codigo': 'Producto', 'Estado_Riesgo': 'Estado'}
