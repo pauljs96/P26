@@ -2783,33 +2783,51 @@ class Dashboard:
                         
                         with col_viz1:
                             # Gráfico: Top productos por Producción Recomendada
-                            reco_top_sorted = reco_top.sort_values('Produccion_Recomendada', ascending=True)
-                            fig_prod = px.barh(
-                                reco_top_sorted,
-                                x='Produccion_Recomendada',
-                                y='Codigo',
-                                color='Estado_Riesgo',
-                                color_discrete_map={'🚨 RIESGO': '#ef4444', '✅ Seguro': '#10b981'},
-                                title=f'Top {top_n}: Producción Recomendada',
-                                labels={'Produccion_Recomendada': 'Unidades', 'Codigo': 'Producto', 'Estado_Riesgo': 'Estado'}
-                            )
-                            fig_prod.update_layout(height=450, font=dict(size=11), showlegend=True)
-                            st.plotly_chart(fig_prod, use_container_width=True)
+                            reco_top_sorted = reco_top.sort_values('Produccion_Recomendada', ascending=True).reset_index(drop=True)
+                            
+                            # Debug: verificar datos antes de plotear
+                            if reco_top_sorted.empty:
+                                st.warning("Sin datos para graficar producción recomendada")
+                            else:
+                                try:
+                                    fig_prod = px.barh(
+                                        reco_top_sorted,
+                                        x='Produccion_Recomendada',
+                                        y='Codigo',
+                                        color='Estado_Riesgo',
+                                        color_discrete_map={'🚨 RIESGO': '#ef4444', '✅ Seguro': '#10b981'},
+                                        title=f'Top {top_n}: Producción Recomendada',
+                                        labels={'Produccion_Recomendada': 'Unidades', 'Codigo': 'Producto', 'Estado_Riesgo': 'Estado'}
+                                    )
+                                    fig_prod.update_layout(height=450, font=dict(size=11), showlegend=True)
+                                    st.plotly_chart(fig_prod, use_container_width=True)
+                                except Exception as e:
+                                    st.error(f"Error al generar gráfico de producción: {str(e)}")
+                                    st.write("Datos disponibles:", reco_top_sorted.columns.tolist())
+                                    st.write("Primeras filas:", reco_top_sorted.head())
                         
                         with col_viz2:
                             # Gráfico: Stock Actual vs SS (Stock de Seguridad)
-                            reco_top_viz = reco_top[['Codigo', 'Stock_Actual', 'SS']].copy()
-                            fig_stock_ss = px.bar(
-                                reco_top_viz,
-                                x='Codigo',
-                                y=['Stock_Actual', 'SS'],
-                                barmode='group',
-                                title=f'Top {top_n}: Stock Actual vs Stock de Seguridad',
-                                labels={'value': 'Unidades', 'variable': 'Tipo'},
-                                color_discrete_map={'Stock_Actual': '#06b6d4', 'SS': '#f59e0b'}
-                            )
-                            fig_stock_ss.update_layout(height=450, font=dict(size=11))
-                            st.plotly_chart(fig_stock_ss, use_container_width=True)
+                            reco_top_viz = reco_top[['Codigo', 'Stock_Actual', 'SS']].copy().reset_index(drop=True)
+                            
+                            if reco_top_viz.empty:
+                                st.warning("Sin datos para graficar stock")
+                            else:
+                                try:
+                                    fig_stock_ss = px.bar(
+                                        reco_top_viz,
+                                        x='Codigo',
+                                        y=['Stock_Actual', 'SS'],
+                                        barmode='group',
+                                        title=f'Top {top_n}: Stock Actual vs Stock de Seguridad',
+                                        labels={'value': 'Unidades', 'variable': 'Tipo'},
+                                        color_discrete_map={'Stock_Actual': '#06b6d4', 'SS': '#f59e0b'}
+                                    )
+                                    fig_stock_ss.update_layout(height=450, font=dict(size=11))
+                                    st.plotly_chart(fig_stock_ss, use_container_width=True)
+                                except Exception as e:
+                                    st.error(f"Error al generar gráfico de stock: {str(e)}")
+                                    st.write("Datos disponibles:", reco_top_viz.columns.tolist())
                         
                         st.divider()
                         
