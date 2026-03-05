@@ -3196,8 +3196,17 @@ class Dashboard:
                     st.markdown(f"**Resultado neto:** Ahorraría **{ahorro_total_port:,.0f} unidades monetarias** en {eval_months_port} meses")
                     st.markdown(f"**Proyección anual:** {ahorro_total_port * (12/eval_months_port):,.0f} unidades (extrapolado a 12 meses)")
                     st.markdown(f"")
-                    st.markdown(f"✅ Al mismo tiempo mejoraría tu disponibilidad de {fillrate_base_port:.1f}% a {fillrate_sys_port:.1f}% - significa **menos clientes insatisfechos**")
-                    st.markdown(f"✨ **En conclusión:** Implementar el sistema en tu portafolio ABC A te permite **reducir costos Y mejorar servicio simultáneamente**")
+                    
+                    # Lógica adaptativa para Fill Rate del Portafolio
+                    if fillrate_sys_port >= fillrate_base_port:
+                        cambio_ff_port = fillrate_sys_port - fillrate_base_port
+                        st.markdown(f"✅ **Fill Rate:** Mejora de **{fillrate_base_port:.1f}%** a **{fillrate_sys_port:.1f}%** (ganancia de {cambio_ff_port:.1f}%)")
+                        st.markdown(f"✨ **En conclusión:** Implementar el sistema en tu portafolio ABC A te permite **reducir costos Y mejorar servicio simultáneamente**")
+                    else:
+                        cambio_ff_port = fillrate_base_port - fillrate_sys_port
+                        st.markdown(f"📊 **Fill Rate:** {fillrate_base_port:.1f}% (sin sistema) vs {fillrate_sys_port:.1f}% (con sistema)")
+                        st.markdown(f"   → Reducción de {cambio_ff_port:.1f}%, pero compensada por **ahorros de ${ahorro_total_port:,.0f}**")
+                        st.markdown(f"⚖️ **En conclusión:** Implementar el sistema en tu portafolio ABC A genera **ahorros significativos** con un trade-off aceptable en disponibilidad")
                 
                 with st.expander("📊 Resumen y tablas detalladas del portafolio", expanded=False):
                     st.markdown("#### Resumen Agregado del Portafolio")
