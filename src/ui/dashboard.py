@@ -2828,9 +2828,19 @@ class Dashboard:
                                     st.plotly_chart(fig_stock_ss, use_container_width=True)
                                 except Exception as e:
                                     st.error(f"Error al generar gráfico de stock: {str(e)}")
-                                    st.write("Datos disponibles:", reco_top_viz.columns.tolist())
-                        
-                        st.divider()
+                            
+                            # Explicación para el cliente (fuera del try/except)
+                            st.markdown("""
+                            <div style='background: #f0f7ff; padding: 12px; border-left: 4px solid #06b6d4; border-radius: 4px; font-size: 0.9em; margin-top: 10px;'>
+                            <strong>💡 Interpretación Clave:</strong><br>
+                            <strong style='color: #06b6d4;'>Cyan (Stock Actual):</strong> Inventario que tienes HOY<br>
+                            <strong style='color: #f59e0b;'>Naranja (Stock de Seguridad):</strong> Mínimo recomendado para protegerte de quiebres<br><br>
+                            <strong>Qué significa:</strong><br>
+                            ✅ Si <strong>Cyan > Naranja:</strong> Tienes colchón, sin riesgo inmediato<br>
+                            🚨 Si <strong>Cyan < Naranja:</strong> Estás bajo el nivel seguro - necesitas producción URGENTE<br>
+                            ⚠️ Si <strong>Cyan ≈ Naranja:</strong> Punto crítico, pequeños cambios en demanda causan quiebre
+                            </div>
+                            """, unsafe_allow_html=True)
                         
                         # ==================== TABLA DETALLADA CON EXPLICACIONES ====================
                         st.markdown("#### 📋 Tabla Detallada: Todos los Productos")
