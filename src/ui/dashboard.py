@@ -1773,9 +1773,8 @@ class Dashboard:
         
         # Crear subtabs dentro de Análisis de Grupo (para TODOS)
         with tab_grupal:
-            ResumenComparativa, Valida_Retro, ComparaRetroEntreSistema, Reco_Masiva = st.tabs([
+            ResumenComparativa, ComparaRetroEntreSistema, Reco_Masiva = st.tabs([
                 "📊 Resumen Comparativa Global",
-                "✅ Validación Retrospectiva",
                 "📉 Comparativa Retrospectiva",
                 "📑 Recomendación Masiva",
             ])
@@ -1902,7 +1901,7 @@ class Dashboard:
                 
                 # ========== FILA 2: ANÁLISIS DE GRUPO ==========
                 st.markdown("##### 📊 Análisis de Grupo (múltiples productos)")
-                col5, col6, col7, col8 = st.columns(4)
+                col5, col6, col7 = st.columns(3)
                 
                 with col5:
                     st.markdown("""
@@ -1933,29 +1932,6 @@ class Dashboard:
                         display: flex;
                         flex-direction: column;
                     ">
-                        <h4 style="margin-top: 0; margin-bottom: 0.3em; font-size: 0.95em;">✅ Validación Retrospectiva</h4>
-                        <div style="
-                            background: linear-gradient(135deg, #ee0979 0%, #ff6a00 100%);
-                            color: white;
-                            padding: 10px;
-                            border-radius: 8px;
-                            text-align: center;
-                            margin-bottom: 10px;
-                            font-weight: 600;
-                            font-size: 0.9em;
-                        ">
-                        📌 Análisis de Grupo → ✅ Validación
-                        </div>
-                        <p style="margin: 0; font-size: 0.9em; color: #555;">Simula la política de producción en el histórico.</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                with col7:
-                    st.markdown("""
-                    <div style="
-                        display: flex;
-                        flex-direction: column;
-                    ">
                         <h4 style="margin-top: 0; margin-bottom: 0.3em; font-size: 0.95em;">📉 Comparativa Retrospectiva</h4>
                         <div style="
                             background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
@@ -1973,7 +1949,7 @@ class Dashboard:
                     </div>
                     """, unsafe_allow_html=True)
                 
-                with col8:
+                with col7:
                     st.markdown("""
                     <div style="
                         display: flex;
@@ -2730,204 +2706,14 @@ class Dashboard:
                             st.download_button("Descargar recomendaciones.csv", csv, file_name="recomendaciones.csv", mime="text/csv")
 
 
-        # ==========================================================
-        # TAB 10: VALIDACIÓN RETROSPECTIVA DE LA POLÍTICA
-        # ==========================================================
-        with Valida_Retro:
-            st.subheader("🧪 Validación retrospectiva de la política (simulación)")
-            
-            st.markdown("**Análisis:** Simula día a día cómo habría funcionado tu política de producción en el histórico. Muestra si habrías tenido quiebres, inventario y fill rate.")
-            if prod_sel is not None:
-                st.info(f"📊 Validando: **Producto {prod_sel}** (según filtro seleccionado)")
-            else:
-                st.warning("⚠️ Selecciona un producto en los Filtros de Producto del sidebar")
-
-            dm = res_demand.copy()
-            dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
-            hist = dm[dm["Codigo"] == str(prod_sel)][["Mes", "Demanda_Unid"]].copy().sort_values("Mes")
-
-            if hist.empty:
-                st.info("No hay serie mensual para este producto.")
-            else:
-                    # Stock mensual del producto (empresa)
-                stock_p = pd.DataFrame()
-                if res_stock is not None and not res_stock.empty:
-                    stock_p = res_stock.copy()
-                    stock_p["Codigo"] = stock_p["Codigo"].astype(str).str.strip()
-                    stock_p = stock_p[stock_p["Codigo"] == str(prod_sel)][["Mes", "Stock_Unid"]].copy().sort_values("Mes")
-
-                    # ABC del producto
-                row = abc_df[abc_df["Codigo"] == str(prod_sel)]
-                abc_class = str(row.iloc[0]["ABC"]) if not row.empty else "C"
-
-                    # Auto-calcular test_months: 25% del histórico disponible para máxima comparabilidad
-                test_months = max(6, int(len(hist) * 0.25))
-                st.info(f"🎯 **{test_months} meses** para elegir ganador (25% de {len(hist)}, criterio estándar)")
-                    
-                    # Auto-optimizar MA (3 vs 6) evaluando Baselines
-                bt_ma3 = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), ma_window=3)
-                bt_ma6 = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), ma_window=6)
-                mae_ma3 = float(bt_ma3.metrics.iloc[0]["MAE"]) if not bt_ma3.metrics.empty else float("inf")
-                mae_ma6 = float(bt_ma6.metrics.iloc[0]["MAE"]) if not bt_ma6.metrics.empty else float("inf")
-                ma_window = 3 if mae_ma3 < mae_ma6 else 6
-                st.caption(f"✅ Ventana MA auto-optimizada: **MA{ma_window}** (MAE: {min(mae_ma3, mae_ma6):.2f})")
-                    
-                lead_time = 1  # Parámetro operacional fijo
-                eval_months = test_months  # Usar los mismos meses de evaluación para consistencia
-
-                run_sim = st.button("▶️ Ejecutar simulación (ganador automático por MAE)", type="primary", key="run_sim")
-
-                if run_sim:
-                    with st.spinner("Calculando ganador por MAE y simulando política..."):
-                            # 1) Backtests para elegir ganador por MAE
-                        bt_base = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), ma_window=int(ma_window))
-
-                        ets_params = dict(seasonal_periods=12, trend="add", seasonal="add", damped_trend=False, min_obs=24)
-                        ets = ETSForecaster(**ets_params)
-                        bt_ets = backtest_ets_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), ets=ets)
-
-                        rf_params = dict(n_estimators=400, min_obs=24, min_samples_leaf=1, random_state=42)
-                        rf = RFForecaster(**rf_params)
-                        bt_rf = backtest_rf_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), rf=rf)
-
-                            # 2) Unir métricas y escoger ganador por MAE
-                        cmp = compare_models_metrics(bt_base.metrics, bt_ets.metrics, bt_rf.metrics, sort_by="MAE")
-                        if cmp.empty:
-                            st.warning("No se pudo determinar ganador (métricas vacías).")
-                            st.stop()
-
-                        winner = str(cmp.iloc[0]["Modelo"])
-                        mae_win = float(pd.to_numeric(cmp.iloc[0].get("MAE", np.nan), errors="coerce"))
-
-                        st.success(f"Ganador por MAE: **{winner}**  |  MAE: **{mae_win:.3f}**")
-
-                            # 3) Simular política usando winner y sigma_fixed = MAE ganador
-                        df_sim, kpis = simulate_policy_backtest_1step(
-                            hist=hist,
-                            stock_series=stock_p,
-                            winner=winner,
-                            abc_class=abc_class,
-                            lead_time=int(lead_time),
-                            eval_months=int(eval_months),
-                            ets_params=ets_params,
-                            rf_params=rf_params,
-                            sigma_fixed=mae_win,   # 👈 CLAVE
-                        )
-
-                    # ========== RESUMEN DE LA SIMULACIÓN ==========
-                    st.markdown("---")
-                    st.markdown("### 📊 Resultados de la Simulación")
-                    
-                    # Resumen explicativo
-                    st.markdown(f"""
-                    **¿Qué se simuló?** Se ejecutó la política de producción día a día durante {eval_months} meses 
-                    usando el modelo ganador (**{winner}**) para pronosticar la demanda y calcular stock de seguridad.
-                    
-                    **Lógica de la política:**
-                    - 📈 Cada mes se pronostica la demanda esperada
-                    - 🛡️ Se suma stock de seguridad (protección ante variaciones)
-                    - 📦 Se resta stock disponible
-                    - ✅ El resultado es lo que debes producir
-                    
-                    **Beneficios esperados:**
-                    - Reducción de quiebres (faltantes de stock)
-                    - Optimización del inventario promedio
-                    - Mayor fill rate (cumplimiento de demanda)
-                    """)
-                    
-                    # KPIs principales con mejor visual
-                    c1, c2, c3, c4 = st.columns(4)
-                    
-                    with c1:
-                        quiebres = kpis['Meses_con_quiebre']
-                        total_meses = kpis['Meses_evaluados']
-                        st.metric(
-                            "🚨 Meses con quiebre",
-                            f"{quiebres}",
-                            delta=f"de {total_meses}" if total_meses > 0 else "N/A"
-                        )
-                    
-                    with c2:
-                        fill_rate = kpis['FillRate_%']
-                        st.metric(
-                            "✅ Fill Rate",
-                            f"{fill_rate:.1f}%",
-                            delta="Cumplimiento de demanda" if fill_rate >= 90 else "Requiere mejora"
-                        )
-                    
-                    with c3:
-                        faltantes = kpis['Unidades_faltantes']
-                        st.metric(
-                            "📉 Unidades faltantes",
-                            f"{faltantes:,.0f}",
-                            delta="Total en período" if faltantes > 0 else "Excelente"
-                        )
-                    
-                    with c4:
-                        inv_prom = kpis['Inventario_promedio']
-                        st.metric(
-                            "📦 Inventario promedio",
-                            f"{inv_prom:,.0f}",
-                            delta="unidades"
-                        )
-                    
-                    st.divider()
-                    
-                    # Gráfico de Stock con anotaciones
-                    st.markdown("#### 📈 Evolución del Stock")
-                    fig_stock = px.line(df_sim, x="Mes_target", y="Stock_fin", markers=True, 
-                                       title="Stock mensual resultante de la simulación")
-                    fig_stock.add_hline(
-                        y=0, line_dash="dash", line_color="red", 
-                        annotation_text="Punto de quiebre (stock = 0)", 
-                        annotation_position="right"
-                    )
-                    fig_stock.update_yaxes(title_text="Unidades")
-                    fig_stock.update_xaxes(title_text="Mes")
-                    st.plotly_chart(fig_stock, use_container_width=True)
-                    
-                    # Gráfico de Faltantes
-                    st.markdown("#### 📉 Quiebres (Faltantes por mes)")
-                    fig_lost = px.bar(df_sim, x="Mes_target", y="Faltante", 
-                                     title="Unidades NO satisfechas por mes (quiebres)",
-                                     color="Faltante",
-                                     color_continuous_scale=["green", "yellow", "red"])
-                    fig_lost.update_yaxes(title_text="Unidades faltantes")
-                    fig_lost.update_xaxes(title_text="Mes")
-                    st.plotly_chart(fig_lost, use_container_width=True)
-                    
-                    st.divider()
-                    
-                    # Explicación de variables
-                    with st.expander("📋 Significado de las columnas en la tabla detallada", expanded=False):
-                        st.markdown("""
-                        | Columna | Significado |
-                        |---------|------------|
-                        | **Mes_target** | Mes de la simulación que se está evaluando |
-                        | **Stock_inicio** | Stock disponible al INICIO del mes |
-                        | **Forecast** | Predicción de demanda para el siguiente mes (usada para calcular producción) |
-                        | **Sigma_proxy** | Error promedio del modelo (usado para calcular stock de seguridad) |
-                        | **SS** | Stock de seguridad calculado según la política (protección contra variaciones) |
-                        | **Produccion_Q** | Cantidad que DEBISTE PRODUCIR ese mes (según la política) |
-                        | **Demand_real** | Unidades que los clientes solicitaron ese mes |
-                        | **Servido** | Lo que efectivamente se pudo servir/vender |
-                        | **Faltante** | Unidades que NO se pudieron vender (quiebre de stock) |
-                        | **Stock_fin** | Stock disponible al FINAL del mes (después de ventas y producción) |
-                        | **Quiebre** | Indicador (1=sí hay quiebre, 0=no hay) |
-                        """)
-                    
-                    st.markdown("#### 📊 Detalle completo por mes")
-                    st.dataframe(df_sim, use_container_width=True, height=420)
-
-
 
         # ==========================================================
-        # TAB 11: COMPARATIVA RETROSPECTIVA SIN SISTEMA VS CON SISTEMA
+        # TAB 10: COMPARATIVA RETROSPECTIVA SIN SISTEMA VS CON SISTEMA
         # ==========================================================
         with ComparaRetroEntreSistema:
             st.subheader("⚖️ Comparativa de Costos por Producto: Sin sistema vs Con sistema")
             
-            st.markdown("**Análisis Individual:** Compara cuánto hubieras gastado sin sistema (produciendo lo vendido anteriormente) vs con sistema (inteligencia + stock de seguridad). Segundo: Analiza todo el portafolio ABC A mostrando ahorros.")
+            st.markdown("**Análisis Individual:** Compara cuánto hubieras gastado sin sistema (produciendo lo vendido anteriormente) vs con sistema (inteligencia + stock de seguridad).")
             if prod_sel is not None:
                 st.info(f"📊 Comparando: **Producto {prod_sel}** (según filtro seleccionado) + Portafolio ABC A")
             else:
@@ -3188,6 +2974,7 @@ class Dashboard:
             st.divider()
             st.subheader("📦 Comparativa de Costos por Portafolio A: Sin sistema vs Con sistema")
 
+            st.markdown("Analiza todo el portafolio ABC A mostrando ahorros.")
             # ==================== SINCRONIZAR PARÁMETROS DESDE COMPARATIVA INDIVIDUAL ====================
             # Si el usuario ya evaluó un producto en la sección Individual, usamos esos parámetros
             has_sync_params = st.session_state.get("sync_eval_months") is not None
