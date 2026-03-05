@@ -2711,317 +2711,328 @@ class Dashboard:
         # TAB 10: COMPARATIVA RETROSPECTIVA SIN SISTEMA VS CON SISTEMA
         # ==========================================================
         with ComparaRetroEntreSistema:
-            st.subheader("⚖️ Comparativa de Costos por Producto: Sin sistema vs Con sistema")
+            st.subheader("⚖️ Comparativa de Costos: Sin sistema vs Con sistema")
             
-            st.markdown("**Análisis Individual:** Compara cuánto hubieras gastado sin sistema (produciendo lo vendido anteriormente) vs con sistema (inteligencia + stock de seguridad).")
-            if prod_sel is not None:
-                st.info(f"📊 Comparando: **Producto {prod_sel}** (según filtro seleccionado) + Portafolio ABC A")
-            else:
-                st.warning("⚠️ Selecciona un producto en los Filtros de Producto del sidebar")
+            st.markdown("Compara el impacto económico de implementar el sistema inteligente. Analiza tanto producto individual como portafolio completo.")
+            
+            # ==================== INPUTS DE COSTO COMPARTIDOS (LAZY LOADING) ====================
+            st.markdown("### 💰 Parámetros de Costo (compartidos para ambos análisis)")
+            cost_col1, cost_col2 = st.columns(2)
+            
+            with cost_col1:
+                cost_stock_unit_shared = st.number_input("Costo inventario por unidad (proxy)", min_value=0.0, value=1.0, step=0.5, key="shared_cinv")
+            with cost_col2:
+                cost_stockout_unit_shared = st.number_input("Costo quiebre por unidad (proxy)", min_value=0.0, value=5.0, step=0.5, key="shared_cbrk")
+            
+            # Detectar cambio global en costos
+            prev_cost_stock_shared = st.session_state.get("prev_cost_stock_shared", 1.0)
+            prev_cost_stockout_shared = st.session_state.get("prev_cost_stockout_shared", 5.0)
+            
+            valores_cambiaron_shared = (cost_stock_unit_shared != prev_cost_stock_shared or 
+                                       cost_stockout_unit_shared != prev_cost_stockout_shared)
+            
+            if valores_cambiaron_shared:
+                if (st.session_state.get("comparativa_individual_cmp") is not None or 
+                    st.session_state.get("portafolio_abc_a_resumen") is not None):
+                    st.warning("⚠️ Detectamos cambio en costos. Haz clic en 'Ejecutar' en cualquiera de los análisis para actualizar resultados con los nuevos valores.")
+            
+            st.divider()
+            
+            # ========== ANÁLISIS 1: POR PRODUCTO (EXPANDER) ==========
+            with st.expander("📊 Análisis Individual (Por Producto)", expanded=False):
+                st.markdown("**Análisis:** Compara cuánto hubieras gastado sin sistema (produciendo lo vendido anteriormente) vs con sistema (inteligencia + stock de seguridad).")
+                if prod_sel is not None:
+                    st.info(f"📊 Comparando: **Producto {prod_sel}** (según filtro seleccionado)")
+                else:
+                    st.warning("⚠️ Selecciona un producto en los Filtros de Producto del sidebar")
 
-            dm = res_demand.copy()
-            dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
-            hist = dm[dm["Codigo"] == str(prod_sel)][["Mes", "Demanda_Unid"]].copy().sort_values("Mes")
+                dm = res_demand.copy()
+                dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
+                hist = dm[dm["Codigo"] == str(prod_sel)][["Mes", "Demanda_Unid"]].copy().sort_values("Mes")
 
-                # stock mensual producto
-            stock_p = pd.DataFrame()
-            if res_stock is not None and not res_stock.empty:
-                stock_p = res_stock.copy()
-                stock_p["Codigo"] = stock_p["Codigo"].astype(str).str.strip()
-                stock_p = stock_p[stock_p["Codigo"] == str(prod_sel)][["Mes", "Stock_Unid"]].copy().sort_values("Mes")
+                    # stock mensual producto
+                stock_p = pd.DataFrame()
+                if res_stock is not None and not res_stock.empty:
+                    stock_p = res_stock.copy()
+                    stock_p["Codigo"] = stock_p["Codigo"].astype(str).str.strip()
+                    stock_p = stock_p[stock_p["Codigo"] == str(prod_sel)][["Mes", "Stock_Unid"]].copy().sort_values("Mes")
 
-            row = abc_df[abc_df["Codigo"] == str(prod_sel)]
-            abc_class = str(row.iloc[0]["ABC"]) if not row.empty else "C"
+                row = abc_df[abc_df["Codigo"] == str(prod_sel)]
+                abc_class = str(row.iloc[0]["ABC"]) if not row.empty else "C"
 
-            # ==================== AUTO-CALCULAR eval_months Y winner ====================
-            # Esto se calcula UNA SOLA VEZ de forma automática para ese producto
-            eval_months = max(6, int(len(hist) * 0.25))
-            
-            # AUTO-optimizar MA (3 vs 6) para elegir la mejor ventana
-            ets_params_auto = dict(seasonal_periods=12, trend="add", seasonal="add", damped_trend=False, min_obs=24)
-            rf_params_auto = dict(n_estimators=400, min_obs=24, min_samples_leaf=1, random_state=42)
-            
-            bt_ma3_auto = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(eval_months), ma_window=3)
-            bt_ma6_auto = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(eval_months), ma_window=6)
-            mae_ma3_auto = float(bt_ma3_auto.metrics.iloc[0]["MAE"]) if not bt_ma3_auto.metrics.empty else float("inf")
-            mae_ma6_auto = float(bt_ma6_auto.metrics.iloc[0]["MAE"]) if not bt_ma6_auto.metrics.empty else float("inf")
-            ma_window_opt = 3 if mae_ma3_auto < mae_ma6_auto else 6
-            bt_base_auto = bt_ma3_auto if ma_window_opt == 3 else bt_ma6_auto
-            
-            # Luego ETS y RF
-            ets_auto = ETSForecaster(**ets_params_auto)
-            bt_ets_auto = backtest_ets_1step(hist, y_col="Demanda_Unid", test_months=int(eval_months), ets=ets_auto)
-            rf_auto = RFForecaster(**rf_params_auto)
-            bt_rf_auto = backtest_rf_1step(hist, y_col="Demanda_Unid", test_months=int(eval_months), rf=rf_auto)
-            
-            cmp_auto = compare_models_metrics(bt_base_auto.metrics, bt_ets_auto.metrics, bt_rf_auto.metrics, sort_by="MAE")
-            winner = str(cmp_auto.iloc[0]["Modelo"]) if not cmp_auto.empty else "ETS(Holt-Winters)"
-            
-            # 💾 Guardar parámetros sincronizados en session_state
-            st.session_state.sync_eval_months = eval_months
-            st.session_state.sync_winner_model = winner
-            st.session_state.sync_ma_window = ma_window_opt  # ← IMPORTANTE: guardar la ventana MA optimizada
-            st.session_state.sync_product_code = str(prod_sel)
+                # Usar costos compartidos (NO inputs individuales)
+                cost_stock_unit = cost_stock_unit_shared
+                cost_stockout_unit = cost_stockout_unit_shared
+                
+                run_cmp = st.button("▶️ Ejecutar análisis por producto", type="primary", key="run_cmp_prod")
 
-            # Mostrar parámetros sincronizados
-            col_info1, col_info2, col_info3 = st.columns(3)
-            with col_info1:
-                st.metric("📅 Meses evaluados (AUTO)", f"{eval_months}", delta=f"{eval_months + 1} filas (incluye mes base)")
-            with col_info2:
-                st.metric("🏆 Modelo ganador (AUTO)", winner.split("(")[0].strip())
-            with col_info3:
-                st.metric("📊 Producto", str(prod_sel))
-            
-            st.info(f"✅ **Parámetros sincronizados:** Todos los tabs usarán **{eval_months} meses** y modelo **{winner}** para {prod_sel}")
-            
-            # Inputs de costos (se guardan también)
-            cost_stock_unit = st.number_input("Costo inventario por unidad (proxy)", min_value=0.0, value=1.0, step=0.5)
-            cost_stockout_unit = st.number_input("Costo quiebre por unidad (proxy)", min_value=0.0, value=5.0, step=0.5)
-            
-            # 💾 Guardar costos sincronizados
-            st.session_state.sync_cost_stock_unit = cost_stock_unit
-            st.session_state.sync_cost_stockout_unit = cost_stockout_unit
+                if run_cmp and not hist.empty:
+                    with st.spinner("Calculando parámetros automáticos y comparativa..."):
+                        # ==================== AHORA SÍ CALCULAMOS (DESPUÉS DE CLICK) ====================
+                        eval_months = max(6, int(len(hist) * 0.25))
+                        
+                        # AUTO-optimizar MA (3 vs 6) para elegir la mejor ventana
+                        ets_params_auto = dict(seasonal_periods=12, trend="add", seasonal="add", damped_trend=False, min_obs=24)
+                        rf_params_auto = dict(n_estimators=400, min_obs=24, min_samples_leaf=1, random_state=42)
+                        
+                        bt_ma3_auto = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(eval_months), ma_window=3)
+                        bt_ma6_auto = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(eval_months), ma_window=6)
+                        mae_ma3_auto = float(bt_ma3_auto.metrics.iloc[0]["MAE"]) if not bt_ma3_auto.metrics.empty else float("inf")
+                        mae_ma6_auto = float(bt_ma6_auto.metrics.iloc[0]["MAE"]) if not bt_ma6_auto.metrics.empty else float("inf")
+                        ma_window_opt = 3 if mae_ma3_auto < mae_ma6_auto else 6
+                        bt_base_auto = bt_ma3_auto if ma_window_opt == 3 else bt_ma6_auto
+                        
+                        # Luego ETS y RF
+                        ets_auto = ETSForecaster(**ets_params_auto)
+                        bt_ets_auto = backtest_ets_1step(hist, y_col="Demanda_Unid", test_months=int(eval_months), ets=ets_auto)
+                        rf_auto = RFForecaster(**rf_params_auto)
+                        bt_rf_auto = backtest_rf_1step(hist, y_col="Demanda_Unid", test_months=int(eval_months), rf=rf_auto)
+                        
+                        cmp_auto = compare_models_metrics(bt_base_auto.metrics, bt_ets_auto.metrics, bt_rf_auto.metrics, sort_by="MAE")
+                        winner = str(cmp_auto.iloc[0]["Modelo"]) if not cmp_auto.empty else "ETS(Holt-Winters)"
+                        
+                        # Mostrar parámetros sincronizados
+                        col_info1, col_info2, col_info3 = st.columns(3)
+                        with col_info1:
+                            st.metric("📅 Meses evaluados (AUTO)", f"{eval_months}", delta=f"{eval_months + 1} filas (incluye mes base)")
+                        with col_info2:
+                            st.metric("🏆 Modelo ganador (AUTO)", winner.split("(")[0].strip())
+                        with col_info3:
+                            st.metric("📊 Producto", str(prod_sel))
+                    
+                        df_cmp, s, period_info = simulate_compare_policy_vs_baseline(
+                            hist=hist,
+                            stock_series=stock_p,
+                            abc_class=abc_class,
+                            winner=winner,
+                            eval_months=int(eval_months),
+                            cost_stock_unit=float(cost_stock_unit),
+                            cost_stockout_unit=float(cost_stockout_unit),
+                            ma_window=int(ma_window_opt),
+                            test_months_for_mae=int(eval_months),
+                        )
+                        
+                        # 💾 Guardar en session_state para persistencia
+                        st.session_state.comparativa_individual_cmp = df_cmp
+                        st.session_state.comparativa_individual_summary = s
+                        st.session_state.comparativa_individual_prod = str(prod_sel)
+                        st.session_state.comparativa_individual_period = period_info
+                        
+                        # Guardar costos compartidos para detectar cambios próximos
+                        st.session_state.prev_cost_stock_shared = cost_stock_unit_shared
+                        st.session_state.prev_cost_stockout_shared = cost_stockout_unit_shared
+                        
+                        # 💾 Guardar parámetros sincronizados en session_state
+                        st.session_state.sync_eval_months = eval_months
+                        st.session_state.sync_winner_model = winner
+                        st.session_state.sync_ma_window = ma_window_opt
+                        st.session_state.sync_product_code = str(prod_sel)
+                        st.session_state.sync_cost_stock_unit = cost_stock_unit
+                        st.session_state.sync_cost_stockout_unit = cost_stockout_unit
 
-            run_cmp = st.button("▶️ Ejecutar comparativa", type="primary", key="run_cmp")
-
-            if run_cmp and not hist.empty:
-                df_cmp, s, period_info = simulate_compare_policy_vs_baseline(
-                    hist=hist,
-                    stock_series=stock_p,
-                    abc_class=abc_class,
-                    winner=winner,
-                    eval_months=int(eval_months),
-                    cost_stock_unit=float(cost_stock_unit),
-                    cost_stockout_unit=float(cost_stockout_unit),
-                    ma_window=int(ma_window_opt),  # ← CORRECCIÓN: usar la ventana optimizada en lugar de 3 fijo
-                    test_months_for_mae=int(eval_months),  # ← usar eval_months para consistencia
-                )
-                
-                # 💾 Guardar en session_state para persistencia
-                st.session_state.comparativa_individual_cmp = df_cmp
-                st.session_state.comparativa_individual_summary = s
-                st.session_state.comparativa_individual_prod = str(prod_sel)
-                st.session_state.comparativa_individual_period = period_info
-
-            # 📊 Mostrar resultados guardados (si existen)
-            if st.session_state.get("comparativa_individual_cmp") is not None:
-                df_cmp = st.session_state.comparativa_individual_cmp
-                s = st.session_state.comparativa_individual_summary
-                period_info = st.session_state.get("comparativa_individual_period", {})
-                
-                # Extraer nombre del usuario (de email)
-                user_email = st.session_state.get("email", "Estimado usuario")
-                user_name = user_email.split("@")[0].replace(".", " ").title() if "@" in user_email else "Estimado usuario"
-                
-                # ==================== RESUMEN EJECUTIVO (AMIGABLE PARA CLIENTE) ====================
-                with st.container(border=True):
-                    st.markdown(f"### 📊 Resumen Ejecutivo para {user_name}")
-                    st.markdown(f"**¿Qué significa este análisis?**")
-                    st.markdown(f"Hemos simulado cómo habría funcionado el producto **{str(prod_sel)}** durante los últimos **{period_info.get('num_months', 0)} meses** con dos estrategias diferentes:")
-                    st.markdown(f"- **❌ Sin el sistema:** Produciendo solo lo que se vendió el mes anterior (método reactivo)")
-                    st.markdown(f"- **✅ Con el sistema:** Usando pronósticos inteligentes + stock de seguridad (método proactivo)")
-                    st.markdown(f"**Los resultados muestran:** Implementar el sistema inteligente habría generado un **ahorro de {s['Ahorro_CostoTotal']:,.0f} unidades monetarias** mientras se mejora el servicio (menos quiebres de stock).")
-                
-                # ==================== INFORMACIÓN DEL PERÍODO EVALUADO ====================
-                st.markdown("### 📅 Período Evaluado + Modelo Usado")
-                col_period1, col_period2, col_period3, col_period4, col_period5 = st.columns(5)
-                
-                if period_info:
-                    start_date = period_info.get("start_date")
-                    end_date = period_info.get("end_date")
-                    num_months = period_info.get("num_months", 0)
+                # 📊 Mostrar resultados guardados (si existen)
+                if st.session_state.get("comparativa_individual_cmp") is not None:
+                    df_cmp = st.session_state.comparativa_individual_cmp
+                    s = st.session_state.comparativa_individual_summary
+                    period_info = st.session_state.get("comparativa_individual_period", {})
                     
-                    with col_period1:
-                        start_str = start_date.strftime("%Y-%m") if start_date else "N/A"
-                        st.metric("📍 Inicio", start_str)
+                    # Extraer nombre del usuario (de email)
+                    user_email = st.session_state.get("email", "Estimado usuario")
+                    user_name = user_email.split("@")[0].replace(".", " ").title() if "@" in user_email else "Estimado usuario"
                     
-                    with col_period2:
-                        end_str = end_date.strftime("%Y-%m") if end_date else "N/A"
-                        st.metric("📍 Fin", end_str)
+                    # ==================== RESUMEN EJECUTIVO (AMIGABLE PARA CLIENTE) ====================
+                    with st.container(border=True):
+                        st.markdown(f"### 📊 Resumen Ejecutivo para {user_name}")
+                        st.markdown(f"**¿Qué significa este análisis?**")
+                        st.markdown(f"Hemos simulado cómo habría funcionado el producto **{str(prod_sel)}** durante los últimos **{period_info.get('num_months', 0)} meses** con dos estrategias diferentes:")
+                        st.markdown(f"- **❌ Sin el sistema:** Produciendo solo lo que se vendió el mes anterior (método reactivo)")
+                        st.markdown(f"- **✅ Con el sistema:** Usando pronósticos inteligentes + stock de seguridad (método proactivo)")
+                        st.markdown(f"**Los resultados muestran:** Implementar el sistema inteligente habría generado un **ahorro de {s['Ahorro_CostoTotal']:,.0f} unidades monetarias** mientras se mejora el servicio (menos quiebres de stock).")
                     
-                    with col_period3:
-                        st.metric("📊 Meses evaluados", num_months)
-                        st.caption("(+ 1 fila base inicial)")
+                    # ==================== INFORMACIÓN DEL PERÍODO EVALUADO ====================
+                    st.markdown("### 📅 Período Evaluado + Modelo Usado")
+                    col_period1, col_period2, col_period3, col_period4, col_period5 = st.columns(5)
                     
-                    with col_period4:
-                        st.metric("✅ Filas resultado", len(df_cmp), delta=f"{num_months} evaluados + 1 base")
+                    if period_info:
+                        start_date = period_info.get("start_date")
+                        end_date = period_info.get("end_date")
+                        num_months = period_info.get("num_months", 0)
+                        
+                        with col_period1:
+                            start_str = start_date.strftime("%Y-%m") if start_date else "N/A"
+                            st.metric("📍 Inicio", start_str)
+                        
+                        with col_period2:
+                            end_str = end_date.strftime("%Y-%m") if end_date else "N/A"
+                            st.metric("📍 Fin", end_str)
+                        
+                        with col_period3:
+                            st.metric("📊 Meses evaluados", num_months)
+                            st.caption("(+ 1 fila base inicial)")
+                        
+                        with col_period4:
+                            st.metric("✅ Filas resultado", len(df_cmp), delta=f"{num_months} evaluados + 1 base")
+                        
+                        with col_period5:
+                            model_display = s.get("Winner", "N/A").split("(")[0].strip()
+                            st.metric("🏆 Modelo (costos)", model_display)
                     
-                    with col_period5:
-                        model_display = s.get("Winner", "N/A").split("(")[0].strip()
-                        st.metric("🏆 Modelo (costos)", model_display)
-                
-                # ==================== MÉTRICAS PRINCIPALES (TARJETAS VISUALES) ====================
-                st.markdown("### 💰 Impacto Financiero y Operativo")
-                
-                ahorro_total = float(s['Ahorro_CostoTotal'])
-                mejora_fillrate = float(s['Mejora_FillRate_pp'])
-                reduccion_faltantes = float(s['Reduccion_Faltantes'])
-                fill_rate_base = float(s['Base']['FillRate_%'])
-                fill_rate_sys = float(s['Sistema']['FillRate_%'])
-                
-                # Tarjetas principales - Ahorro, Fill Rate, Quiebres
-                col_card1, col_card2, col_card3 = st.columns(3, gap="medium")
-                
-                with col_card1:
-                    st.markdown(f"""
-                    <div style='background: linear-gradient(135deg, #10B981 0%, #059669 100%); padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1);'>
-                        <p style='margin: 0; font-size: 0.85em; color: rgba(255,255,255,0.8);'>Ahorro Total</p>
-                        <p style='margin: 5px 0 0 0; font-size: 2em; font-weight: bold; color: white;'>{ahorro_total:,.0f}</p>
-                        <p style='margin: 5px 0 0 0; font-size: 0.75em; color: rgba(255,255,255,0.7);'>unidades monetarias</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                with col_card2:
-                    st.markdown(f"""
-                    <div style='background: linear-gradient(135deg, #06B6D4 0%, #0891B2 100%); padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1);'>
-                        <p style='margin: 0; font-size: 0.85em; color: rgba(255,255,255,0.8);'>Mejora Fill Rate</p>
-                        <p style='margin: 5px 0 0 0; font-size: 2em; font-weight: bold; color: white;'>+{mejora_fillrate:.1f}%</p>
-                        <p style='margin: 5px 0 0 0; font-size: 0.75em; color: rgba(255,255,255,0.7);'>{fill_rate_base:.0f}% → {fill_rate_sys:.0f}%</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                with col_card3:
-                    st.markdown(f"""
-                    <div style='background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1);'>
-                        <p style='margin: 0; font-size: 0.85em; color: rgba(255,255,255,0.8);'>Quiebres Evitados</p>
-                        <p style='margin: 5px 0 0 0; font-size: 2em; font-weight: bold; color: white;'>{reduccion_faltantes:,.0f}</p>
-                        <p style='margin: 5px 0 0 0; font-size: 0.75em; color: rgba(255,255,255,0.7);'>menos faltantes</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                
-                st.divider()
-                
-                # ==================== GRÁFICOS PRINCIPALES (DESTACADOS) ====================
-                st.markdown("### 📊 Gráficos de Impacto")
-                
-                col_g1, col_g2 = st.columns(2, gap="medium")
-                
-                with col_g1:
-                    fig_cost = px.line(df_cmp, x="Mes", y=["Base_Costo_total", "Sys_Costo_total"], markers=True,
-                                    title="Costo total mensual: Baseline vs Sistema")
-                    fig_cost.update_traces(line=dict(width=3))
-                    st.plotly_chart(fig_cost, use_container_width=True)
-                
-                with col_g2:
-                    fig_lost = px.bar(df_cmp, x="Mes", y=["Base_Faltante", "Sys_Faltante"], barmode="group",
-                                    title="Quiebres por mes: Baseline vs Sistema")
-                    st.plotly_chart(fig_lost, use_container_width=True)
-                
-                st.divider()
-                
-                # ==================== INFORMACIÓN DETALLADA (COLAPSADA) ====================
-                with st.expander("📈 ¿Qué significa esto para tu negocio? (Explicación detallada)", expanded=False):
-                    st.markdown(f"**{user_name},** durante el período de **{period_info.get('num_months', 0)} meses**, tu estrategia anterior (producir lo que se vendió antes) habría costado aproximadamente **{s['Base']['Costo_total']:,.0f}** en inventario y quiebres.")
-                    st.markdown(f"Si hubiera implementado el sistema inteligente desde entonces, el costo habría sido **{s['Sistema']['Costo_total']:,.0f}**, lo que representa un **ahorro de {ahorro_total:,.0f}**.")
-                    st.markdown("**Además:**")
-                    st.markdown(f"✅ Tu disponibilidad de producto mejoraría de **{fill_rate_base:.1f}%** a **{fill_rate_sys:.1f}%**")
-                    st.markdown(f"✅ Evitarías **{reduccion_faltantes:,.0f} unidades** de clientes insatisfechos")
-                    st.markdown(f"✅ Los costos de inventario se optimizarían automáticamente")
-                    st.markdown("✨ **En resumen: El sistema inteligente te permite ahorrar dinero Y servir mejor a tus clientes.**")
-                
-                with st.expander("🔍 Validación técnica y detalles de costos", expanded=False):
-                    st.markdown("#### Suma Manual de Costos (Validación)")
-                    col_cost1, col_cost2, col_cost3 = st.columns(3)
+                    # ==================== MÉTRICAS PRINCIPALES (TARJETAS VISUALES) ====================
+                    st.markdown("### 💰 Impacto Financiero y Operativo")
                     
-                    with col_cost1:
-                        costo_base_suma = float(df_cmp["Base_Costo_total"].sum())
-                        st.metric("Base_Costo_total (suma manual)", f"{costo_base_suma:,.1f}", 
-                                  delta=f"KPI: {s['Base']['Costo_total']:,.1f}")
+                    ahorro_total = float(s['Ahorro_CostoTotal'])
+                    mejora_fillrate = float(s['Mejora_FillRate_pp'])
+                    reduccion_faltantes = float(s['Reduccion_Faltantes'])
+                    fill_rate_base = float(s['Base']['FillRate_%'])
+                    fill_rate_sys = float(s['Sistema']['FillRate_%'])
                     
-                    with col_cost2:
-                        costo_sys_suma = float(df_cmp["Sys_Costo_total"].sum())
-                        st.metric("Sys_Costo_total (suma manual)", f"{costo_sys_suma:,.1f}",
-                                  delta=f"KPI: {s['Sistema']['Costo_total']:,.1f}")
+                    # Tarjetas principales - Ahorro, Fill Rate, Quiebres
+                    col_card1, col_card2, col_card3 = st.columns(3, gap="medium")
                     
-                    with col_cost3:
-                        ahorro_suma = costo_base_suma - costo_sys_suma
-                        st.metric("Ahorro (calc manual)", f"{ahorro_suma:,.1f}",
-                                  delta=f"KPI: {s['Ahorro_CostoTotal']:,.1f}")
+                    with col_card1:
+                        st.markdown(f"""
+                        <div style='background: linear-gradient(135deg, #10B981 0%, #059669 100%); padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1);'>
+                            <p style='margin: 0; font-size: 0.85em; color: rgba(255,255,255,0.8);'>Ahorro Total</p>
+                            <p style='margin: 5px 0 0 0; font-size: 2em; font-weight: bold; color: white;'>{ahorro_total:,.0f}</p>
+                            <p style='margin: 5px 0 0 0; font-size: 0.75em; color: rgba(255,255,255,0.7);'>unidades monetarias</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col_card2:
+                        st.markdown(f"""
+                        <div style='background: linear-gradient(135deg, #06B6D4 0%, #0891B2 100%); padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1);'>
+                            <p style='margin: 0; font-size: 0.85em; color: rgba(255,255,255,0.8);'>Mejora Fill Rate</p>
+                            <p style='margin: 5px 0 0 0; font-size: 2em; font-weight: bold; color: white;'>+{mejora_fillrate:.1f}%</p>
+                            <p style='margin: 5px 0 0 0; font-size: 0.75em; color: rgba(255,255,255,0.7);'>{fill_rate_base:.0f}% → {fill_rate_sys:.0f}%</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col_card3:
+                        st.markdown(f"""
+                        <div style='background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1);'>
+                            <p style='margin: 0; font-size: 0.85em; color: rgba(255,255,255,0.8);'>Quiebres Evitados</p>
+                            <p style='margin: 5px 0 0 0; font-size: 2em; font-weight: bold; color: white;'>{reduccion_faltantes:,.0f}</p>
+                            <p style='margin: 5px 0 0 0; font-size: 0.75em; color: rgba(255,255,255,0.7);'>menos faltantes</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
                     
                     st.divider()
-                    st.markdown("#### Tabla Detallada Mes a Mes")
-                    st.dataframe(df_cmp, use_container_width=True, height=420)
-                
-                # Explicación de columnas
-                with st.expander("📋 Significado de las columnas en la tabla comparativa", expanded=False):
-                    st.markdown("""
-                    | Columna | Significado |
-                    |---------|------------|
-                    | **Mes** | Mes del período evaluado |
-                    | **Demanda_real** | Unidades que los clientes solicitaron ese mes |
-                    | **Base_stock_ini** | Stock inicial disponible al inicio del mes (método baseline) |
-                    | **Base_Q** | Producción recomendada mes a mes (método baseline/reactivo) |
-                    | **Base_Stock_Fin** | Stock final después de atender demanda (método baseline) |
-                    | **Base_Faltante** | Unidades NO satisfechas en baseline (quiebre) |
-                    | **Base_Costo_inv** | Costo de mantener inventario en baseline |
-                    | **Base_Costo_stockout** | Costo de quiebres en baseline |
-                    | **Base_Costo_total** | Costo total (inventario + quiebres) en baseline |
-                    | **Sys_Stock_ini** | Stock inicial disponible al inicio del mes (sistema inteligente) |
-                    | **Sys_Forecast** | Pronóstico de demanda para el siguiente mes |
-                    | **Sys_SS** | Stock de seguridad calculado por la política inteligente |
-                    | **Sys_Q** | Producción recomendada por la política inteligente |
-                    | **Sys_Stock_fin** | Stock final después de atender demanda (sistema inteligente) |
-                    | **Sys_Faltante** | Unidades NO satisfechas con sistema (quiebre reducido) |
-                    | **Sys_Costo_inv** | Costo de inventario con sistema inteligente |
-                    | **Sys_Costo_stockout** | Costo de quiebres con sistema (menor que baseline) |
-                    | **Sys_Costo_total** | Costo total (inventario + quiebres) con sistema inteligente |
-                    """)
+                    
+                    # ==================== GRÁFICOS PRINCIPALES (DESTACADOS) ====================
+                    st.markdown("### 📊 Gráficos de Impacto")
+                    
+                    col_g1, col_g2 = st.columns(2, gap="medium")
+                    
+                    with col_g1:
+                        fig_cost = px.line(df_cmp, x="Mes", y=["Base_Costo_total", "Sys_Costo_total"], markers=True,
+                                        title="Costo total mensual: Baseline vs Sistema")
+                        fig_cost.update_traces(line=dict(width=3))
+                        st.plotly_chart(fig_cost, use_container_width=True)
+                    
+                    with col_g2:
+                        fig_lost = px.bar(df_cmp, x="Mes", y=["Base_Faltante", "Sys_Faltante"], barmode="group",
+                                        title="Quiebres por mes: Baseline vs Sistema")
+                        st.plotly_chart(fig_lost, use_container_width=True)
+                    
+                    st.divider()
+                    
+                    # ==================== INFORMACIÓN DETALLADA (COLAPSADA) ====================
+                    with st.expander("📈 ¿Qué significa esto para tu negocio? (Explicación detallada)", expanded=False):
+                        st.markdown(f"**{user_name},** durante el período de **{period_info.get('num_months', 0)} meses**, tu estrategia anterior (producir lo que se vendió antes) habría costado aproximadamente **{s['Base']['Costo_total']:,.0f}** en inventario y quiebres.")
+                        st.markdown(f"Si hubiera implementado el sistema inteligente desde entonces, el costo habría sido **{s['Sistema']['Costo_total']:,.0f}**, lo que representa un **ahorro de {ahorro_total:,.0f}**.")
+                        st.markdown("**Además:**")
+                        st.markdown(f"✅ Tu disponibilidad de producto mejoraría de **{fill_rate_base:.1f}%** a **{fill_rate_sys:.1f}%**")
+                        st.markdown(f"✅ Evitarías **{reduccion_faltantes:,.0f} unidades** de clientes insatisfechos")
+                        st.markdown(f"✅ Los costos de inventario se optimizarían automáticamente")
+                        st.markdown("✨ **En resumen: El sistema inteligente te permite ahorrar dinero Y servir mejor a tus clientes.**")
+                    
+                    with st.expander("🔍 Validación técnica y detalles de costos", expanded=False):
+                        st.markdown("#### Suma Manual de Costos (Validación)")
+                        col_cost1, col_cost2, col_cost3 = st.columns(3)
+                        
+                        with col_cost1:
+                            costo_base_suma = float(df_cmp["Base_Costo_total"].sum())
+                            st.metric("Base_Costo_total (suma manual)", f"{costo_base_suma:,.1f}", 
+                                      delta=f"KPI: {s['Base']['Costo_total']:,.1f}")
+                        
+                        with col_cost2:
+                            costo_sys_suma = float(df_cmp["Sys_Costo_total"].sum())
+                            st.metric("Sys_Costo_total (suma manual)", f"{costo_sys_suma:,.1f}",
+                                      delta=f"KPI: {s['Sistema']['Costo_total']:,.1f}")
+                        
+                        with col_cost3:
+                            ahorro_suma = costo_base_suma - costo_sys_suma
+                            st.metric("Ahorro (calc manual)", f"{ahorro_suma:,.1f}",
+                                      delta=f"KPI: {s['Ahorro_CostoTotal']:,.1f}")
+                        
+                        st.divider()
+                        st.markdown("#### Tabla Detallada Mes a Mes")
+                        st.dataframe(df_cmp, use_container_width=True, height=420)
+                    
+                    # Explicación de columnas
+                    with st.expander("📋 Significado de las columnas en la tabla comparativa", expanded=False):
+                        st.markdown("""
+                        | Columna | Significado |
+                        |---------|------------|
+                        | **Mes** | Mes del período evaluado |
+                        | **Demanda_real** | Unidades que los clientes solicitaron ese mes |
+                        | **Base_stock_ini** | Stock inicial disponible al inicio del mes (método baseline) |
+                        | **Base_Q** | Producción recomendada mes a mes (método baseline/reactivo) |
+                        | **Base_Stock_Fin** | Stock final después de atender demanda (método baseline) |
+                        | **Base_Faltante** | Unidades NO satisfechas en baseline (quiebre) |
+                        | **Base_Costo_inv** | Costo de mantener inventario en baseline |
+                        | **Base_Costo_stockout** | Costo de quiebres en baseline |
+                        | **Base_Costo_total** | Costo total (inventario + quiebres) en baseline |
+                        | **Sys_Stock_ini** | Stock inicial disponible al inicio del mes (sistema inteligente) |
+                        | **Sys_Forecast** | Pronóstico de demanda para el siguiente mes |
+                        | **Sys_SS** | Stock de seguridad calculado por la política inteligente |
+                        | **Sys_Q** | Producción recomendada por la política inteligente |
+                        | **Sys_Stock_fin** | Stock final después de atender demanda (sistema inteligente) |
+                        | **Sys_Faltante** | Unidades NO satisfechas con sistema (quiebre reducido) |
+                        | **Sys_Costo_inv** | Costo de inventario con sistema inteligente |
+                        | **Sys_Costo_stockout** | Costo de quiebres con sistema (menor que baseline) |
+                        | **Sys_Costo_total** | Costo total (inventario + quiebres) con sistema inteligente |
+                        """)
 
-
-
-
-            st.divider()
-            st.subheader("📦 Comparativa de Costos por Portafolio A: Sin sistema vs Con sistema")
-
-            st.markdown("Analiza todo el portafolio ABC A mostrando ahorros.")
-            # ==================== SINCRONIZAR PARÁMETROS DESDE COMPARATIVA INDIVIDUAL ====================
-            # Si el usuario ya evaluó un producto en la sección Individual, usamos esos parámetros
-            has_sync_params = st.session_state.get("sync_eval_months") is not None
             
-            if has_sync_params:
-                eval_months_port = st.session_state.get("sync_eval_months")
-                cost_stock_unit_port = st.session_state.get("sync_cost_stock_unit", 1.0)
-                cost_stockout_unit_port = st.session_state.get("sync_cost_stockout_unit", 5.0)
-                ma_window_port = st.session_state.get("sync_ma_window", 3)  # ← Obtener la ventana optimizada
-                # 🔑 IMPORTANTE: Usar "AUTO" para que CADA PRODUCTO calcule su propio ganador (no reutilizar el modelo del producto Individual)
-                winner_mode = "AUTO"
-                prod_individual = st.session_state.get("sync_product_code", "N/A")
+            st.divider()
+            
+            # ========== ANÁLISIS 2: POR PORTAFOLIO ABC A (EXPANDER) ==========
+            with st.expander("📦 Análisis de Portafolio ABC A", expanded=False):
+                st.markdown("**Análisis:** Evaluación de costos para TODOS los productos ABC A. Simula cómo habría funcionado la política inteligente en el portafolio.")
                 
-                # Mostrar parámetros sincronizados
-                st.success(f"🔗 **Parámetros sincronizados desde Comparativa Individual**")
-                col_sync1, col_sync2, col_sync3, col_sync4, col_sync5 = st.columns(5)
-                with col_sync1:
-                    st.metric("📅 Meses", eval_months_port)
-                with col_sync2:
-                    st.metric("🏆 Modelo (cada producto)", "AUTO")
-                with col_sync3:
-                    st.metric("MA Window", ma_window_port)
-                with col_sync4:
-                    st.metric("Costo Inv", f"{cost_stock_unit_port:.1f}")
-                with col_sync5:
-                    st.metric("Costo Quiebre", f"{cost_stockout_unit_port:.1f}")
+                # Usar costos compartidos
+                cost_stock_unit_port = cost_stock_unit_shared
+                cost_stockout_unit_port = cost_stockout_unit_shared
                 
-                st.info(f"📊 Evaluando portafolio ABC A:\n- Misma ventana que {prod_individual} en Individual ({eval_months_port} meses, MA{ma_window_port})\n- **Cada producto usa su propio modelo ganador** (AUTO per producto)")
-            else:
-                # Si NO hay parámetros sincronizados, permitir que el usuario los defina
-                st.warning("⚠️ Primero ejecuta 'Comparativa Retrospectiva' en la sección Individual para sincronizar parámetros automáticamente.")
-                eval_months_port = st.slider("Meses a evaluar portafolio (últimos)", 6, 24, 12, 1, key="port_eval")
-                cost_stock_unit_port = st.number_input("Costo inventario por unidad (proxy) - Portafolio", min_value=0.0, value=1.0, step=0.5, key="port_cinv")
-                cost_stockout_unit_port = st.number_input("Costo quiebre por unidad (proxy) - Portafolio", min_value=0.0, value=5.0, step=0.5, key="port_cbrk")
-                ma_window_port = st.selectbox("Ventana MA para Baselines", options=[3, 6], index=0, key="port_ma_window")
-                # 🔑 IMPORTANTE: Por defecto usar "AUTO" para que cada producto tenga su ganador individual
-                winner_mode = "AUTO"
+                # ==================== SINCRONIZACIÓN DE PARÁMETROS ====================
+                has_sync_params = st.session_state.get("sync_eval_months") is not None
+                
+                if has_sync_params:
+                    eval_months_port = st.session_state.get("sync_eval_months")
+                    ma_window_port = st.session_state.get("sync_ma_window", 3)
+                    prod_individual = st.session_state.get("sync_product_code", "N/A")
+                    
+                    # Mostrar parámetros sincronizados (compacto)
+                    st.info(f"🔗 **Parámetros sincronizados desde Análisis Individual**\n- Producto: {prod_individual} | Meses: {eval_months_port} | MA Window: MA{ma_window_port}")
+                else:
+                    # Si NO hay parámetros sincronizados, permitir que el usuario los defina
+                    st.warning("⚠️ Primero ejecuta el Análisis Individual para sincronizar parámetros automáticamente.")
+                    eval_months_port = st.slider("Meses a evaluar portafolio (últimos)", 6, 24, 12, 1, key="port_eval")
+                    ma_window_port = st.selectbox("Ventana MA para Baselines", options=[3, 6], index=0, key="port_ma_window")
+                
+                winner_mode = "AUTO"  # Cada producto calcula su propio ganador
 
-            max_products_port = st.selectbox(
-                "Cantidad de productos ABC A a procesar (performance)",
-                options=[20, 50, 100, 200, "Todos"],
-                index=1,
-                key="port_max"
-            )
-            max_products_port = None if max_products_port == "Todos" else int(max_products_port)
+                max_products_port = st.selectbox(
+                    "Cantidad de productos ABC A a procesar (performance)",
+                    options=[20, 50, 100, 200, "Todos"],
+                    index=1,
+                    key="port_max"
+                )
+                max_products_port = None if max_products_port == "Todos" else int(max_products_port)
 
-            run_port = st.button("▶️ Ejecutar portafolio ABC A", type="primary", key="run_port_abcA")
+                run_port = st.button("▶️ Ejecutar análisis de portafolio", type="primary", key="run_port_abcA")
 
             if run_port:
                 with st.spinner("Calculando portafolio ABC A (puede tardar)..."):
