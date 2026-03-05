@@ -2615,9 +2615,15 @@ class Dashboard:
                                 continue
 
                                 # Elegir ganador por MAE (baselines + ETS + RF) y extraer MAE del ganador
-                                # OJO: usamos ma_window fijo (puedes exponerlo si quieres)
-                            ma_window = 3
-                            bt_base = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), ma_window=int(ma_window))
+                                # IMPORTANTE: Optimizar MA_WINDOW (3 vs 6) igual que en Análisis Individual
+                            bt_ma3 = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), ma_window=3)
+                            bt_ma6 = backtest_baselines_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), ma_window=6)
+                            
+                            mae_ma3 = float(bt_ma3.metrics.iloc[0]["MAE"]) if not bt_ma3.metrics.empty else float("inf")
+                            mae_ma6 = float(bt_ma6.metrics.iloc[0]["MAE"]) if not bt_ma6.metrics.empty else float("inf")
+                            ma_window = 3 if mae_ma3 < mae_ma6 else 6
+                            bt_base = bt_ma3 if ma_window == 3 else bt_ma6
+                            
                             ets = ETSForecaster(**ets_params)
                             bt_ets = backtest_ets_1step(hist, y_col="Demanda_Unid", test_months=int(test_months), ets=ets)
                             rf = RFForecaster(**rf_params)
