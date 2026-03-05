@@ -2695,15 +2695,194 @@ class Dashboard:
 
                             # KPIs rápidos
                         k1, k2, k3 = st.columns(3)
-                        k1.metric("Productos evaluados", f"{reco_df['Codigo'].nunique():,}")
-                        k2.metric("Con riesgo quiebre", f"{int(reco_df['RIESGO_QUIEBRE'].sum()):,}")
-                        k3.metric("Producción total sugerida", f"{int(reco_df['Produccion_Recomendada'].sum()):,}")
-
-                        st.dataframe(reco_df, use_container_width=True, height=520)
-
-                        with st.expander("⬇️ Descargar tabla (CSV)", expanded=False):
-                            csv = reco_df.to_csv(index=False).encode("utf-8")
-                            st.download_button("Descargar recomendaciones.csv", csv, file_name="recomendaciones.csv", mime="text/csv")
+                        # ==================== RESUMEN EJECUTIVO ====================
+                        # Calcular mes siguiente para contexto
+                        if not dm.empty:
+                            last_mes = pd.to_datetime(dm["Mes"]).max()
+                            next_mes = last_mes + pd.DateOffset(months=1)
+                            months_es = {
+                                1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
+                                5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
+                                9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
+                            }
+                            mes_nombre = months_es.get(next_mes.month, "próximo mes")
+                            next_mes_str = f"{mes_nombre} {next_mes.year}"
+                        else:
+                            next_mes_str = "próximo mes"
+                        
+                        st.markdown(f"### 📅 Recomendaciones para: **{next_mes_str}**")
+                        st.markdown(f"Basadas en pronósticos automáticos (modelo ganador por producto) y niveles de stock actual")
+                        
+                        st.divider()
+                        
+                        # ==================== TARJETAS DE RESUMEN GLOBAL ====================
+                        st.markdown("#### 📊 Resumen Global")
+                        r1, r2, r3, r4 = st.columns(4)
+                        
+                        with r1:
+                            st.markdown(f"""
+                            <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                                        padding: 20px; border-radius: 10px; text-align: center; 
+                                        box-shadow: 0 4px 12px rgba(0,0,0,0.1);'>
+                                <p style='margin: 0; font-size: 0.85em; color: rgba(255,255,255,0.8);'>Productos Analizados</p>
+                                <p style='margin: 10px 0 0 0; font-size: 2.5em; font-weight: bold; color: white;'>{reco_df['Codigo'].nunique():,}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        with r2:
+                            riesgo_count = int(reco_df['RIESGO_QUIEBRE'].sum())
+                            color_riesgo = "#ef4444" if riesgo_count > 0 else "#10b981"
+                            st.markdown(f"""
+                            <div style='background: linear-gradient(135deg, {color_riesgo} 0%, {color_riesgo}CC 100%); 
+                                        padding: 20px; border-radius: 10px; text-align: center; 
+                                        box-shadow: 0 4px 12px rgba(0,0,0,0.1);'>
+                                <p style='margin: 0; font-size: 0.85em; color: rgba(255,255,255,0.8);'>⚠️ Con Riesgo de Quiebre</p>
+                                <p style='margin: 10px 0 0 0; font-size: 2.5em; font-weight: bold; color: white;'>{riesgo_count}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        with r3:
+                            prod_total = int(reco_df['Produccion_Recomendada'].sum())
+                            st.markdown(f"""
+                            <div style='background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); 
+                                        padding: 20px; border-radius: 10px; text-align: center; 
+                                        box-shadow: 0 4px 12px rgba(0,0,0,0.1);'>
+                                <p style='margin: 0; font-size: 0.85em; color: rgba(255,255,255,0.8);'>Producción Total Sugerida</p>
+                                <p style='margin: 10px 0 0 0; font-size: 2.5em; font-weight: bold; color: white;'>{prod_total:,}</p>
+                                <p style='margin: 5px 0 0 0; font-size: 0.75em; color: rgba(255,255,255,0.7);'>unidades</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        with r4:
+                            promedio_prod = int(reco_df['Produccion_Recomendada'].mean())
+                            st.markdown(f"""
+                            <div style='background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); 
+                                        padding: 20px; border-radius: 10px; text-align: center; 
+                                        box-shadow: 0 4px 12px rgba(0,0,0,0.1);'>
+                                <p style='margin: 0; font-size: 0.85em; color: rgba(255,255,255,0.8);'>Producción Promedio</p>
+                                <p style='margin: 10px 0 0 0; font-size: 2.5em; font-weight: bold; color: white;'>{promedio_prod:,}</p>
+                                <p style='margin: 5px 0 0 0; font-size: 0.75em; color: rgba(255,255,255,0.7);'>por producto</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        st.divider()
+                        
+                        # ==================== TOP PRODUCTOS PRIORITARIOS ====================
+                        st.markdown("#### 🎯 Top Productos Prioritarios (Ordena por: Riesgo → Producción → Demanda)")
+                        
+                        # Top 10 prioritarios
+                        top_n = min(10, len(reco_df))
+                        reco_top = reco_df.head(top_n)
+                        
+                        col_viz1, col_viz2 = st.columns(2)
+                        
+                        with col_viz1:
+                            # Gráfico: Top productos por Producción Recomendada
+                            fig_prod = px.barh(
+                                reco_top.sort_values('Produccion_Recomendada', ascending=True),
+                                x='Produccion_Recomendada',
+                                y='Codigo',
+                                color='RIESGO_QUIEBRE',
+                                color_discrete_map={True: '#ef4444', False: '#10b981'},
+                                title=f'Top {top_n}: Producción Recomendada',
+                                labels={'Produccion_Recomendada': 'Unidades', 'Codigo': 'Producto'}
+                            )
+                            fig_prod.update_layout(height=450, font=dict(size=11), showlegend=False)
+                            st.plotly_chart(fig_prod, use_container_width=True)
+                        
+                        with col_viz2:
+                            # Gráfico: Stock Actual vs SS (Stock de Seguridad)
+                            reco_top_viz = reco_top[['Codigo', 'Stock_Actual', 'SS']].copy()
+                            fig_stock_ss = px.bar(
+                                reco_top_viz,
+                                x='Codigo',
+                                y=['Stock_Actual', 'SS'],
+                                barmode='group',
+                                title=f'Top {top_n}: Stock Actual vs Stock de Seguridad',
+                                labels={'value': 'Unidades', 'variable': 'Tipo'},
+                                color_discrete_map={'Stock_Actual': '#06b6d4', 'SS': '#f59e0b'}
+                            )
+                            fig_stock_ss.update_layout(height=450, font=dict(size=11))
+                            st.plotly_chart(fig_stock_ss, use_container_width=True)
+                        
+                        st.divider()
+                        
+                        # ==================== TABLA DETALLADA CON EXPLICACIONES ====================
+                        st.markdown("#### 📋 Tabla Detallada: Todos los Productos")
+                        st.markdown("*Clic en una fila para ver más detalles de la recomendación*")
+                        
+                        # Preparar tabla para display (con formato)
+                        reco_display = reco_df.copy()
+                        reco_display['Estado'] = reco_display['RIESGO_QUIEBRE'].apply(
+                            lambda x: '🚨 RIESGO' if x else '✅ Seguro'
+                        )
+                        reco_display['Produccion_Recomendada'] = reco_display['Produccion_Recomendada'].apply(
+                            lambda x: f"{int(x):,} unid."
+                        )
+                        reco_display['Forecast_t+1'] = reco_display['Forecast_t+1'].apply(
+                            lambda x: f"{int(x):,.0f}"
+                        )
+                        reco_display['Stock_Actual'] = reco_display['Stock_Actual'].apply(
+                            lambda x: f"{int(x):,.0f}"
+                        )
+                        reco_display['SS'] = reco_display['SS'].apply(
+                            lambda x: f"{x:.0f}"
+                        )
+                        
+                        cols_display = ['Codigo', 'ABC', 'Estado', 'Modelo_Ganador', 'Forecast_t+1', 
+                                       'Stock_Actual', 'SS', 'MAE_ganador', 'Z', 'Produccion_Recomendada']
+                        
+                        st.dataframe(reco_display[cols_display], use_container_width=True, height=520)
+                        
+                        st.divider()
+                        
+                        # ==================== EXPLICACIÓN DE LAS RECOMENDACIONES ====================
+                        with st.expander("💡 ¿Cómo se calculan estas recomendaciones?", expanded=False):
+                            st.markdown(f"""
+                            **Variables clave:**
+                            - **Forecast (t+1)**: Predicción de demanda para {next_mes_str} usando el modelo ganador
+                            - **Stock Actual**: Inventario disponible hoy (último mes registrado)
+                            - **Stock de Seguridad (SS)**: Protección contra variaciones = Z × MAE × √(Lead Time)
+                              - Z: Factor según clasificación ABC (A=1.65, B=1.28, C=1.04)
+                              - MAE: Error promedio del modelo ganador
+                            - **Producción Recomendada**: = Forecast + SS - Stock Actual
+                            
+                            **¿Por qué algunos productos tienen "RIESGO"?**
+                            - Cuando Stock Actual < SS, significa que HOY ya hay riesgo de quiebre
+                            - Estos productos necesitan producción INMEDIATA (prioritarios)
+                            
+                            **¿Por qué el modelo ganador es diferente por producto?**
+                            - Cada serie de demanda es única
+                            - El sistema elige entre Baselines (MA3, MA6, Seasonal), ETS y RandomForest
+                            - Se selecciona por MAE más bajo en los últimos {test_months} meses de histórico
+                            """
+                            )
+                        
+                        # ==================== DESCARGAR RECOMENDACIONES ====================
+                        with st.expander("⬇️ Descargar Recomendaciones (CSV / Tabla Completa)", expanded=False):
+                            csv = reco_df.to_csv(index=False).encode("utf-8-sig")
+                            st.download_button(
+                                "📥 Descargar recomendaciones_masivas.csv",
+                                data=csv,
+                                file_name=f"recomendaciones_masivas_{abc_sel}_{next_mes_str.replace(' ', '_')}.csv",
+                                mime="text/csv",
+                                key="download_reco_masiva"
+                            )
+                            
+                            st.markdown("**Columnas en el archivo CSV:**")
+                            st.markdown("""
+                            - **Codigo**: Identificador del producto
+                            - **ABC**: Clasificación (A/B/C)
+                            - **Modelo_Ganador**: Qué modelo de pronóstico se usó
+                            - **Forecast_t+1**: Predicción de demanda para el próximo mes
+                            - **MAE_ganador**: Error promedio del modelo elegido
+                            - **Z**: Factor de seguridad (según ABC)
+                            - **SS**: Stock de Seguridad calculado
+                            - **Stock_Actual**: Inventario hoy
+                            - **Produccion_Recomendada**: **← ESTO ES LO QUE DEBES PRODUCIR**
+                            - **RIESGO_QUIEBRE**: Si hay riesgo actual (True/False)
+                            - **DEMANDA_TOTAL_HIST**: Demanda total histórica
+                            """)
 
 
 
