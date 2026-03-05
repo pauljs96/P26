@@ -2941,11 +2941,34 @@ class Dashboard:
                     with st.expander("📈 ¿Qué significa esto para tu negocio? (Explicación detallada)", expanded=False):
                         st.markdown(f"**{user_name},** durante el período de **{period_info.get('num_months', 0)} meses**, tu estrategia anterior (producir lo que se vendió antes) habría costado aproximadamente **{s['Base']['Costo_total']:,.0f}** en inventario y quiebres.")
                         st.markdown(f"Si hubiera implementado el sistema inteligente desde entonces, el costo habría sido **{s['Sistema']['Costo_total']:,.0f}**, lo que representa un **ahorro de {ahorro_total:,.0f}**.")
-                        st.markdown("**Además:**")
-                        st.markdown(f"✅ Tu disponibilidad de producto mejoraría de **{fill_rate_base:.1f}%** a **{fill_rate_sys:.1f}%**")
-                        st.markdown(f"✅ Evitarías **{reduccion_faltantes:,.0f} unidades** de clientes insatisfechos")
-                        st.markdown(f"✅ Los costos de inventario se optimizarían automáticamente")
-                        st.markdown("✨ **En resumen: El sistema inteligente te permite ahorrar dinero Y servir mejor a tus clientes.**")
+                        st.markdown("**Análisis de impacto operativo:**")
+                        
+                        # Lógica adaptativa para Fill Rate
+                        if fill_rate_sys >= fill_rate_base:
+                            st.markdown(f"✅ **Fill Rate:** Mejora de **{fill_rate_base:.1f}%** a **{fill_rate_sys:.1f}%** (ganancia de {fill_rate_sys - fill_rate_base:.1f}%)")
+                        else:
+                            cambio_ff = fill_rate_base - fill_rate_sys
+                            st.markdown(f"📊 **Fill Rate:** {fill_rate_base:.1f}% (sin sistema) vs {fill_rate_sys:.1f}% (con sistema)")
+                            st.markdown(f"   → Reducción de {cambio_ff:.1f}%, pero compensada por **ahorros de ${ahorro_total:,.0f}**")
+                        
+                        # Lógica adaptativa para Faltantes
+                        if reduccion_faltantes >= 0:
+                            st.markdown(f"✅ **Quiebres evitados:** {reduccion_faltantes:,.0f} unidades menos faltantes")
+                        else:
+                            faltantes_adicionales = abs(reduccion_faltantes)
+                            st.markdown(f"📊 **Quiebres:** Se podrían generar {faltantes_adicionales:,.0f} unidades más faltantes")
+                            st.markdown(f"   → Trade-off aceptable: más quiebres pero **${ahorro_total:,.0f} en ahorros**")
+                        
+                        st.markdown("---")
+                        st.markdown("**Conclusión:**")
+                        if ahorro_total > 0:
+                            st.markdown(f"🎯 El sistema inteligente genera **${ahorro_total:,.0f} en ahorros** durante {period_info.get('num_months', 0)} meses.")
+                            if fill_rate_sys >= fill_rate_base:
+                                st.markdown("✨ **Beneficio doble:** Ahorras dinero Y mejoras la disponibilidad para clientes.")
+                            else:
+                                st.markdown("⚖️ **Balance económico:** Ahorras dinero con un trade-off aceptable en disponibilidad.")
+                        else:
+                            st.markdown("ℹ️ En este caso, el sistema simplemente optimiza los costos.")
                     
                     with st.expander("🔍 Validación técnica y detalles de costos", expanded=False):
                         st.markdown("#### Suma Manual de Costos (Validación)")
