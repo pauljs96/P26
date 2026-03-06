@@ -2296,8 +2296,9 @@ class Dashboard:
                         
                         for idx, (cat, row) in enumerate(summary_wins.iterrows()):
                             with cols_kpi[idx % 3]:
-                                modelo_ganador = row.get("Modelo_Ganador", "N/A")
-                                cant_productos = row.get("Cantidad_Ganadas", 0)
+                                # Usar 'Winner' columna actual (no 'Modelo_Ganador')
+                                modelo_ganador = row.get("Winner", "N/A")
+                                cant_productos = row.get("N_Productos", 0)
                                 
                                 # Color según categoría y modelo
                                 if cat == "A":
@@ -2335,10 +2336,16 @@ class Dashboard:
                     if not summary_errors.empty:
                         cols_err = st.columns(3)
                         
+                        # Detectar el nombre de columnas de error (MAE_Promedio o MAE_promedio según versión)
+                        error_cols = [c for c in summary_errors.columns if "Promedio" in c or "promedio" in c]
+                        error_col_name = error_cols[0] if error_cols else None
+                        pond_cols = [c for c in summary_errors.columns if "Ponderado" in c or "ponderado" in c]
+                        pond_col_name = pond_cols[0] if pond_cols else None
+                        
                         for idx, (cat, row) in enumerate(summary_errors.iterrows()):
                             with cols_err[idx % 3]:
-                                mae_prom = row.get("MAE_promedio", 0)
-                                mae_pond = row.get("MAE_ponderado", 0)
+                                mae_prom = float(row.get(error_col_name, 0)) if error_col_name else 0
+                                mae_pond = float(row.get(pond_col_name, 0)) if pond_col_name else 0
                                 
                                 # Determinar color de riesgo (menor error = mejor)
                                 if mae_prom < 100:
@@ -2374,10 +2381,9 @@ class Dashboard:
                     # Preparar tabla con formato
                     reco_display = per_sku.copy()
                     reco_display['Demanda_Total'] = reco_display['Demanda_Total'].apply(lambda x: f"{x:,.0f}")
-                    reco_display['MAE'] = reco_display['MAE'].apply(lambda x: f"{x:.2f}")
                     
-                    # Columnas a mostrar, ordenadas por ABC y demanda
-                    cols_mostrar = ['Codigo', 'ABC', 'Modelo_Ganador', 'MAE', 'Demanda_Total', 'RMSE', 'sMAPE_%']
+                    # Detectar columnas disponibles
+                    cols_mostrar = ['Codigo', 'ABC', 'Winner', 'MAE', 'Demanda_Total', 'RMSE', 'sMAPE_%']
                     cols_disponibles = [c for c in cols_mostrar if c in reco_display.columns]
                     
                     st.dataframe(
@@ -2391,27 +2397,27 @@ class Dashboard:
                     st.markdown("---")
                     st.markdown("### 💡 Insights y Recomendaciones")
                     
-                    # Extraer insights
-                    if not summary_wins.empty:
-                        modelos_ganadores = summary_wins['Modelo_Ganador'].unique()
+                    # Extraer insights de forma segura
+                    if not summary_wins.empty and "Winner" in summary_wins.columns:
+                        modelos_ganadores = summary_wins['Winner'].unique()
                         
                         insight_html = "<div style='background: #f5f5f5; padding: 16px; border-radius: 8px;'>"
                         
-                        if "ETS(Holt-Winters)" in modelos_ganadores:
+                        if any("ETS" in str(m) for m in modelos_ganadores):
                             insight_html += """
                             <p style='margin: 0.5em 0;'>✅ <strong>ETS destaca en tu portafolio:</strong> 
                             Tus productos tienen tendencias y ciclos bien definidos. El método ETS captura bien 
                             estos patrones. Considera ver históricamente si hay cambios de producción/demanda que siguen ciclos.</p>
                             """
                         
-                        if "RandomForest" in modelos_ganadores:
+                        if any("RandomForest" in str(m) or "RF" in str(m) for m in modelos_ganadores):
                             insight_html += """
                             <p style='margin: 0.5em 0;'>⚡ <strong>Random Forest gana en algunos casos:</strong> 
                             Algunos productos tienen patrones complejos que los métodos simples no capturan. 
                             Esto es normal en portafolios grandes y diversificados.</p>
                             """
                         
-                        if any(m in modelos_ganadores for m in ["MA3", "MA6", "Seasonal12", "Naive"]):
+                        if any(m in ["MA3", "MA6", "Seasonal12", "Naive"] for m in modelos_ganadores):
                             insight_html += """
                             <p style='margin: 0.5em 0;'>📊 <strong>Métodos simples son efectivos:</strong> 
                             Algunos productos responden bien a modelos basados en promedios móviles. 
