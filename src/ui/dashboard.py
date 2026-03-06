@@ -2294,18 +2294,19 @@ class Dashboard:
                     if not summary_wins.empty:
                         cols_kpi = st.columns(3)
                         
-                        for idx, (cat, row) in enumerate(summary_wins.iterrows()):
+                        for idx, row in summary_wins.iterrows():
                             with cols_kpi[idx % 3]:
-                                # Usar 'Winner' columna actual (no 'Modelo_Ganador')
+                                # Extraer ABC correctamente del row (no del índice)
+                                abc_class = row.get("ABC", "?")
                                 modelo_ganador = row.get("Winner", "N/A")
                                 cant_productos = row.get("N_Productos", 0)
                                 
-                                # Color según categoría y modelo
-                                if cat == "A":
+                                # Color según categoría ABC
+                                if abc_class == "A":
                                     bg_color = "#ffebee"
                                     border_color = "#c62828"
                                     icon = "🔴"
-                                elif cat == "B":
+                                elif abc_class == "B":
                                     bg_color = "#fff3e0"
                                     border_color = "#ef6c00"
                                     icon = "🟡"
@@ -2322,13 +2323,11 @@ class Dashboard:
                                     border-radius: 8px;
                                     text-align: center;
                                 '>
-                                    <p style='margin: 0; color: #666; font-size: 0.9em;'>{icon} <strong>Clase {cat}</strong></p>
+                                    <p style='margin: 0; color: #666; font-size: 0.9em;'>{icon} <strong>Clase {abc_class}</strong></p>
                                     <h2 style='margin: 8px 0; color: {border_color}; font-size: 1.8em;'>{modelo_ganador}</h2>
                                     <p style='margin: 0; color: #888; font-size: 0.85em;'>Ganador en {int(cant_productos)} productos</p>
                                 </div>
                                 """, unsafe_allow_html=True)
-                    
-                    st.divider()
                     
                     # ==================== COMPARATIVA DE ERRORES ====================
                     st.markdown("### 📉 Precisión del Ganador por Categoría")
@@ -2342,8 +2341,10 @@ class Dashboard:
                         pond_cols = [c for c in summary_errors.columns if "Ponderado" in c or "ponderado" in c]
                         pond_col_name = pond_cols[0] if pond_cols else None
                         
-                        for idx, (cat, row) in enumerate(summary_errors.iterrows()):
+                        for idx, row in summary_errors.iterrows():
                             with cols_err[idx % 3]:
+                                # Extraer ABC correctamente del row (no del índice)
+                                abc_class = row.get("ABC", "?")
                                 mae_prom = float(row.get(error_col_name, 0)) if error_col_name else 0
                                 mae_pond = float(row.get(pond_col_name, 0)) if pond_col_name else 0
                                 
@@ -2365,7 +2366,7 @@ class Dashboard:
                                     padding: 14px;
                                     border-radius: 8px;
                                 '>
-                                    <p style='margin: 0; color: #666; font-size: 0.85em; font-weight: bold;'>Clase {cat} - Error Promedio</p>
+                                    <p style='margin: 0; color: #666; font-size: 0.85em; font-weight: bold;'>Clase {abc_class} - Error Promedio</p>
                                     <h3 style='margin: 8px 0; color: {error_color};'>{mae_prom:.1f}</h3>
                                     <p style='margin: 4px 0; color: #888; font-size: 0.8em;'>{error_status}</p>
                                     <hr style='margin: 8px 0; border: none; border-top: 1px solid #ddd;'>
