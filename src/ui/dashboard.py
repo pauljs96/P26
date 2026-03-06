@@ -2035,12 +2035,117 @@ class Dashboard:
          
             comp = get_demanda_components(prod_sel)
 
+            # ==================== RESUMEN EJECUTIVO ====================
+            st.markdown("### 📊 Resumen de Demanda")
+            
+            if not comp.empty:
+                # Calcular KPIs
+                demanda_promedio = float(comp["Demanda_Total"].mean())
+                demanda_max = float(comp["Demanda_Total"].max())
+                demanda_min = float(comp["Demanda_Total"].min())
+                demanda_reciente = float(comp.iloc[-1]["Demanda_Total"]) if len(comp) > 0 else 0
+                demanda_anterior = float(comp.iloc[-2]["Demanda_Total"]) if len(comp) > 1 else demanda_reciente
+                trend = ((demanda_reciente - demanda_anterior) / demanda_anterior * 100) if demanda_anterior != 0 else 0
+                volatilidad = float(comp["Demanda_Total"].std())
+                
+                # Mostrar KPIs en columnas
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    st.metric(
+                        "📈 Promedio",
+                        f"{demanda_promedio:,.0f} unid",
+                        f"{volatilidad:,.0f} (σ)"
+                    )
+                
+                with col2:
+                    st.metric(
+                        "🔴 Máximo",
+                        f"{demanda_max:,.0f} unid",
+                        f"+{((demanda_max - demanda_promedio)/demanda_promedio*100):.1f}%"
+                    )
+                
+                with col3:
+                    st.metric(
+                        "🟢 Mínimo",
+                        f"{demanda_min:,.0f} unid",
+                        f"{((demanda_min - demanda_promedio)/demanda_promedio*100):.1f}%"
+                    )
+                
+                with col4:
+                    trend_emoji = "📈" if trend > 0 else "📉" if trend < 0 else "➡️"
+                    st.metric(
+                        f"{trend_emoji} Tendencia Reciente",
+                        f"{abs(trend):.1f}%",
+                        f"Mes anterior: {demanda_anterior:,.0f} → {demanda_reciente:,.0f}"
+                    )
+                
+                # Explicación visual
+                st.markdown("""
+                <div style='background: linear-gradient(135deg, #e3f2fd 0%, #f5f5f5 100%); padding: 14px; border-left: 4px solid #1976d2; border-radius: 8px; margin-bottom: 1em;'>
+                    <p style='margin: 0; color: #333; font-size: 0.9em;'>
+                        <strong>💡 Qué observar:</strong><br>
+                        • <strong>Promedio:</strong> Nivel normal de demanda. Usar como referencia para planificación.<br>
+                        • <strong>Volatilidad (σ):</strong> Desviación estándar. Valores altos = demanda impredecible.<br>
+                        • <strong>Tendencia:</strong> Si es positiva, la demanda está creciendo. Planes de producción deben ajustarse.<br>
+                        • <strong>Máximo vs Mínimo:</strong> Si la diferencia es grande, necesitas stock de seguridad mayor.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+
             # Gráfico de demanda total (ancho completo)
             fig_total = px.line(
                 comp, x="Mes", y="Demanda_Total", markers=True,
-                title=f"Demanda total histórica - Producto {prod_sel}"
+                title=f"Demanda total histórica - Producto {prod_sel}",
+                height=400
             )
+            fig_total.add_hline(y=demanda_promedio, line_dash="dash", line_color="green", 
+                               annotation_text=f"Promedio: {demanda_promedio:,.0f}", annotation_position="right")
             st.plotly_chart(fig_total, use_container_width=True)
+
+            # ==================== ANÁLISIS DE COMPONENTES ====================
+            st.markdown("### 🧩 Desglose de Componentes")
+            
+            if not comp.empty and "Venta_unid" in comp.columns:
+                col_comp1, col_comp2 = st.columns(2)
+                
+                with col_comp1:
+                    # Suma de componentes
+                    venta_total = comp["Venta_unid"].sum() if "Venta_unid" in comp.columns else 0
+                    consumo_total = comp["Consumo_unid"].sum() if "Consumo_unid" in comp.columns else 0
+                    guia_total = comp["Guia_Salida_Externa_Unid"].sum() if "Guia_Salida_Externa_Unid" in comp.columns else 0
+                    
+                    total = venta_total + consumo_total + guia_total
+                    
+                    if total > 0:
+                        # Gráfico de pastel
+                        component_data = {
+                            "Componente": ["Venta", "Consumo", "Guía Externa"],
+                            "Unidades": [venta_total, consumo_total, guia_total]
+                        }
+                        fig_pie = px.pie(
+                            component_data, 
+                            values="Unidades", 
+                            names="Componente",
+                            title="Proporción de Componentes"
+                        )
+                        st.plotly_chart(fig_pie, use_container_width=True)
+                
+                with col_comp2:
+                    st.markdown("""
+                    <div style='background: #fff9e6; padding: 14px; border-left: 4px solid #ff9800; border-radius: 8px; height: 100%;'>
+                        <p style='margin: 0; color: #333; font-size: 0.9em; font-weight: 600;'>📌 Significado de Componentes:</p>
+                        <ul style='margin: 0.5em 0; padding-left: 20px; color: #555; font-size: 0.85em;'>
+                            <li><strong>Venta:</strong> Demanda de clientes externos</li>
+                            <li><strong>Consumo:</strong> Uso interno en operaciones</li>
+                            <li><strong>Guía Externa:</strong> Transferencias a otras bodegas</li>
+                        </ul>
+                        <p style='margin: 0.5em 0; color: #666; font-size: 0.85em;'>
+                            Si <strong>Venta es baja</strong> pero <strong>Consumo es alto</strong>, hay ineficiencia operativa.<br>
+                            Si <strong>Guía Externa es significativa</strong>, hay movimiento entre sedes.
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
 
             # Tabla de componentes colapsada
             with st.expander("🧩 Detalles: Componentes de demanda por mes", expanded=False):
@@ -2421,7 +2526,7 @@ class Dashboard:
         # TAB 7: STOCK + DIAGNÓSTICO
         # ==========================================================
         with tab_stock_diag:
-            
+            st.markdown("### 📦 Análisis de Stock")
 
             stock = res_stock
             if stock is None or stock.empty:
@@ -2431,11 +2536,106 @@ class Dashboard:
                 if splot.empty:
                     st.info("No hay stock mensual para ese producto.")
                 else:
+                    # ==================== RESUMEN EJECUTIVO STOCK ====================
+                    if not splot.empty:
+                        stock_promedio = float(splot["Stock_Unid"].mean())
+                        stock_max = float(splot["Stock_Unid"].max())
+                        stock_min = float(splot["Stock_Unid"].min())
+                        stock_reciente = float(splot.iloc[-1]["Stock_Unid"])
+                        stock_anterior = float(splot.iloc[-2]["Stock_Unid"]) if len(splot) > 1 else stock_reciente
+                        cambio_stock = stock_reciente - stock_anterior
+                        ocupacion_actual = (stock_reciente / stock_max * 100) if stock_max != 0 else 0
+                        
+                        # Calcular cobertura (días)
+                        dm = res_demand.copy()
+                        dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
+                        demanda_diaria = dm[dm["Codigo"] == str(prod_sel)]["Demanda_Unid"].sum() / len(dm) if not dm[dm["Codigo"] == str(prod_sel)].empty else 1
+                        cobertura_dias = (stock_reciente / demanda_diaria) if demanda_diaria > 0 else 0
+                        
+                        # Mostrar KPIs
+                        col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+                        
+                        with col_s1:
+                            st.metric(
+                                "📈 Promedio",
+                                f"{stock_promedio:,.0f} unid",
+                                f"Rango: {stock_min:,.0f} a {stock_max:,.0f}"
+                            )
+                        
+                        with col_s2:
+                            cambio_emoji = "📈" if cambio_stock > 0 else "📉" if cambio_stock < 0 else "➡️"
+                            st.metric(
+                                f"{cambio_emoji} Stock Actual",
+                                f"{stock_reciente:,.0f} unid",
+                                f"{cambio_stock:+.0f} respecto mes anterior"
+                            )
+                        
+                        with col_s3:
+                            ocupacion_status = "🟢 Óptimo" if 30 <= ocupacion_actual <= 80 else "🟡 Revisar" if ocupacion_actual > 80 else "🔴 Bajo"
+                            st.metric(
+                                "🎯 Ocupación",
+                                f"{ocupacion_actual:.1f}%",
+                                ocupacion_status
+                            )
+                        
+                        with col_s4:
+                            cobertura_status = "🟢 Bien" if cobertura_dias >= 7 else "🟡 Justo" if cobertura_dias >= 3 else "🔴 Crítico"
+                            st.metric(
+                                "⏱️ Cobertura",
+                                f"{cobertura_dias:.1f} días",
+                                cobertura_status
+                            )
+                        
+                        # Explicación visual
+                        st.markdown("""
+                        <div style='background: linear-gradient(135deg, #f3e5f5 0%, #f5f5f5 100%); padding: 14px; border-left: 4px solid #9c27b0; border-radius: 8px; margin-bottom: 1em;'>
+                            <p style='margin: 0; color: #333; font-size: 0.9em;'>
+                                <strong>💡 Qué observar:</strong><br>
+                                • <strong>Stock Actual:</strong> Cantidad disponible ahora. Si baja mucho = riesgo de quiebre.<br>
+                                • <strong>Ocupación:</strong> % del máximo histórico. 30-80% es ideal para no exceso ni falta.<br>
+                                • <strong>Cobertura (días):</strong> Cuántos días de demanda cubre el stock actual. Mínimo recomendado: 7-10 días.<br>
+                                • <strong>Tendencia:</strong> Si stock crece = producción > demanda. Si baja = demanda > producción.
+                            </p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    # Gráfico con línea de referencia
                     fig_stock = px.line(
                         splot, x="Mes", y="Stock_Unid", markers=True,
-                        title=f"Stock mensual histórico - Producto {prod_sel}"
+                        title=f"Stock mensual histórico - Producto {prod_sel}",
+                        height=400
                     )
+                    fig_stock.add_hline(y=stock_promedio, line_dash="dash", line_color="orange", 
+                                       annotation_text=f"Promedio: {stock_promedio:,.0f}", annotation_position="right")
                     st.plotly_chart(fig_stock, use_container_width=True)
+                    
+                    # Análisis de volatilidad
+                    with st.expander("📊 Análisis Detallado de Stock", expanded=False):
+                        col_a1, col_a2 = st.columns(2)
+                        
+                        with col_a1:
+                            volatilidad_stock = float(splot["Stock_Unid"].std())
+                            coeficiente_var = (volatilidad_stock / stock_promedio * 100) if stock_promedio > 0 else 0
+                            
+                            st.markdown(f"""
+                            **📉 Volatilidad:**
+                            - Desv. Estándar: {volatilidad_stock:,.0f} unid
+                            - Coef. Variación: {coeficiente_var:.1f}%
+                            
+                            **Status:** {'🔴 Alta variabilidad' if coeficiente_var > 50 else '🟡 Moderada' if coeficiente_var > 25 else '🟢 Estable'}
+                            """)
+                        
+                        with col_a2:
+                            meses_bajo_promedio = len(splot[splot["Stock_Unid"] < stock_promedio])
+                            pct_bajo = (meses_bajo_promedio / len(splot) * 100) if len(splot) > 0 else 0
+                            
+                            st.markdown(f"""
+                            **📈 Distribución:**
+                            - Meses bajo promedio: {meses_bajo_promedio} ({pct_bajo:.1f}%)
+                            - Stock máximo: {stock_max:,.0f} unid
+                            - Stock mínimo: {stock_min:,.0f} unid
+                            - Rango total: {stock_max - stock_min:,.0f} unid
+                            """)
 
             st.divider()
 
