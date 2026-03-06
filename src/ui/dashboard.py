@@ -2899,7 +2899,7 @@ class Dashboard:
                         
                         # ==================== TABLA DETALLADA CON EXPLICACIONES ====================
                         st.markdown("#### 📋 Tabla Detallada: Todos los Productos")
-                        st.markdown("*Clic en una fila para ver más detalles de la recomendación*")
+                        st.markdown("**Ordenamiento:** 🚨 Productos en riesgo primero → Mayor producción recomendada → Mayor demanda histórica")
                         
                         # Preparar tabla para display (con formato)
                         reco_display = reco_df.copy()
