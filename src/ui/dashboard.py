@@ -1189,11 +1189,12 @@ class Dashboard:
                 x=[next_mes_demo],
                 y=[forecast_valor],
                 mode="markers+text",
-                name="🎯 Pronóstico Siguiente",
+                name="",  # Sin leyenda (es obvio que es el pronóstico)
                 marker=dict(size=18, color="#FF6B6B", symbol="star", line=dict(color="white", width=2)),
                 text=[f"<b>{forecast_valor} unid.</b>"],
                 textposition="top center",
-                hovertemplate="<b>Pronóstico:</b> %{y} unidades<extra></extra>"
+                hovertemplate="<b>Pronóstico:</b> %{y} unidades<extra></extra>",
+                showlegend=False
             )
             
             # Estilo premium del gráfico
@@ -1202,22 +1203,12 @@ class Dashboard:
                 template="plotly_white",
                 yaxis_title="<b>Unidades de Demanda</b>",
                 xaxis_title="<b>Período (Mes)</b>",
-                showlegend=True,
+                showlegend=False,
                 paper_bgcolor="rgba(240, 245, 250, 0.5)",
                 plot_bgcolor="white",
                 font=dict(family="Arial, sans-serif", size=11, color="#333"),
                 title_font=dict(size=14, color="#1565C0"),
-                margin=dict(l=50, r=50, t=60, b=50),
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=-0.2,
-                    xanchor="center",
-                    x=0.5,
-                    bgcolor="rgba(255,255,255,0.8)",
-                    bordercolor="#1976D2",
-                    borderwidth=1
-                )
+                margin=dict(l=50, r=50, t=60, b=50)
             )
             
             # Mejorar línea histórica (más gruesa y con gradiente de color)
