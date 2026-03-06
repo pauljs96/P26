@@ -1167,28 +1167,64 @@ class Dashboard:
             fig_demo = px.line(
                 demo_df,
                 x="Mes", y="Demanda",
-                title="Histórico vs Pronóstico",
+                title="<b>📈 Visualización: Demanda Histórica y Pronóstico Inteligente</b>",
                 markers=True,
-                line_shape="linear",
-                height=300
+                line_shape="spline",
+                height=400
             )
             
+            # Agregar área sombreada bajo la línea histórica (efecto visual premium)
+            fig_demo.add_scatter(
+                x=demo_df["Mes"].tolist() + demo_df["Mes"].tolist()[::-1],
+                y=demo_df["Demanda"].tolist() + [0] * len(demo_df),
+                fill="tozeroy",
+                fillcolor="rgba(25, 118, 210, 0.1)",
+                line=dict(color="rgba(255,255,255,0)"),
+                hoverinfo="skip",
+                showlegend=False
+            )
+            
+            # Pronóstico con estrella roja impactante
             fig_demo.add_scatter(
                 x=[next_mes_demo],
                 y=[forecast_valor],
                 mode="markers+text",
-                name="Pronóstico",
-                marker=dict(size=12, color="red", symbol="star"),
-                text=[f"{forecast_valor}"],
-                textposition="top center"
+                name="🎯 Pronóstico Siguiente",
+                marker=dict(size=18, color="#FF6B6B", symbol="star", line=dict(color="white", width=2)),
+                text=[f"<b>{forecast_valor} unid.</b>"],
+                textposition="top center",
+                hovertemplate="<b>Pronóstico:</b> %{y} unidades<extra></extra>"
             )
             
+            # Estilo premium del gráfico
             fig_demo.update_layout(
                 hovermode="x unified",
                 template="plotly_white",
-                yaxis_title="Unidades",
-                xaxis_title="",
-                showlegend=False
+                yaxis_title="<b>Unidades de Demanda</b>",
+                xaxis_title="<b>Período (Mes)</b>",
+                showlegend=True,
+                paper_bgcolor="rgba(240, 245, 250, 0.5)",
+                plot_bgcolor="white",
+                font=dict(family="Arial, sans-serif", size=11, color="#333"),
+                title_font=dict(size=14, color="#1565C0"),
+                margin=dict(l=50, r=50, t=60, b=50),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=-0.2,
+                    xanchor="center",
+                    x=0.5,
+                    bgcolor="rgba(255,255,255,0.8)",
+                    bordercolor="#1976D2",
+                    borderwidth=1
+                )
+            )
+            
+            # Mejorar línea histórica (más gruesa y con gradiente de color)
+            fig_demo.update_traces(
+                line=dict(color="#1976D2", width=3),
+                marker=dict(size=6, color="#1565C0"),
+                selector=dict(mode="lines+markers")
             )
             
             return fig_demo
@@ -1792,8 +1828,9 @@ class Dashboard:
         with tab_dashboard:
             # Header compacto
             st.markdown("""
-            <div style='text-align: center; margin-bottom: 1em;'>
-                <h2 style='color: #1976D2; font-size: 2em; margin-bottom: 0;'>📊 Sistema de Recomendación</h2>
+            <div style='text-align: center; margin-bottom: 1em; background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%); padding: 2em; border-radius: 10px; box-shadow: 0 4px 15px rgba(25, 118, 210, 0.3);'>
+                <h1 style='color: white; font-size: 2.5em; margin: 0; font-weight: bold;'>🚀 Inteligencia en Planificación de Demanda</h1>
+                <p style='color: rgba(255, 255, 255, 0.9); font-size: 1.1em; margin-top: 0.5em; margin-bottom: 0;'>Pronósticos precisos + Recomendaciones inteligentes = Máxima eficiencia</p>
             </div>
             """, unsafe_allow_html=True)
             
