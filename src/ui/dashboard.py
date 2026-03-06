@@ -2211,73 +2211,215 @@ class Dashboard:
         # TAB 6: COMPARATIVA GLOBAL ETS VS BASELINES VS RF
         # ==========================================================
         with ResumenComparativa:
+            # ==================== HEADER IMPACTANTE ====================
+            st.markdown("""
+            <div style='text-align: center; margin-bottom: 2em; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 2.5em; border-radius: 12px; box-shadow: 0 4px 15px rgba(245, 87, 108, 0.3);'>
+                <h1 style='color: white; font-size: 2.2em; margin: 0; font-weight: bold;'>🏆 Análisis de Mejor Modelo por Categoría</h1>
+                <p style='color: rgba(255, 255, 255, 0.9); font-size: 1em; margin-top: 0.8em; margin-bottom: 0;'>¿Cuál es el mejor método de pronóstico para tus productos? Baselines vs ETS vs Random Forest</p>
+            </div>
+            """, unsafe_allow_html=True)
 
-            st.divider()
-            st.subheader("🌍 Comparación global de modelos para ABC (todos los productos)")
-            
-            st.markdown("**Análisis:** Compara el desempeño de Baselines, ETS y Random Forest en TODOS los productos del portafolio. Muestra qué modelo gana por clase ABC y errores promedio.")
-            st.info(f"📊 Evaluando: **TODOS los productos** (sin filtro - evaluación global del portafolio)")
+            # ==================== EXPLICACIÓN AMIGABLE ====================
+            st.markdown("""
+            <div style='background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%); padding: 16px; border-left: 5px solid #4caf50; border-radius: 8px; margin-bottom: 2em;'>
+                <h3 style='color: #2e7d32; margin-top: 0;'>📊 ¿Qué ves aquí?</h3>
+                <p style='color: #333; margin: 0.5em 0;'><strong>Este análisis compara automáticamente 3 métodos de pronóstico</strong> en cada categoría ABC de tu portafolio:</p>
+                <ul style='color: #333; margin: 0.5em 0; padding-left: 20px;'>
+                    <li><strong>Baselines (MA3, MA6, Seasonal):</strong> Métodos simples y rápidos</li>
+                    <li><strong>ETS (Holt-Winters):</strong> Captura tendencias y ciclos</li>
+                    <li><strong>Random Forest:</strong> Aprendizaje automático avanzado</li>
+                </ul>
+                <p style='color: #333; margin: 0.5em 0;'>El sistema <strong>elige automáticamente el mejor</strong> para cada grupo ABC basado en precisión de errores.</p>
+            </div>
+            """, unsafe_allow_html=True)
 
-            sort_metric = st.selectbox(
-                "Métrica para elegir ganador",
-                options=["MAE", "RMSE", "sMAPE_%", "MAPE_safe_%"],
-                index=0,
-                key="global_sort_metric"
-            )
+            # ==================== PARÁMETROS (EXPANDIBLE) ====================
+            with st.expander("⚙️ Parámetros de Análisis (avanzado)", expanded=False):
+                col_p1, col_p2, col_p3 = st.columns([1, 1, 1.5])
+                
+                with col_p1:
+                    sort_metric = st.selectbox(
+                        "Métrica ganadora",
+                        options=["MAE", "RMSE", "sMAPE_%", "MAPE_safe_%"],
+                        index=0,
+                        key="global_sort_metric",
+                        help="Criterio usado para elegir el mejor modelo"
+                    )
+                
+                with col_p2:
+                    test_months_global = st.slider(
+                        "Meses de backtest",
+                        min_value=6, max_value=24, value=12, step=1,
+                        key="global_test_months",
+                        help="Últimos meses usados para evaluar cada modelo"
+                    )
+                
+                with col_p3:
+                    max_products = st.selectbox(
+                        "Productos a analizar",
+                        options=[50, 100, 200, "Todos"],
+                        index=1,
+                        key="global_max_products",
+                        help="Más productos = análisis más completo pero más lento"
+                    )
+                    max_products = None if max_products == "Todos" else int(max_products)
+                
+                st.info("✅ **Configuración automática:** Ventana MA optimizada (3 vs 6) + ETS con parámetros estándares")
 
-            test_months_global = st.slider(
-                "Backtest (últimos meses)",
-                min_value=6, max_value=24, value=12, step=1,
-                key="global_test_months"
-            )
-
-            st.caption("✅ Ventana MA: **MA3** (optimizada para portafolio globalizado)")
-
-            max_products = st.selectbox(
-                "Cantidad de productos a evaluar (performance)",
-                options=[50, 100, 200, "Todos"],
-                index=1,
-                key="global_max_products"
-            )
-            max_products = None if max_products == "Todos" else int(max_products)
-
-            ets_params = dict(seasonal_periods=12, trend="add", seasonal="add", damped_trend=False, min_obs=24)
-
-            run_btn = st.button("▶️ Ejecutar comparación global", type="primary")
+            # ==================== BOTÓN EJECUTAR ====================
+            run_btn = st.button("▶️ Ejecutar análisis global (puede tardar 1-2 min)", type="primary", use_container_width=True)
 
             if run_btn:
-                ma_window_global = 3  # Auto-seleccionado como media móvil estándar
-                with st.spinner("Corriendo comparación global (puede tardar según la cantidad de productos)..."):
+                ma_window_global = 3
+                with st.spinner("⏳ Analizando todos los productos y comparando modelos... Por favor espera"):
                     per_sku, summary_wins, summary_errors = run_portfolio_comparison(
                         res_demand,
                         sort_metric=sort_metric,
                         test_months=int(test_months_global),
                         ma_window=int(ma_window_global),
-                        ets_params=ets_params,
+                        ets_params=dict(seasonal_periods=12, trend="add", seasonal="add", damped_trend=False, min_obs=24),
                         max_products=max_products
                     )
 
                 if per_sku.empty:
-                    st.warning("No se generaron resultados (revisa data/parametros).")
+                    st.warning("❌ No se generaron resultados. Revisa los parámetros o la cantidad de datos.")
                 else:
-                    st.success(f"✅ Resultados generados para {per_sku['Codigo'].nunique():,} productos.")
-
-                    c1, c2 = st.columns([1, 1])
-
-                    with c1:
-                        st.markdown("**Ganadores por ABC**")
-                        st.dataframe(summary_wins, use_container_width=True, height=320)
-
-                    with c2:
-                        st.markdown("**Error del ganador (promedio y ponderado por demanda)**")
-                        st.dataframe(summary_errors, use_container_width=True, height=320)
-
-                    st.markdown("**Detalle por producto (ganador + ABC + métricas)**")
+                    st.success(f"✅ Análisis completado: **{per_sku['Codigo'].nunique():,} productos** evaluados")
+                    
+                    # ==================== RESUMEN EJECUTIVO ====================
+                    st.markdown("---")
+                    st.markdown("### 🎯 Resumen Ejecutivo: Ganadores por Categoría ABC")
+                    
+                    # Tarjetas KPI de ganadores
+                    if not summary_wins.empty:
+                        cols_kpi = st.columns(3)
+                        
+                        for idx, (cat, row) in enumerate(summary_wins.iterrows()):
+                            with cols_kpi[idx % 3]:
+                                modelo_ganador = row.get("Modelo_Ganador", "N/A")
+                                cant_productos = row.get("Cantidad_Ganadas", 0)
+                                
+                                # Color según categoría y modelo
+                                if cat == "A":
+                                    bg_color = "#ffebee"
+                                    border_color = "#c62828"
+                                    icon = "🔴"
+                                elif cat == "B":
+                                    bg_color = "#fff3e0"
+                                    border_color = "#ef6c00"
+                                    icon = "🟡"
+                                else:
+                                    bg_color = "#e8f5e9"
+                                    border_color = "#2e7d32"
+                                    icon = "🟢"
+                                
+                                st.markdown(f"""
+                                <div style='
+                                    background: {bg_color};
+                                    border-left: 4px solid {border_color};
+                                    padding: 16px;
+                                    border-radius: 8px;
+                                    text-align: center;
+                                '>
+                                    <p style='margin: 0; color: #666; font-size: 0.9em;'>{icon} <strong>Clase {cat}</strong></p>
+                                    <h2 style='margin: 8px 0; color: {border_color}; font-size: 1.8em;'>{modelo_ganador}</h2>
+                                    <p style='margin: 0; color: #888; font-size: 0.85em;'>Ganador en {int(cant_productos)} productos</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                    
+                    st.divider()
+                    
+                    # ==================== COMPARATIVA DE ERRORES ====================
+                    st.markdown("### 📉 Precisión del Ganador por Categoría")
+                    
+                    if not summary_errors.empty:
+                        cols_err = st.columns(3)
+                        
+                        for idx, (cat, row) in enumerate(summary_errors.iterrows()):
+                            with cols_err[idx % 3]:
+                                mae_prom = row.get("MAE_promedio", 0)
+                                mae_pond = row.get("MAE_ponderado", 0)
+                                
+                                # Determinar color de riesgo (menor error = mejor)
+                                if mae_prom < 100:
+                                    error_color = "#4caf50"
+                                    error_status = "🟢 Excelente"
+                                elif mae_prom < 300:
+                                    error_color = "#ff9800"
+                                    error_status = "🟡 Bueno"
+                                else:
+                                    error_color = "#f44336"
+                                    error_status = "🔴 Revisar"
+                                
+                                st.markdown(f"""
+                                <div style='
+                                    background: #f9f9f9;
+                                    border: 2px solid {error_color};
+                                    padding: 14px;
+                                    border-radius: 8px;
+                                '>
+                                    <p style='margin: 0; color: #666; font-size: 0.85em; font-weight: bold;'>Clase {cat} - Error Promedio</p>
+                                    <h3 style='margin: 8px 0; color: {error_color};'>{mae_prom:.1f}</h3>
+                                    <p style='margin: 4px 0; color: #888; font-size: 0.8em;'>{error_status}</p>
+                                    <hr style='margin: 8px 0; border: none; border-top: 1px solid #ddd;'>
+                                    <p style='margin: 4px 0; color: #888; font-size: 0.8em;'><strong>Ponderado:</strong> {mae_pond:.1f}</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                    
+                    st.divider()
+                    
+                    # ==================== TABLA DETALLADA ====================
+                    st.markdown("### 📋 Detalle Completo: Todos los Productos")
+                    
+                    # Preparar tabla con formato
+                    reco_display = per_sku.copy()
+                    reco_display['Demanda_Total'] = reco_display['Demanda_Total'].apply(lambda x: f"{x:,.0f}")
+                    reco_display['MAE'] = reco_display['MAE'].apply(lambda x: f"{x:.2f}")
+                    
+                    # Columnas a mostrar, ordenadas por ABC y demanda
+                    cols_mostrar = ['Codigo', 'ABC', 'Modelo_Ganador', 'MAE', 'Demanda_Total', 'RMSE', 'sMAPE_%']
+                    cols_disponibles = [c for c in cols_mostrar if c in reco_display.columns]
+                    
                     st.dataframe(
-                        per_sku.sort_values(["ABC", "Demanda_Total"], ascending=[True, False]),
+                        reco_display[cols_disponibles].sort_values(['ABC', 'Demanda_Total'], ascending=[True, False]),
                         use_container_width=True,
-                        height=420
+                        height=450,
+                        hide_index=True
                     )
+                    
+                    # ==================== INSIGHTS Y RECOMENDACIONES ====================
+                    st.markdown("---")
+                    st.markdown("### 💡 Insights y Recomendaciones")
+                    
+                    # Extraer insights
+                    if not summary_wins.empty:
+                        modelos_ganadores = summary_wins['Modelo_Ganador'].unique()
+                        
+                        insight_html = "<div style='background: #f5f5f5; padding: 16px; border-radius: 8px;'>"
+                        
+                        if "ETS(Holt-Winters)" in modelos_ganadores:
+                            insight_html += """
+                            <p style='margin: 0.5em 0;'>✅ <strong>ETS destaca en tu portafolio:</strong> 
+                            Tus productos tienen tendencias y ciclos bien definidos. El método ETS captura bien 
+                            estos patrones. Considera ver históricamente si hay cambios de producción/demanda que siguen ciclos.</p>
+                            """
+                        
+                        if "RandomForest" in modelos_ganadores:
+                            insight_html += """
+                            <p style='margin: 0.5em 0;'>⚡ <strong>Random Forest gana en algunos casos:</strong> 
+                            Algunos productos tienen patrones complejos que los métodos simples no capturan. 
+                            Esto es normal en portafolios grandes y diversificados.</p>
+                            """
+                        
+                        if any(m in modelos_ganadores for m in ["MA3", "MA6", "Seasonal12", "Naive"]):
+                            insight_html += """
+                            <p style='margin: 0.5em 0;'>📊 <strong>Métodos simples son efectivos:</strong> 
+                            Algunos productos responden bien a modelos basados en promedios móviles. 
+                            Esto indica demanda relativamente estable sin grandes sorpresas.</p>
+                            """
+                        
+                        insight_html += "</div>"
+                        st.markdown(insight_html, unsafe_allow_html=True)
 
 
         # ==========================================================
