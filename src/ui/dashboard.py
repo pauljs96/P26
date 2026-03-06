@@ -2178,6 +2178,17 @@ class Dashboard:
             if hist_cmp.empty:
                 st.info("No hay serie mensual para este producto.")
             else:
+                # ==================== EXPLICACIÓN GENERAL ====================
+                st.markdown("""
+                <div style='background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%); padding: 14px; border-left: 5px solid #4caf50; border-radius: 8px; margin-bottom: 1.5em;'>
+                    <p style='margin: 0; color: #333; font-size: 0.9em;'>
+                        <strong>📖 Cómo funciona este análisis:</strong><br>
+                        El sistema prueba 3 tipos diferentes de modelos de pronóstico en los últimos meses de datos y mide qué tan precisos fueron.
+                        Luego elige el que menor error cometió. Es como una "competencia" de precisión.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+
                 st.markdown("### ⚙️ Parámetros de Evaluación")
                 c1, c2, c3 = st.columns([1, 1, 1.5])
                 
@@ -2223,7 +2234,59 @@ class Dashboard:
                     
                     # Destacar ganador visualmente
                     st.markdown(f"## 🥇 **Ganador: {winner}**")
+                    
+                    # ==================== EXPLICACIÓN DE MÉTRICAS ====================
+                    with st.expander("📊 Entiende las Métricas", expanded=True):
+                        col_exp1, col_exp2 = st.columns(2)
+                        
+                        with col_exp1:
+                            st.markdown("""
+                            **📈 MAE (Error Absoluto Medio)**
+                            - **Qué es:** Promedio de errores en unidades (ej: 100 unidades de error)
+                            - **Ejemplo:** Si MAE=100, el modelo se equivoca ±100 unidades en promedio
+                            - **Relevancia:** ⭐⭐⭐⭐⭐ CRÍTICA - Usa esta métrica por defecto
+                            - **Interpretación:** Números BAJOS = Buenos pronósticos
+                            
+                            **📊 RMSE (Raíz Error Cuadrático Medio)**
+                            - **Qué es:** Similar a MAE pero penaliza más los errores grandes
+                            - **Ejemplo:** RMSE=150 vs MAE=100 = hay algunos errores MUY grandes
+                            - **Relevancia:** ⭐⭐⭐⭐ Buena para detectar outliers
+                            - **Interpretación:** Si RMSE >> MAE, hay variabilidad en errores
+                            """, unsafe_allow_html=True)
+                        
+                        with col_exp2:
+                            st.markdown("""
+                            **📉 sMAPE (Error Porcentual Simétrico)**
+                            - **Qué es:** Error como porcentaje (0-100%) de la demanda real
+                            - **Ejemplo:** sMAPE=10% = pronóstico fue ~10% diferente a lo real
+                            - **Relevancia:** ⭐⭐⭐ Buena para ver % de error relativo
+                            - **Interpretación:** <15% es EXCELENTE, 15-30% es BUENO, >30% es POBRE
+                            
+                            **🎯 MAPE_safe (Alternativa segura)**
+                            - **Qué es:** Versión mejorada de sMAPE sin problemas con valores bajos
+                            - **Ejemplo:** Cuando demanda es muy baja, MAPE_safe es más confiable
+                            - **Relevancia:** ⭐⭐ Usar solo para demandas muy variables/bajas
+                            - **Interpretación:** Similar a sMAPE pero más preciso
+                            """, unsafe_allow_html=True)
+                    
+                    # Tabla de resultados con formato mejorado
+                    st.markdown("### 🏆 Resultados de Comparison")
                     st.dataframe(cmp, use_container_width=True)
+                    
+                    # Explicación de la tabla
+                    st.markdown("""
+                    <div style='background: #f3e5f5; padding: 14px; border-left: 4px solid #9c27b0; border-radius: 8px; margin-top: 1em;'>
+                        <p style='margin: 0; color: #333; font-size: 0.85em;'>
+                            <strong>📋 Cómo leer la tabla:</strong><br>
+                            • <strong>Rank:</strong> Posición (1 = mejor)<br>
+                            • <strong>Modelo:</strong> Nombre del método de pronóstico<br>
+                            • <strong>MAE:</strong> Error promedio en unidades - BUSCA EL MÁS BAJO<br>
+                            • <strong>RMSE:</strong> Error más sensible a valores atípicos<br>
+                            • <strong>sMAPE_%:</strong> Error en porcentaje - ÚTIL PARA ENTENDER EL CONTEXTO<br>
+                            • <strong>N:</strong> Número de predicciones evaluadas
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
 
                     # Plot ganador vs real
                     if not cmp.empty:
@@ -2236,9 +2299,23 @@ class Dashboard:
 
                         fig_best = px.line(
                             pred_best, x="Mes_target", y=["y_true", "y_pred"], markers=True,
-                            title=f"Ganador vs Real (Backtest) - {winner} - Producto {prod_sel}"
+                            title=f"Ganador vs Real (Backtest) - {winner} - Producto {prod_sel}",
+                            labels={"y_true": "Demanda Real", "y_pred": "Pronóstico"}
                         )
                         st.plotly_chart(fig_best, use_container_width=True)
+                        
+                        # Explicación del gráfico
+                        st.markdown("""
+                        <div style='background: #e3f2fd; padding: 14px; border-left: 4px solid #1976d2; border-radius: 8px;'>
+                            <p style='margin: 0; color: #333; font-size: 0.85em;'>
+                                <strong>📈 Qué ves en el gráfico:</strong><br>
+                                • <strong>Línea azul:</strong> Demanda REAL que sucedió en los últimos meses (realidad)<br>
+                                • <strong>Línea naranja:</strong> Lo que el modelo PREDIJO (pronóstico)<br>
+                                • <strong>Qué es BUENO:</strong> Las líneas casi se superponen (predicción cerca de la realidad)<br>
+                                • <strong>Qué es MALO:</strong> Grandes separaciones entre líneas (predicción muy diferente)
+                            </p>
+                        </div>
+                        """, unsafe_allow_html=True)
 
                     st.divider()
 
@@ -2246,6 +2323,7 @@ class Dashboard:
                     st.markdown("### 📊 Detalles por Modelo (Usuarios Avanzados)")
 
                     with st.expander("📈 Baselines - Detalles y predicciones"):
+                        st.markdown("**ℹ️ Baselines = Métodos Simples (MA3, MA6, Seasonal, Naive)**")
                         col1, col2 = st.columns([1, 1])
                         with col1:
                             st.markdown("**Métricas Baselines**")
@@ -2273,6 +2351,15 @@ class Dashboard:
                         st.plotly_chart(fig_base, use_container_width=True)
 
                     with st.expander("🌀 ETS (Holt-Winters) - Detalles y predicciones"):
+                        st.markdown("""
+                        **ℹ️ ETS = Modelo de Tendencia & Estacionalidad (detecta ciclos)**
+                        
+                        • **Qué hace:** Detecta patrones cíclicos en tus datos (ej: picos de demanda cada mes)
+                        • **Cuándo usar:** Productos con demanda estacional o tendencias claras
+                        • **Ventaja:** Muy bueno para detectar cambios graduales y ciclos regulares
+                        • **Desventaja:** Lento si demanda es muy irregular o tiene shocks
+                        """)
+                        
                         col1, col2 = st.columns([1, 1])
                         with col1:
                             st.markdown("**Métricas ETS**")
@@ -2287,11 +2374,21 @@ class Dashboard:
                         
                         fig_ets = px.line(
                             bt_ets_cmp.predictions, x="Mes_target", y=["y_true", "ETS"], markers=True,
-                            title=f"ETS vs Real (Backtest) - Producto {prod_sel}"
+                            title=f"ETS vs Real (Backtest) - Producto {prod_sel}",
+                            labels={"y_true": "Demanda Real", "ETS": "Predicción ETS"}
                         )
                         st.plotly_chart(fig_ets, use_container_width=True)
 
                     with st.expander("🤖 Random Forest (RF) - Detalles y predicciones"):
+                        st.markdown("""
+                        **ℹ️ Random Forest = Aprendizaje Automático Avanzado (múltiples decisiones)**
+                        
+                        • **Qué hace:** Combinación de 100+ árboles de decisión que votan por la mejor predicción
+                        • **Cuándo usar:** Datos complejos con múltiples patrones o relaciones ocultas
+                        • **Ventaja:** Muy flexible, captura patrones complejos automáticamente
+                        • **Desventaja:** Puede ser lento, más "caja negra" (difícil de interpretar)
+                        """)
+                        
                         col1, col2 = st.columns([1, 1])
                         with col1:
                             st.markdown("**Métricas RF**")
@@ -2306,9 +2403,44 @@ class Dashboard:
                         
                         fig_rf = px.line(
                             bt_rf_cmp.predictions, x="Mes_target", y=["y_true", "RF"], markers=True,
-                            title=f"RF vs Real (Backtest) - Producto {prod_sel}"
+                            title=f"RF vs Real (Backtest) - Producto {prod_sel}",
+                            labels={"y_true": "Demanda Real", "RF": "Predicción RF"}
                         )
                         st.plotly_chart(fig_rf, use_container_width=True)
+
+                    st.divider()
+
+                    # ========== RECOMENDACIONES FINALES ==========
+                    st.markdown("### 🎯 Recomendaciones de Uso")
+                    
+                    if not cmp.empty:
+                        winner_mae = cmp.iloc[0].get("MAE", 0)
+                        winner_smape = cmp.iloc[0].get("sMAPE_%", 0)
+                        
+                        # Generar recomendación basada en métricas
+                        recommendation = ""
+                        if winner == "RandomForest":
+                            recommendation = "✅ **Usar Random Forest:** Este producto tiene patrones complejos que los métodos simples no capturan bien. El ML avanzado es la mejor opción."
+                        elif winner == "ETS(Holt-Winters)":
+                            recommendation = "✅ **Usar ETS:** Este producto tiene ciclos estacionales claros. ETS detecta perfectamente estos patrones sin complejidad innecesaria."
+                        else:
+                            recommendation = f"✅ **Usar {winner}:** Este producto tiene demanda simple y predecible. Los métodos simples y rápidos son óptimos y eficientes."
+                        
+                        quality = ""
+                        if winner_smape < 15:
+                            quality = "🟢 **EXCELENTE:** Predicciones muy confiables (sMAPE < 15%)"
+                        elif winner_smape < 30:
+                            quality = "🟡 **BUENO:** Predicciones confiables pero revisar casos atípicos (sMAPE 15-30%)"
+                        else:
+                            quality = "🔴 **REVISAR:** Predicciones tienen margen de error significativo (sMAPE > 30%). Considerar manualmente"
+                        
+                        st.markdown(f"""
+                        <div style='background: #fff3e0; padding: 14px; border-left: 4px solid #ff9800; border-radius: 8px; margin-top: 1em;'>
+                            <p style='margin: 0.3em 0; color: #333;'>{recommendation}</p>
+                            <p style='margin: 0.3em 0; color: #333;'>{quality}</p>
+                            <p style='margin: 0.3em 0; color: #333; font-size: 0.9em;'>💡 <strong>Tip:</strong> Revisa el gráfico "Ganador vs Real". Si ves grandes separaciones, evalúa combinar este modelo con análisis manual para mayor seguridad.</p>
+                        </div>
+                        """, unsafe_allow_html=True)
 
 
 
