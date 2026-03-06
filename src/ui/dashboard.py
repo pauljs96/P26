@@ -2405,25 +2405,13 @@ class Dashboard:
                         insight_html = "<div style='background: #f5f5f5; padding: 16px; border-radius: 8px;'>"
                         
                         if any("ETS" in str(m) for m in modelos_ganadores):
-                            insight_html += """
-                            <p style='margin: 0.5em 0;'>✅ <strong>ETS destaca en tu portafolio:</strong> 
-                            Tus productos tienen tendencias y ciclos bien definidos. El método ETS captura bien 
-                            estos patrones. Considera ver históricamente si hay cambios de producción/demanda que siguen ciclos.</p>
-                            """
+                            insight_html += "<p style='margin: 0.5em 0;'>✅ <strong>ETS destaca en tu portafolio:</strong> Tus productos tienen tendencias y ciclos bien definidos. El método ETS captura bien estos patrones. Considera ver históricamente si hay cambios de producción/demanda que siguen ciclos.</p>"
                         
                         if any("RandomForest" in str(m) or "RF" in str(m) for m in modelos_ganadores):
-                            insight_html += """
-                            <p style='margin: 0.5em 0;'>⚡ <strong>Random Forest gana en algunos casos:</strong> 
-                            Algunos productos tienen patrones complejos que los métodos simples no capturan. 
-                            Esto es normal en portafolios grandes y diversificados.</p>
-                            """
+                            insight_html += "<p style='margin: 0.5em 0;'>⚡ <strong>Random Forest gana en algunos casos:</strong> Algunos productos tienen patrones complejos que los métodos simples no capturan. Esto es normal en portafolios grandes y diversificados.</p>"
                         
                         if any(m in ["MA3", "MA6", "Seasonal12", "Naive"] for m in modelos_ganadores):
-                            insight_html += """
-                            <p style='margin: 0.5em 0;'>📊 <strong>Métodos simples son efectivos:</strong> 
-                            Algunos productos responden bien a modelos basados en promedios móviles. 
-                            Esto indica demanda relativamente estable sin grandes sorpresas.</p>
-                            """
+                            insight_html += "<p style='margin: 0.5em 0;'>📊 <strong>Métodos simples son efectivos:</strong> Algunos productos responden bien a modelos basados en promedios móviles. Esto indica demanda relativamente estable sin grandes sorpresas.</p>"
                         
                         insight_html += "</div>"
                         st.markdown(insight_html, unsafe_allow_html=True)
