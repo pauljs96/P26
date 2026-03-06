@@ -2602,6 +2602,10 @@ class Dashboard:
                         ets_params = dict(seasonal_periods=12, trend="add", seasonal="add", damped_trend=False, min_obs=24)
                         rf_params = dict(n_estimators=400, min_obs=24, min_samples_leaf=1, random_state=42)
 
+                            # Obtener costos del session_state (sincronizados desde Comparativa Retrospectiva)
+                        cost_stock_unit_mass = st.session_state.get("sync_cost_stock_unit", 1.0)
+                        cost_stockout_unit_mass = st.session_state.get("sync_cost_stockout_unit", 5.0)
+
                             # Stock mensual
                         stock = res_stock.copy() if res_stock is not None else pd.DataFrame()
                         if not stock.empty:
@@ -2661,12 +2665,17 @@ class Dashboard:
                             abc_class = str(row_abc.iloc[0]["ABC"]) if not row_abc.empty else "C"
                             demanda_total = float(row_abc.iloc[0]["Demanda_Total"]) if not row_abc.empty else 0.0
 
-                            service_level = policy_service_level_by_abc(abc_class)
-                            z = z_from_service_level(service_level)
-
-                                # SS con MAE como proxy σ
+                                # SS con NEWSVENDOR dinámico (igual que Análisis Individual)
                             sigma = float(max(0.0, mae_win if np.isfinite(mae_win) else 0.0))
-                            ss = float(z * sigma * np.sqrt(float(lead_time)))
+                            
+                            # Importar función Newsvendor (para consistencia)
+                            from src.services.ml_service import calculate_safety_stock_newsvendor
+                            ss = calculate_safety_stock_newsvendor(
+                                cost_stockout=cost_stockout_unit_mass,
+                                cost_inv=cost_stock_unit_mass,
+                                sigma=sigma,
+                                lead_time=lead_time
+                            )
 
                                 # Producción recomendada
                             prod_reco = max(0.0, yhat + ss - stock_actual)
