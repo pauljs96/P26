@@ -1137,6 +1137,14 @@ class Dashboard:
         return False
 
     def render(self):
+        
+        # ==================== INICIALIZAR COSTOS EN SESSION_STATE ====================
+        # (Evita desincronización entre tabs: asegura que existan defaults aunque
+        # Comparativa Retrospectiva no se haya abierto todavía)
+        if "sync_cost_stock_unit" not in st.session_state:
+            st.session_state.sync_cost_stock_unit = 1.0  # Cost de mantener 1 unidad en stock
+        if "sync_cost_stockout_unit" not in st.session_state:
+            st.session_state.sync_cost_stockout_unit = 5.0  # Cost de quiebre de 1 unidad
 
         # ========================================
         # FUNCIÓN CACHEADA: Crear gráfico demo
@@ -2688,10 +2696,14 @@ class Dashboard:
                                 if not splot.empty:
                                     stock_actual = float(splot.iloc[-1]["Stock_Unid"])
 
-                                # ABC + política Z
+                                # ABC + política Z (CRÍTICO: calcular z para cada producto como en Análisis Individual)
                             row_abc = abc_work[abc_work["Codigo"] == str(cod)]
                             abc_class = str(row_abc.iloc[0]["ABC"]) if not row_abc.empty else "C"
                             demanda_total = float(row_abc.iloc[0]["Demanda_Total"]) if not row_abc.empty else 0.0
+                            
+                            # Calcular Z dinámicamente según la clase ABC (esto faltaba y causaba NameError)
+                            service_level_prod = policy_service_level_by_abc(abc_class)
+                            z_prod = z_from_service_level(service_level_prod)
 
                                 # SS con NEWSVENDOR dinámico (igual que Análisis Individual)
                             sigma = float(max(0.0, mae_win if np.isfinite(mae_win) else 0.0))
@@ -2715,7 +2727,7 @@ class Dashboard:
                                 "Modelo_Ganador": winner,
                                 "Forecast_t+1": yhat,
                                 "MAE_ganador": sigma,
-                                "Z": z,
+                                "Z": z_prod,
                                 "SS": ss,
                                 "Stock_Actual": stock_actual,
                                 "Produccion_Recomendada": prod_reco_int,
