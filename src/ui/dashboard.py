@@ -2257,8 +2257,8 @@ class Dashboard:
                 with col_p3:
                     max_products = st.selectbox(
                         "Productos a analizar",
-                        options=[50, 100, 200, "Todos"],
-                        index=1,
+                        options=[20, 50, 100, 200, "Todos"],
+                        index=0,
                         key="global_max_products",
                         help="Más productos = análisis más completo pero más lento"
                     )
