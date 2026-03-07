@@ -1508,6 +1508,7 @@ class Dashboard:
             st.write(f"**¿Es superadmin?:** {is_superadmin_check}")
         
         st.sidebar.divider()
+        if st.sidebar.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.authenticated = False
             st.session_state.user_id = None
             st.session_state.email = None
