@@ -1519,6 +1519,45 @@ class Dashboard:
         
         # DEBUG SUPERADMIN
         is_superadmin_check = _is_superadmin()
+        
+        # ==================== SI ES SUPERADMIN: MOSTRAR SOLO PANEL SUPERADMIN ====================
+        if is_superadmin_check:
+            # Header superadmin
+            st.markdown("""
+            <div style='text-align: center; margin-bottom: 2em; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 2.5em; border-radius: 12px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);'>
+                <h1 style='color: #FFD700; font-size: 2.5em; margin: 0; font-weight: bold;'>⚙️ PANEL DE SUPERADMINISTRADOR</h1>
+                <p style='color: rgba(255, 255, 255, 0.8); font-size: 1.1em; margin-top: 0.8em; margin-bottom: 0;'>Gestión completa del sistema: organizaciones, usuarios y permisos</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Sidebar info para superadmin
+            st.sidebar.write("**👤 Información de Sesión**")
+            st.sidebar.write(f"Email: {st.session_state.email}")
+            st.sidebar.write("🏆 **Rol:** SUPERADMIN")
+            st.sidebar.divider()
+            
+            if st.sidebar.button("🚪 Cerrar Sesión", use_container_width=True):
+                st.session_state.authenticated = False
+                st.session_state.user_id = None
+                st.session_state.email = None
+                st.session_state.organization_id = None
+                st.session_state.is_admin = False
+                st.session_state.organization_name = None
+                
+                st.cache_data.clear()
+                st.cache_resource.clear()
+                
+                st.success("Sesión cerrada. Recargando...")
+                st.rerun()
+            
+            # Renderizar panel superadmin
+            from src.ui.superadmin_panel import SuperAdminPanel
+            superadmin = SuperAdminPanel(get_db())
+            superadmin.render()
+            return  # Terminar aquí, no mostrar el resto del dashboard
+        
+        # ==================== SI NO ES SUPERADMIN: CONTINUAMOS CON DASHBOARD NORMAL ====================
+        
         with st.sidebar.expander("🔧 DEBUG (QUITAR DESPUÉS)", expanded=False):
             st.write(f"**Email:** {st.session_state.get('email', 'N/A').lower()}")
             try:
