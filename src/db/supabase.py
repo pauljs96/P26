@@ -466,9 +466,17 @@ class SupabaseDB:
     def get_all_users(self) -> List[Dict]:
         """Lista TODOS los usuarios en el sistema (solo para superadmin)"""
         try:
+            # Intentar con RLS habilitado
             response = self.client.table("users").select("*").execute()
-            return response.data or []
-        except Exception:
+            users = response.data or []
+            print(f"[DEBUG get_all_users] Usuarios encontrados: {len(users)}")
+            for user in users:
+                print(f"  - {user.get('email')} | {user.get('company_name')} | {user.get('organization_id')}")
+            return users
+        except Exception as e:
+            print(f"[ERROR get_all_users] {str(e)}")
+            import traceback
+            traceback.print_exc()
             return []
 
     def assign_user_to_organization(self, user_id: str, org_id: str) -> Dict[str, Any]:
