@@ -269,6 +269,7 @@ class SuperAdminPanel:
                         )
                         
                         if result["success"]:
+                            st.cache_data.clear()  # Limpiar cache para refrescar listado
                             st.success(f"✅ Usuario '{user_email}' creado exitosamente")
                             st.info(f"🔑 ID del usuario: {result['user_id'][:12]}...")
                         else:
@@ -283,6 +284,11 @@ class SuperAdminPanel:
                 </p>
             </div>
             """, unsafe_allow_html=True)
+            
+            # Botón de refresh
+            if st.button("🔄 Refrescar Listado", key="refresh_users", use_container_width=True):
+                st.cache_data.clear()
+                st.rerun()
             
             all_users = self.db.get_all_users()
             

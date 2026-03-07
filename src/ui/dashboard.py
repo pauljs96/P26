@@ -1522,18 +1522,9 @@ class Dashboard:
         
         # ==================== SI ES SUPERADMIN: MOSTRAR SOLO PANEL SUPERADMIN ====================
         if is_superadmin_check:
-            # Header superadmin
-            st.markdown("""
-            <div style='text-align: center; margin-bottom: 2em; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 2.5em; border-radius: 12px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);'>
-                <h1 style='color: #FFD700; font-size: 2.5em; margin: 0; font-weight: bold;'>⚙️ PANEL DE SUPERADMINISTRADOR</h1>
-                <p style='color: rgba(255, 255, 255, 0.8); font-size: 1.1em; margin-top: 0.8em; margin-bottom: 0;'>Gestión completa del sistema: organizaciones, usuarios y permisos</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Sidebar info para superadmin
-            st.sidebar.write("**👤 Información de Sesión**")
-            st.sidebar.write(f"Email: {st.session_state.email}")
-            st.sidebar.write("🏆 **Rol:** SUPERADMIN")
+            # Sidebar info para superadmin (minimalista)
+            st.sidebar.write("**👤 Email:** " + st.session_state.email)
+            st.sidebar.write("**🏆 Rol:** SUPERADMIN")
             st.sidebar.divider()
             
             if st.sidebar.button("🚪 Cerrar Sesión", use_container_width=True):
@@ -1550,7 +1541,7 @@ class Dashboard:
                 st.success("Sesión cerrada. Recargando...")
                 st.rerun()
             
-            # Renderizar panel superadmin
+            # Renderizar panel superadmin (sin header extra, ya tiene el suyo)
             from src.ui.superadmin_panel import SuperAdminPanel
             superadmin = SuperAdminPanel(get_db())
             superadmin.render()
