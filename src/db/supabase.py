@@ -453,6 +453,119 @@ class SupabaseDB:
         except Exception:
             return []
 
+    # ==================== SUPERADMIN MANAGEMENT ====================
+    
+    def list_all_organizations(self) -> List[Dict]:
+        """Lista TODAS las organizaciones (solo para superadmin)"""
+        try:
+            response = self.client.table("organizations").select("*").execute()
+            return response.data or []
+        except Exception:
+            return []
+
+    def get_all_users(self) -> List[Dict]:
+        """Lista TODOS los usuarios en el sistema (solo para superadmin)"""
+        try:
+            response = self.client.table("users").select("*").execute()
+            return response.data or []
+        except Exception:
+            return []
+
+    def assign_user_to_organization(self, user_id: str, org_id: str) -> Dict[str, Any]:
+        """
+        Asigna un usuario a una organización (reasigna si ya pertenecía a otra)
+        
+        Args:
+            user_id: ID del usuario
+            org_id: ID de la organización destino
+        
+        Returns:
+            {"success": bool, "error": str (si falla)}
+        """
+        try:
+            # Verificar que la org existe
+            org = self.get_organization(org_id)
+            if not org:
+                return {"success": False, "error": "Organización no encontrada"}
+            
+            # Actualizar usuario
+            self.client.table("users").update({
+                "organization_id": org_id,
+                "is_admin": False  # Por defecto como viewer
+            }).eq("id", user_id).execute()
+            
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def update_user_role(self, user_id: str, is_admin: bool) -> Dict[str, Any]:
+        """
+        Actualiza rol del usuario (admin/viewer)
+        
+        Args:
+            user_id: ID del usuario
+            is_admin: True para admin, False para viewer
+        
+        Returns:
+            {"success": bool, "error": str (si falla)}
+        """
+        try:
+            self.client.table("users").update({
+                "is_admin": is_admin
+            }).eq("id", user_id).execute()
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def delete_user_from_organization(self, user_id: str, org_id: str) -> Dict[str, Any]:
+        """
+        Elimina a un usuario de una organización (mantiene el usuario en el sistema)
+        
+        Args:
+            user_id: ID del usuario
+            org_id: ID de la organización
+        
+        Returns:
+            {"success": bool, "error": str (si falta)}
+        """
+        try:
+            # Cambiar organization_id a NULL (usuario sin org)
+            self.client.table("users").update({
+                "organization_id": None,
+                "is_admin": False
+            }).eq("id", user_id).execute()
+            
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def delete_user_completely(self, user_id: str) -> Dict[str, Any]:
+        """
+        Elimina a un usuario COMPLETAMENTE del sistema
+        - Elimina de tabla users
+        - Intenta eliminar de Supabase Auth
+        
+        Args:
+            user_id: ID del usuario
+        
+        Returns:
+            {"success": bool, "error": str (si falla)}
+        """
+        try:
+            # 1. Eliminar de tabla users
+            self.client.table("users").delete().eq("id", user_id).execute()
+            
+            # 2. Intentar eliminar de Supabase Auth (requiere admin permisos)
+            try:
+                self.client.auth.admin_delete_user(user_id)
+            except Exception as auth_error:
+                # Si falla auth, igual continuar (usuario ya está eliminado de DB)
+                print(f"⚠️ Advertencia: No se pudo eliminar de Auth: {str(auth_error)}")
+            
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
 
 # Singleton global (opcional, para evitar re-crear cliente constantemente)
 _db_instance: Optional[SupabaseDB] = None

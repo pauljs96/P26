@@ -1777,25 +1777,42 @@ class Dashboard:
         </style>
         """, unsafe_allow_html=True)
 
-        # ------------------------------
-        # TABS - Todos ven el mismo contenido (excepto Panel Admin)
-        # ------------------------------
-        # Admin ve tabs completas + Panel Admin
+        # ==================== VERIFICAR SUPERADMIN ====================
+        def _is_superadmin() -> bool:
+            """Verifica si usuario actual es superadmin"""
+            import os
+            superadmin_emails = os.getenv("SUPERADMIN_EMAILS", "").split(",")
+            superadmin_emails = [e.strip().lower() for e in superadmin_emails if e.strip()]
+            current_email = st.session_state.get("email", "").lower()
+            return current_email in superadmin_emails
+        
+        is_superadmin = _is_superadmin()
+        
+        # ==================== TABS DINÁMICAS ====================
+        # Construir tabs según permisos del usuario
+        tabs_config = [
+            ("🏠 Dashboard", "dashboard"),
+            ("📊 Análisis Individual", "individual"),
+            ("📊 Análisis de Grupo", "grupal"),
+        ]
+        
         if is_admin:
-            tab_dashboard, tab_individual, tab_grupal, tab_admin = st.tabs([
-                "🏠 Dashboard",
-                "📊 Análisis Individual",
-                "📊 Análisis de Grupo",
-                "⚙️ Panel Admin",
-            ])
-        else:
-            # Viewers ven tabs sin Panel Admin
-            tab_dashboard, tab_individual, tab_grupal = st.tabs([
-                "🏠 Dashboard",
-                "📊 Análisis Individual",
-                "📊 Análisis de Grupo",
-            ])
-            tab_admin = EmptyTab()
+            tabs_config.append(("⚙️ Panel Admin", "admin"))
+        
+        if is_superadmin:
+            tabs_config.append(("🏆 Superadmin", "superadmin"))
+        
+        tabs_labels = [t[0] for t in tabs_config]
+        tabs_keys = [t[1] for t in tabs_config]
+        
+        tabs = st.tabs(tabs_labels)
+        tabs_dict = {key: tab for key, tab in zip(tabs_keys, tabs)}
+        
+        tab_dashboard = tabs_dict["dashboard"]
+        tab_individual = tabs_dict["individual"]
+        tab_grupal = tabs_dict["grupal"]
+        tab_admin = tabs_dict.get("admin", EmptyTab())
+        tab_superadmin = tabs_dict.get("superadmin", None)
         
         # Crear subtabs dentro de Análisis Individual (para TODOS)
         with tab_individual:
@@ -1820,6 +1837,13 @@ class Dashboard:
                 from src.ui.admin_panel import AdminPanel
                 admin = AdminPanel(get_db())
                 admin.render()
+        
+        # Renderizar superadmin panel (solo si es superadmin)
+        if is_superadmin and tab_superadmin:
+            with tab_superadmin:
+                from src.ui.superadmin_panel import SuperAdminPanel
+                superadmin = SuperAdminPanel(get_db())
+                superadmin.render()
 
         # ==========================================================
         # TAB 0: DASHBOARD (LANDING PAGE)
