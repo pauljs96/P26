@@ -1781,9 +1781,22 @@ class Dashboard:
         def _is_superadmin() -> bool:
             """Verifica si usuario actual es superadmin"""
             import os
-            superadmin_emails = os.getenv("SUPERADMIN_EMAILS", "").split(",")
-            superadmin_emails = [e.strip().lower() for e in superadmin_emails if e.strip()]
+            
+            # Intentar leer de st.secrets primero (Streamlit Cloud)
+            # Si no existe, leer de os.getenv (local)
+            try:
+                superadmin_emails_str = st.secrets.get("SUPERADMIN_EMAILS", "")
+            except:
+                superadmin_emails_str = os.getenv("SUPERADMIN_EMAILS", "")
+            
+            superadmin_emails = [e.strip().lower() for e in superadmin_emails_str.split(",") if e.strip()]
             current_email = st.session_state.get("email", "").lower()
+            
+            # DEBUG
+            print(f"[DEBUG SUPERADMIN] Emails configurados: {superadmin_emails}")
+            print(f"[DEBUG SUPERADMIN] Email actual: {current_email}")
+            print(f"[DEBUG SUPERADMIN] ¿Es superadmin?: {current_email in superadmin_emails}")
+            
             return current_email in superadmin_emails
         
         is_superadmin = _is_superadmin()
