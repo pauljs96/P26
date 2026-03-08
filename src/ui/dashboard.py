@@ -1549,17 +1549,6 @@ class Dashboard:
         
         # ==================== SI NO ES SUPERADMIN: CONTINUAMOS CON DASHBOARD NORMAL ====================
         
-        with st.sidebar.expander("🔧 DEBUG (QUITAR DESPUÉS)", expanded=False):
-            st.write(f"**Email:** {st.session_state.get('email', 'N/A').lower()}")
-            try:
-                sa_emails = st.secrets.get("SUPERADMIN_EMAILS", "")
-            except:
-                import os
-                sa_emails = os.getenv("SUPERADMIN_EMAILS", "")
-            st.write(f"**SUPERADMIN_EMAILS config:** `{sa_emails}`")
-            st.write(f"**¿Es superadmin?:** {is_superadmin_check}")
-        
-        st.sidebar.divider()
         if st.sidebar.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.authenticated = False
             st.session_state.user_id = None
