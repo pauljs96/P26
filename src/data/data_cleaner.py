@@ -105,7 +105,7 @@ class DataCleaner:
         out["Numero"] = df[c_num].astype(str).str.strip()
         out["Bodega"] = df[c_bodega].astype(str).str.strip()
 
-        out["Fecha"] = pd.to_datetime(df[c_fecha], errors="coerce", dayfirst=True)
+        out["Fecha"] = pd.to_datetime(df[c_fecha], format='%Y-%m-%d', errors='coerce')
 
         out["Entrada_unid"] = _to_num(df[c_ent_u]).fillna(0.0)
         out["Salida_unid"] = _to_num(df[c_sal_u]).fillna(0.0)

@@ -47,7 +47,7 @@ class GuideReconciler:
             return out
 
         # Asegurar datetime
-        out["Fecha"] = pd.to_datetime(out["Fecha"], errors="coerce", dayfirst=True)
+        out["Fecha"] = pd.to_datetime(out["Fecha"], format='%Y-%m-%d', errors='coerce')
 
         # Mes para reconciliar por periodo (evita mezclar meses)
         out["Mes"] = out["Fecha"].dt.to_period("M").dt.to_timestamp()
