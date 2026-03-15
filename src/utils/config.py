@@ -41,9 +41,9 @@ COL_NUMERO = ["Número", "Numero", "NÚMERO", "NUMERO"]
 COL_BODEGA = ["Bodega", "BODEGA"]
 
 # Unidades (físicas)
-COL_ENTRADA_UNID = ["Entrada"]
-COL_SALIDA_UNID = ["Salida"]
-COL_SALDO_UNID = ["Saldo"]
+COL_ENTRADA_UNID = ["Entrada", "Entrada_unid", "Entrada_unidades"]
+COL_SALIDA_UNID = ["Salida", "Salida_unid", "Salida_unidades"]
+COL_SALDO_UNID = ["Saldo", "Saldo_unid", "Saldo_unidades"]
 
 # Valores monetarios / costos
 COL_VALOR_UNIT = ["Valor Unitario", "ValorUnitario", "VALOR UNITARIO"]
