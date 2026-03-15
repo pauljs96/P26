@@ -1694,7 +1694,8 @@ class Dashboard:
                     res = pipeline.run(saved_files)
                 
                 if res.movements.empty:
-                    st.error("No se detectaron columnas mínimas o la data quedó vacía tras limpieza.")
+                    error_msg = res.error_message if res.error_message else "No se detectaron columnas mínimas o la data quedó vacía tras limpieza."
+                    st.error(error_msg)
                     return
                 
                 # ==================== GUARDAR EN CACHE ====================

@@ -82,18 +82,21 @@ class DataCleaner:
         missing_cols = [name for name, val, _ in required if val is None]
         
         if missing_cols:
-            # Log detallado de qué falta
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"❌ COLUMNAS FALTANTES: {missing_cols}")
-            logger.error(f"   Columnas disponibles: {list(df.columns)}")
+            # Crear mensaje de error detallado
+            error_details = f"COLUMNAS FALTANTES: {', '.join(missing_cols)}\n"
+            error_details += f"Columnas disponibles ({len(df.columns)}): {list(df.columns)}\n\n"
+            error_details += "Detalles:\n"
             for name, val, candidates in required:
                 if val is None:
-                    logger.error(f"   ✗ {name}: esperaba uno de {candidates}")
+                    error_details += f"  ✗ {name}: esperaba uno de {candidates}\n"
                 else:
-                    logger.info(f"   ✓ {name}: encontrado como '{val}'")
-            # Devolver vacío para que UI muestre columnas encontradas
-            return pd.DataFrame()
+                    error_details += f"  ✓ {name}: encontrado como '{val}'\n"
+            
+            # Log y excepción
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(error_details)
+            raise ValueError(error_details)
 
         out = pd.DataFrame()
         out["Codigo"] = df[c_codigo].astype(str).str.strip()
