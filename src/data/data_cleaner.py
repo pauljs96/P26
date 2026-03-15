@@ -39,10 +39,16 @@ def _to_num(series: pd.Series) -> pd.Series:
 
 class DataCleaner:
     def clean(self, df_raw: pd.DataFrame) -> pd.DataFrame:
+        import logging
+        logger = logging.getLogger(__name__)
+        
         if df_raw is None or df_raw.empty:
+            logger.error("❌ DataCleaner.clean: DataFrame vacío o None")
             return pd.DataFrame()
 
         df = df_raw.copy()
+        logger.info(f"📊 DataCleaner recibió: {len(df)} filas, {len(df.columns)} columnas")
+        logger.info(f"   Columnas: {list(df.columns)}")
 
         c_codigo = _pick_col(df, config.COL_CODIGO)
         c_desc = _pick_col(df, config.COL_DESCRIPCION)
@@ -62,8 +68,30 @@ class DataCleaner:
         c_sal_m = _pick_col(df, config.COL_SALIDA_MONTO)
         c_saldo_m = _pick_col(df, config.COL_SALDO_MONTO)
 
-        required = [c_codigo, c_fecha, c_doc, c_num, c_bodega, c_ent_u, c_sal_u, c_saldo_u]
-        if any(c is None for c in required):
+        required = [
+            ("Codigo", c_codigo, config.COL_CODIGO),
+            ("Fecha", c_fecha, config.COL_FECHA),
+            ("Documento", c_doc, config.COL_DOCUMENTO),
+            ("Numero", c_num, config.COL_NUMERO),
+            ("Bodega", c_bodega, config.COL_BODEGA),
+            ("Entrada_unid", c_ent_u, config.COL_ENTRADA_UNID),
+            ("Salida_unid", c_sal_u, config.COL_SALIDA_UNID),
+            ("Saldo_unid", c_saldo_u, config.COL_SALDO_UNID),
+        ]
+        
+        missing_cols = [name for name, val, _ in required if val is None]
+        
+        if missing_cols:
+            # Log detallado de qué falta
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"❌ COLUMNAS FALTANTES: {missing_cols}")
+            logger.error(f"   Columnas disponibles: {list(df.columns)}")
+            for name, val, candidates in required:
+                if val is None:
+                    logger.error(f"   ✗ {name}: esperaba uno de {candidates}")
+                else:
+                    logger.info(f"   ✓ {name}: encontrado como '{val}'")
             # Devolver vacío para que UI muestre columnas encontradas
             return pd.DataFrame()
 

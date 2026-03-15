@@ -36,6 +36,7 @@ class DataLoader:
     def _load_single_file(self, uploaded_file) -> pd.DataFrame:
         content = uploaded_file.getvalue()
         last_error: Optional[Exception] = None
+        filename = getattr(uploaded_file, "name", "unknown")
 
         for enc in CSV_ENCODINGS:
             for sep in CSV_SEPARATORS:
@@ -66,25 +67,59 @@ class DataLoader:
                         if str(c).strip() and not str(c).lower().startswith("unnamed")
                     ]]
 
+                    # Log exitoso
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.info(f"✓ {filename}: Cargado con sep='{sep}', encoding='{enc}', {len(df)} filas, {len(df.columns)} columnas")
+                    
                     return df.reset_index(drop=True)
 
                 except Exception as e:
                     last_error = e
 
+        # Si llegamos aquí, fallamos
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"✗ {filename}: No se pudo leer")
+        logger.error(f"  Último error: {last_error}")
+        logger.error(f"  Tamaño archivo: {len(content)} bytes")
+        logger.error(f"  Primeros 200 bytes: {content[:200]}")
+        
         raise RuntimeError(
-            f"No se pudo leer el CSV '{getattr(uploaded_file,'name','(sin nombre)')}'. "
+            f"No se pudo leer el CSV '{filename}'. "
             f"Último error: {last_error}"
         )
 
     def _detect_header_row(self, df: pd.DataFrame) -> Optional[int]:
-        """Detecta fila de encabezados reales buscando columnas clave."""
+        """Detecta fila de encabezados reales buscando columnas clave.
+        
+        Busca en las primeras 30 filas una que contenga:
+        - codigo/código
+        - fecha
+        - documento
+        """
         for i in range(min(30, len(df))):
-            row = df.iloc[i].astype(str).str.strip().str.lower().values
-            has_codigo = ("codigo" in row) or ("código" in row)
-            has_fecha = "fecha" in row
-            has_documento = "documento" in row
+            row_str = df.iloc[i].astype(str)
+            # Buscar en toda la fila
+            row_values = [str(cell).strip().lower() for cell in row_str.values]
+            
+            # Buscar patrones
+            has_codigo = any(
+                "codigo" in val or "código" in val 
+                for val in row_values
+            )
+            has_fecha = any(
+                "fecha" in val or "date" in val 
+                for val in row_values
+            )
+            has_documento = any(
+                "documento" in val or "doc" in val 
+                for val in row_values
+            )
+            
             if has_codigo and has_fecha and has_documento:
                 return i
+        
         return None
 
     def _dedupe_columns(self, cols) -> list:
