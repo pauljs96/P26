@@ -13,3 +13,12 @@ boto3>=1.26
 duckdb>=0.10
 polars>=0.20
 pyarrow>=15.0
+
+# FASE 3: Testing & Deployment
+pytest>=7.0
+pytest-cov>=4.0
+pytest-asyncio>=0.21
+pytest-timeout>=2.1
+pytest-mock>=3.10
+psutil>=5.9
+python-jose>=3.3
