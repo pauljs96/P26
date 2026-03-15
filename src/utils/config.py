@@ -13,6 +13,8 @@ CSV_ENCODINGS = ["utf-8", "latin-1"]
 
 # -----------------------------
 # Documentos (texto exacto esperado, con strip() aplicado)
+# NOTA: Sin acentos - tal como aparecen en archivos ERP
+# Verificado en D_2020.csv al 2026-03-15
 # -----------------------------
 DOC_VENTA_TIENDA = "Venta Tienda Sin Doc"
 DOC_SALIDA_CONSUMO = "Salida por Consumo"
@@ -21,7 +23,8 @@ DOC_SALIDA_CONSUMO = "Salida por Consumo"
 DEMAND_DIRECT_DOCS = [DOC_VENTA_TIENDA, DOC_SALIDA_CONSUMO]
 
 # Documento guía (puede ser transferencia interna o venta externa)
-GUIDE_DOC = "Guía de remisión - R"
+# CORREGIDO: Sin acento "Guia" (no "Guía")
+GUIDE_DOC = "Guia de remision - R"
 
 # -----------------------------
 # Reconciliación de guías
