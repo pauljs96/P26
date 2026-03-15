@@ -144,4 +144,6 @@ class DataCleaner:
         out["Entrada_unid"] = out["Entrada_unid"].clip(lower=0)
         out["Salida_unid"] = out["Salida_unid"].clip(lower=0)
 
+        logger.info(f"✓ DataCleaner: {len(out)}/{len(df_raw)} filas finales ({100*len(out)/len(df_raw):.1f}%)")
+        
         return out.reset_index(drop=True)

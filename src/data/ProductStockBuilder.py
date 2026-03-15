@@ -16,7 +16,19 @@ class ProductStockBuilder:
             return pd.DataFrame(columns=["Codigo", "Mes", "Stock_Unid"])
 
         d = df.copy()
-        d["Fecha"] = pd.to_datetime(d["Fecha"], errors="coerce", dayfirst=True)
+        
+        # Parsear fechas con múltiples formatos soportados (igual que guide_reconciliation)
+        d["Fecha"] = pd.to_datetime(d["Fecha"], format='%Y-%m-%d', errors='coerce')
+        
+        # Si hay NaNs, intentar con formato europeo DD/MM/YYYY
+        nan_mask = d["Fecha"].isna()
+        if nan_mask.any():
+            d.loc[nan_mask, "Fecha"] = pd.to_datetime(
+                d.loc[nan_mask, "Fecha"], 
+                format='%d/%m/%Y', 
+                errors='coerce'
+            )
+        
         d = d.dropna(subset=["Fecha"])
 
         d["Codigo"] = d["Codigo"].astype(str).str.strip()

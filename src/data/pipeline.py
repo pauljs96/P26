@@ -43,6 +43,7 @@ class DataPipeline:
         try:
             self.logger.info("Cargando CSV...")
             raw = self.loader.load_files(uploaded_files)
+            self.logger.info(f"✓ {len(raw)} filas cargadas")
 
             self.logger.info("Limpiando y tipando data...")
             try:
@@ -61,18 +62,32 @@ class DataPipeline:
                 result = PipelineResult(pd.DataFrame(), pd.DataFrame(), pd.DataFrame())
                 result.error_message = error_msg
                 return result
+            
+            self.logger.info(f"✓ {len(clean)} filas limpias")
 
             self.logger.info("Reconciliando guías de remisión...")
             rec = self.reconciler.reconcile(clean)
+            self.logger.info(f"✓ {len(rec)} filas reconciliadas")
 
             self.logger.info("Construyendo demanda mensual...")
             demand = self.demand_builder.build_monthly(rec)
+            self.logger.info(f"✓ {len(demand)} registros de demanda mensual")
 
+            # Usar rango dinámico basado en los datos (NO hardcode)
+            min_date = rec["Fecha"].min()
+            max_date = rec["Fecha"].max()
+            self.logger.info(f"   Rango de fechas: {min_date.strftime('%Y-%m-%d')} a {max_date.strftime('%Y-%m-%d')}")
+            
             self.logger.info("Completando meses faltantes con 0 (serie uniforme)...")
-            demand = complete_monthly_demand(demand, start="2021-01-01", end="2025-05-01")
+            # Calcular rango de meses sin hardcode
+            start_month = f"{min_date.year}-{min_date.month:02d}-01"
+            end_month = f"{max_date.year}-{max_date.month:02d}-01"
+            demand = complete_monthly_demand(demand, start=start_month, end=end_month)
+            self.logger.info(f"✓ {len(demand)} registros de demanda (después de completar meses)")
 
             self.logger.info("Construyendo stock mensual EMPRESA (último saldo del mes)...")
             stock = self.stock_builder.build_monthly(rec)
+            self.logger.info(f"✓ {len(stock)} registros de stock mensual")
 
             return PipelineResult(rec, demand, stock)
         
