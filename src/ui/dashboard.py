@@ -1115,11 +1115,14 @@ class Dashboard:
                         st.error(f"Error: {result['error']}")
                 except Exception as e:
                     # Demo mode fallback
+                    import uuid
+                    demo_org_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, "demo.local"))
+                    
                     st.session_state.authenticated = True
                     st.session_state.user_id = "demo-user-id"
                     st.session_state.email = email
                     st.session_state.company = "Demo Company"
-                    st.session_state.organization_id = "demo-org-id"
+                    st.session_state.organization_id = demo_org_uuid  # Use valid UUID for demo
                     st.session_state.is_admin = True
                     st.session_state.organization_name = "Demo Organization"
                     
