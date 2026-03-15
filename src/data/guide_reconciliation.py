@@ -47,7 +47,17 @@ class GuideReconciler:
             return out
 
         # Asegurar datetime
+        # Parsear fechas con múltiples formatos soportados
         out["Fecha"] = pd.to_datetime(out["Fecha"], format='%Y-%m-%d', errors='coerce')
+        
+        # Si hay NaNs, intentar con formato europeo DD/MM/YYYY
+        nan_mask = out["Fecha"].isna()
+        if nan_mask.any():
+            out.loc[nan_mask, "Fecha"] = pd.to_datetime(
+                out.loc[nan_mask, "Fecha"], 
+                format='%d/%m/%Y', 
+                errors='coerce'
+            )
 
         # Mes para reconciliar por periodo (evita mezclar meses)
         out["Mes"] = out["Fecha"].dt.to_period("M").dt.to_timestamp()

@@ -105,7 +105,25 @@ class DataCleaner:
         out["Numero"] = df[c_num].astype(str).str.strip()
         out["Bodega"] = df[c_bodega].astype(str).str.strip()
 
+        # Parsear fechas con múltiples formatos soportados
+        # Intentar primero con formato ISO (%Y-%m-%d), luego con DD/MM/YYYY
         out["Fecha"] = pd.to_datetime(df[c_fecha], format='%Y-%m-%d', errors='coerce')
+        
+        # Si hay NaNs, intentar con formato europeo DD/MM/YYYY
+        nan_mask = out["Fecha"].isna()
+        if nan_mask.any():
+            out.loc[nan_mask, "Fecha"] = pd.to_datetime(
+                df.loc[nan_mask, c_fecha], 
+                format='%d/%m/%Y', 
+                errors='coerce'
+            )
+        
+        # Log de conversión
+        import logging
+        logger = logging.getLogger(__name__)
+        total_parsed = out["Fecha"].notna().sum()
+        total_rows = len(out)
+        logger.info(f"✓ Fechas parseadas: {total_parsed}/{total_rows} ({100*total_parsed/total_rows:.1f}%)")
 
         out["Entrada_unid"] = _to_num(df[c_ent_u]).fillna(0.0)
         out["Salida_unid"] = _to_num(df[c_sal_u]).fillna(0.0)
