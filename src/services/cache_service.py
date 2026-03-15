@@ -116,29 +116,44 @@ def save_org_cache(
         (success: bool, updated_at_timestamp: str or None)
     """
     try:
+        from datetime import datetime
+        import traceback
+        
         # Serializar
+        print(f"[CACHE] Serializando dataframes para org_id={org_id}...")
         movements_json, demand_json, stock_json = serialize_pipeline_result(
             movements, demand_monthly, stock_monthly
         )
+        print(f"[CACHE] Serialización completada.")
         
         # Guardar en BD
-        result = db.save_org_data(
-            org_id=org_id,
-            demand_monthly_json=demand_json,
-            stock_monthly_json=stock_json,
-            movements_json=movements_json,
-            processed_by=processed_by,
-            csv_files_count=csv_files_count
-        )
+        print(f"[CACHE] Guardando en BD...")
+        try:
+            result = db.save_org_data(
+                org_id=org_id,
+                demand_monthly_json=demand_json,
+                stock_monthly_json=stock_json,
+                movements_json=movements_json,
+                processed_by=processed_by,
+                csv_files_count=csv_files_count
+            )
+            print(f"[CACHE] save_org_data retornó: {result}")
+        except Exception as db_error:
+            print(f"[ERROR] db.save_org_data lanzó excepción: {str(db_error)}")
+            traceback.print_exc()
+            return False, None
         
-        if result.get("success", False):
-            # Retornar timestamp actualizado para detección de cambios
-            cache_data = db.load_org_data(org_id)
-            timestamp = cache_data.get("updated_at") if cache_data.get("success") else None
+        if result.get("success", False) is True:
+            # Si fue exitoso, usar timestamp actual (Supabase lo grabará con NOW())
+            timestamp = datetime.now().isoformat()
+            print(f"[OK] Cache guardado exitosamente para org_id={org_id} | timestamp={timestamp}")
             return True, timestamp
-        
-        return False, None
+        else:
+            print(f"[ERROR] save_org_data retornó success={result.get('success')} (esperaba True)")
+            return False, None
     
     except Exception as e:
-        print(f"❌ Error saving cache: {str(e)}")
+        print(f"[EXCEPTION] Error guardando cache: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return False, None

@@ -1742,6 +1742,7 @@ class Dashboard:
                 # ==================== GUARDAR EN CACHE ====================
                 st.info("💾 Guardando datos en cache...")
                 if db:
+                    print(f"[DASHBOARD] Llamando save_org_cache para org_id={org_id}, user={user_id}")
                     cache_success, cache_timestamp = save_org_cache(
                         db=db,
                         org_id=org_id,
@@ -1751,6 +1752,7 @@ class Dashboard:
                         processed_by=user_id,
                         csv_files_count=len(saved_files)
                     )
+                    print(f"[DASHBOARD] save_org_cache retornó: success={cache_success}, timestamp={cache_timestamp}")
                     
                     if cache_success:
                         # Actualizar timestamp de caché para detección de cambios
@@ -1763,6 +1765,9 @@ class Dashboard:
                         st.balloons()
                     else:
                         st.warning("⚠️ Error saving cache (pero data está lista para análisis)")
+                else:
+                    print(f"[DASHBOARD] db es None - no se guardó en cache")
+                    st.warning("⚠️ No hay conexión a BD, datos no se guardaron en cache")
                 
                 # Usar los datos procesados
                 res_movements = res.movements
