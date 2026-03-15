@@ -1579,10 +1579,19 @@ class Dashboard:
         
         # Verificar si hay data cacheada
         from src.services.cache_service import check_and_load_org_cache, save_org_cache
+        import time
         
         has_cache, cached_data = False, None
         if db and org_id:
-            has_cache, cached_data = check_and_load_org_cache(db, org_id)
+            try:
+                start_time = time.time()
+                has_cache, cached_data = check_and_load_org_cache(db, org_id)
+                elapsed = time.time() - start_time
+                if elapsed > 10:
+                    st.warning(f"⏱️ Cache tardó {elapsed:.1f}s en cargar - puede haber timeouts")
+            except Exception as e:
+                st.warning(f"⚠️ Error cargando cache: {str(e)[:100]}")
+                has_cache, cached_data = False, None
         
         if has_cache and cached_data:
             # ==================== CARGAR DESDE CACHE ====================
@@ -1643,6 +1652,15 @@ class Dashboard:
                 if not files:
                     st.info("👆 Admin: Sube los CSV para procesar")
                     return
+                
+                # ==================== LIMPIAR CACHE ANTERIOR ANTES DE PROCESAR ====================
+                if db and org_id:
+                    st.info("🧹 Limpiando caché anterior...")
+                    clear_result = db.clear_org_cache(org_id)
+                    if clear_result.get("success"):
+                        st.info("✓ Caché limpiado - procesando nuevos datos")
+                    else:
+                        st.warning(f"⚠️ No se pudo limpiar caché anterior: {clear_result.get('error')}")
                 
                 # ==================== S3 UPLOAD ====================
                 storage = get_storage_manager()

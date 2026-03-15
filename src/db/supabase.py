@@ -263,6 +263,23 @@ class SupabaseDB:
         except Exception:
             return False
 
+    def clear_org_cache(self, org_id: str) -> Dict[str, Any]:
+        """
+        Limpia el caché de una organización (elimina datos viejos antes de cargar nuevos).
+        - Marca data_loaded = False
+        - Elimina el registro de org_cache
+        """
+        try:
+            # Marcar org como sin data
+            self.client.table("organizations").update({"data_loaded": False}).eq("id", org_id).execute()
+            
+            # Eliminar caché antiguo
+            self.client.table("org_cache").delete().eq("organization_id", org_id).execute()
+            
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     # ==================== ORG CSV SCHEMA ====================
     
     def save_csv_schema(
