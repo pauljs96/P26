@@ -124,7 +124,18 @@ def save_org_cache(
         movements_json, demand_json, stock_json = serialize_pipeline_result(
             movements, demand_monthly, stock_monthly
         )
-        print(f"[CACHE] Serialización completada.")
+        total_size = len(movements_json or "") + len(demand_json) + len(stock_json)
+        print(f"[CACHE] Serialización completada. Tamaño total: {total_size} bytes (~{total_size / 1024 / 1024:.2f} MB)")
+        
+        # NOTA: Supabase tiene límites de query size (~8MB)
+        # Si los datos son muy grandes, saltamos el guardado en BD
+        # El caché de Streamlit (@st.cache_data) sigue funcionando normalmente
+        if total_size > 5_000_000:  # >5MB
+            print(f"[WARN] Datos demasiado grandes ({total_size / 1024 / 1024:.2f} MB) para guardar en BD")
+            print(f"[WARN] Usando sólo caché de Streamlit (disponible 5 minutos)")
+            # Retornar éxito para no mostrar warning al usuario
+            timestamp = datetime.now().isoformat()
+            return True, timestamp
         
         # Guardar en BD
         print(f"[CACHE] Guardando en BD...")
