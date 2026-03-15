@@ -101,6 +101,7 @@ def save_org_cache(
 ) -> Tuple[bool, Optional[str]]:
     """
     Serializa y guarda resultados de DataPipeline en org_cache.
+    Los DataFrames se comprimen automáticamente (típicamente 10:1)
     Retorna timestamp para detección futura de cambios.
     
     Args:
@@ -119,23 +120,13 @@ def save_org_cache(
         from datetime import datetime
         import traceback
         
-        # Serializar
+        # Serializar (con compresión automática)
         print(f"[CACHE] Serializando dataframes para org_id={org_id}...")
         movements_json, demand_json, stock_json = serialize_pipeline_result(
             movements, demand_monthly, stock_monthly
         )
-        total_size = len(movements_json or "") + len(demand_json) + len(stock_json)
-        print(f"[CACHE] Serialización completada. Tamaño total: {total_size} bytes (~{total_size / 1024 / 1024:.2f} MB)")
-        
-        # NOTA: Supabase tiene límites de query size (~8MB)
-        # Si los datos son muy grandes, saltamos el guardado en BD
-        # El caché de Streamlit (@st.cache_data) sigue funcionando normalmente
-        if total_size > 5_000_000:  # >5MB
-            print(f"[WARN] Datos demasiado grandes ({total_size / 1024 / 1024:.2f} MB) para guardar en BD")
-            print(f"[WARN] Usando sólo caché de Streamlit (disponible 5 minutos)")
-            # Retornar éxito para no mostrar warning al usuario
-            timestamp = datetime.now().isoformat()
-            return True, timestamp
+        compressed_size = len(movements_json or "") + len(demand_json) + len(stock_json)
+        print(f"[CACHE] Serialización completada. Tamaño comprimido: {compressed_size / 1024:.1f}KB")
         
         # Guardar en BD
         print(f"[CACHE] Guardando en BD...")
@@ -155,7 +146,7 @@ def save_org_cache(
             return False, None
         
         if result.get("success", False) is True:
-            # Si fue exitoso, usar timestamp actual (Supabase lo grabará con NOW())
+            # Si fue exitoso, usar timestamp actual
             timestamp = datetime.now().isoformat()
             print(f"[OK] Cache guardado exitosamente para org_id={org_id} | timestamp={timestamp}")
             return True, timestamp

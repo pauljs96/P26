@@ -76,17 +76,21 @@ class S3Manager:
         self,
         file_path: str | Path,
         s3_key: str | None = None,
-        user_id: str | None = None,
-        project_id: str | None = None,
+        org_id: str | None = None,
+        data_type: str = "raw",
+        year: str | None = None,
     ) -> Dict[str, Any]:
         """
-        Sube un archivo a S3.
+        Sube un archivo a S3 con estructura org-aware.
+        
+        Estructura: s3://bucket/{org_id}/{data_type}/data_{year}.csv
         
         Args:
             file_path: Ruta local del archivo
-            s3_key: Clave S3 custom (default: users/{user_id}/projects/{project_id}/{filename})
-            user_id: ID del usuario (para organizar en S3)
-            project_id: ID del proyecto
+            s3_key: Clave S3 custom (default: {org_id}/{data_type}/data_{year}.csv)
+            org_id: ID de la organización (REQUIRED)
+            data_type: Tipo de datos - "raw" o "processed"
+            year: Año de los datos (si aplica)
         
         Returns:
             {
@@ -105,15 +109,19 @@ class S3Manager:
                 "error": f"Archivo no existe: {file_path}"
             }
         
-        # Default S3 key
+        if not org_id:
+            return {
+                "success": False,
+                "error": "org_id es requerido para upload multi-tenant"
+            }
+        
+        # Default S3 key con estructura org-aware
         if not s3_key:
             filename = file_path.name
-            if user_id and project_id:
-                s3_key = f"users/{user_id}/projects/{project_id}/{filename}"
-            elif user_id:
-                s3_key = f"users/{user_id}/{filename}"
+            if year:
+                s3_key = f"{org_id}/{data_type}/data_{year}.csv"
             else:
-                s3_key = f"uploads/{filename}"
+                s3_key = f"{org_id}/{data_type}/{filename}"
         
         # Si S3 no está configurado, retornar fallback
         if not self.is_configured:
