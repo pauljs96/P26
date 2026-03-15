@@ -15,10 +15,17 @@ from src.utils.cache_helpers import (
 
 def check_and_load_org_cache(
     db: SupabaseDB, 
-    org_id: str
+    org_id: str,
+    last_cache_timestamp: str = None
 ) -> Tuple[bool, Optional[dict]]:
     """
     Verifica si una organización tiene data cacheada.
+    Incluye detección de cambios recientes en BD.
+    
+    Args:
+        db: SupabaseDB instance
+        org_id: Organization ID
+        last_cache_timestamp: Timestamp del último caché cargado (para detectar cambios)
     
     Returns:
         (has_cache: bool, data_dict: dict or None)
@@ -37,6 +44,21 @@ def check_and_load_org_cache(
         if not cache_data.get("success"):
             return False, None
         
+        current_timestamp = cache_data.get("updated_at")
+        
+        # Si hay timestamp anterior: verificar si BD cambió
+        if last_cache_timestamp and current_timestamp:
+            if str(current_timestamp) == str(last_cache_timestamp):
+                # Data no cambió, caché es válido
+                return True, {
+                    "movements": None,  # No descargar si no cambió
+                    "demand_monthly": None,
+                    "stock_monthly": None,
+                    "csv_files_count": cache_data.get("csv_files_count", 0),
+                    "updated_at": current_timestamp,
+                    "cache_valid": True  # Flag: no re-deserializar
+                }
+        
         # Deserializar DataFrames
         try:
             movements_json = cache_data.get("movements")
@@ -52,10 +74,11 @@ def check_and_load_org_cache(
                 "demand_monthly": demand_monthly,
                 "stock_monthly": stock_monthly,
                 "csv_files_count": cache_data.get("csv_files_count", 0),
-                "updated_at": cache_data.get("updated_at"),
+                "updated_at": current_timestamp,
                 "demand_json": demand_json,
                 "stock_json": stock_json,
-                "movements_json": movements_json
+                "movements_json": movements_json,
+                "cache_valid": False  # Flag: data fue deserializada
             }
         
         except Exception as e:
@@ -75,9 +98,10 @@ def save_org_cache(
     stock_monthly: pd.DataFrame,
     processed_by: str,
     csv_files_count: int = 0
-) -> bool:
+) -> Tuple[bool, Optional[str]]:
     """
     Serializa y guarda resultados de DataPipeline en org_cache.
+    Retorna timestamp para detección futura de cambios.
     
     Args:
         db: SupabaseDB instance
@@ -89,7 +113,7 @@ def save_org_cache(
         csv_files_count: Número de CSVs procesados
     
     Returns:
-        True si fue exitoso, False otherwise
+        (success: bool, updated_at_timestamp: str or None)
     """
     try:
         # Serializar
@@ -107,8 +131,14 @@ def save_org_cache(
             csv_files_count=csv_files_count
         )
         
-        return result.get("success", False)
+        if result.get("success", False):
+            # Retornar timestamp actualizado para detección de cambios
+            cache_data = db.load_org_data(org_id)
+            timestamp = cache_data.get("updated_at") if cache_data.get("success") else None
+            return True, timestamp
+        
+        return False, None
     
     except Exception as e:
         print(f"❌ Error saving cache: {str(e)}")
-        return False
+        return False, None

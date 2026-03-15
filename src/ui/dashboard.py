@@ -1145,11 +1145,20 @@ class Dashboard:
             st.session_state.sync_cost_stock_unit = 1.0  # Cost de mantener 1 unidad en stock
         if "sync_cost_stockout_unit" not in st.session_state:
             st.session_state.sync_cost_stockout_unit = 5.0  # Cost de quiebre de 1 unidad
+        
+        # ==================== TRACKING DE CAMBIOS PARA INVALIDAR CACHÉ ====================
+        # Detectar cambios de org_id o prod_sel para limpiar caché inteligentemente
+        if "_last_org_id" not in st.session_state:
+            st.session_state._last_org_id = None
+        if "_last_prod_sel" not in st.session_state:
+            st.session_state._last_prod_sel = None
+        if "_cache_timestamp" not in st.session_state:
+            st.session_state._cache_timestamp = None
 
         # ========================================
         # FUNCIÓN CACHEADA: Crear gráfico demo
         # ========================================
-        @st.cache_data(ttl=3600)
+        @st.cache_data(ttl=300)  # Reducido de 3600s a 300s (5 min)
         def crear_grafico_demo():
             """Genera el gráfico demo de predicción (se cachea para evitar regenerar en cada rerun)"""
             import numpy as np
@@ -1231,7 +1240,7 @@ class Dashboard:
         # ========================================
         # FUNCIÓN CACHEADA: Componentes por producto
         # ========================================
-        @st.cache_data(ttl=3600)
+        @st.cache_data(ttl=300)  # Reducido de 3600s a 300s (5 min)
         def get_demanda_components(prod_sel):
             """Cachea los componentes de demanda por producto"""
             return build_monthly_components(res_movements, prod_sel)
@@ -1239,7 +1248,7 @@ class Dashboard:
         # ========================================
         # FUNCIÓN CACHEADA: Backtests del comparador
         # ========================================
-        @st.cache_data(ttl=3600)
+        @st.cache_data(ttl=300)  # Reducido de 3600s a 300s (5 min)
         def get_comparador_backtests(prod_sel, test_months: int, sort_metric: str):
             """Ejecuta y cachea todos los backtests (Baselines, ETS, RF) para un producto"""
             dm = res_demand.copy()
@@ -1570,6 +1579,12 @@ class Dashboard:
         user_id = st.session_state.get("user_id")
         is_admin = st.session_state.get("is_admin", False)
         
+        # Detectar cambio de organización (para limpiar caché)
+        if org_id != st.session_state._last_org_id:
+            st.session_state._last_org_id = org_id
+            st.session_state._cache_timestamp = None  # Reset timestamp
+            st.cache_data.clear()  # Limpiar caché Streamlit al cambiar org
+        
         # Obtener DB
         db = None
         try:
@@ -1585,10 +1600,18 @@ class Dashboard:
         if db and org_id:
             try:
                 start_time = time.time()
-                has_cache, cached_data = check_and_load_org_cache(db, org_id)
+                # Pasar timestamp anterior para detectar cambios en BD
+                has_cache, cached_data = check_and_load_org_cache(
+                    db, org_id, 
+                    last_cache_timestamp=st.session_state._cache_timestamp
+                )
                 elapsed = time.time() - start_time
                 if elapsed > 10:
                     st.warning(f"⏱️ Cache tardó {elapsed:.1f}s en cargar - puede haber timeouts")
+                
+                # Actualizar timestamp si hubo cambios
+                if has_cache and cached_data and not cached_data.get("cache_valid", False):
+                    st.session_state._cache_timestamp = cached_data.get("updated_at")
             except Exception as e:
                 st.warning(f"⚠️ Error cargando cache: {str(e)[:100]}")
                 has_cache, cached_data = False, None
@@ -1719,7 +1742,7 @@ class Dashboard:
                 # ==================== GUARDAR EN CACHE ====================
                 st.info("💾 Guardando datos en cache...")
                 if db:
-                    cache_saved = save_org_cache(
+                    cache_success, cache_timestamp = save_org_cache(
                         db=db,
                         org_id=org_id,
                         movements=res.movements,
@@ -1729,8 +1752,14 @@ class Dashboard:
                         csv_files_count=len(saved_files)
                     )
                     
-                    if cache_saved:
-                        st.success("✅ Datos guardados en cache")
+                    if cache_success:
+                        # Actualizar timestamp de caché para detección de cambios
+                        st.session_state._cache_timestamp = cache_timestamp
+                        
+                        # LIMPIAR CACHÉ STREAMLIT para que se recarguen funciones cacheadas
+                        st.cache_data.clear()
+                        
+                        st.success("✅ Datos guardados en cache (caché Streamlit limpiada)")
                         st.balloons()
                     else:
                         st.warning("⚠️ Error saving cache (pero data está lista para análisis)")
@@ -1798,6 +1827,11 @@ class Dashboard:
                     prod_sel = None
                 else:
                     prod_sel = st.selectbox("Producto (Código)", options=productos, key="sidebar_prod")
+        
+        # === DETECTAR CAMBIO DE PRODUCTO PARA INVALIDAR CACHÉ ===
+        if prod_sel != st.session_state._last_prod_sel:
+            st.session_state._last_prod_sel = prod_sel
+            # Streamlit automáticamente invalida funciones @st.cache_data con prod_sel diferente
 
         # === BOTÓN FLOTANTE VISUAL EN SIDEBAR ===
         st.sidebar.markdown("""
