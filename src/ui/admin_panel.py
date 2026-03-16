@@ -265,15 +265,22 @@ class AdminPanel:
                 # Preview de demand_monthly
                 if cache_data.get("demand_monthly"):
                     st.write("**Demanda Mensual (primeras 5 filas):**")
-                    from src.utils.cache_helpers import json_to_dataframe
-                    demand_df = json_to_dataframe(cache_data.get("demand_monthly"))
-                    st.dataframe(demand_df.head(), use_container_width=True)
+                    from src.utils.cache_helpers import json_to_dataframe, decompress_json
+                    demand_compressed = cache_data.get("demand_monthly")
+                    demand_json = decompress_json(demand_compressed) if demand_compressed else None
+                    if demand_json:
+                        demand_df = json_to_dataframe(demand_json)
+                        st.dataframe(demand_df.head(), use_container_width=True)
                 
                 # Preview de stock_monthly
                 if cache_data.get("stock_monthly"):
                     st.write("**Stock Mensual (primeras 5 filas):**")
-                    stock_df = json_to_dataframe(cache_data.get("stock_monthly"))
-                    st.dataframe(stock_df.head(), use_container_width=True)
+                    from src.utils.cache_helpers import json_to_dataframe, decompress_json
+                    stock_compressed = cache_data.get("stock_monthly")
+                    stock_json = decompress_json(stock_compressed) if stock_compressed else None
+                    if stock_json:
+                        stock_df = json_to_dataframe(stock_json)
+                        st.dataframe(stock_df.head(), use_container_width=True)
             else:
                 st.error("❌ Error al cargar cache: " + cache_data.get("error", ""))
         
