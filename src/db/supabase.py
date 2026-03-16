@@ -84,6 +84,40 @@ class SupabaseDB:
         except Exception:
             return None
 
+    def get_user_with_org(self, user_id: str) -> Optional[Dict]:
+        """Obtiene info del usuario con su organización y rol (MULTI-TENANT)"""
+        try:
+            # Obtener user base
+            user = self.get_user(user_id)
+            if not user:
+                return None
+            
+            # Obtener org assignment (org_id y role)
+            response = self.client.table("user_org_assignments").select(
+                "*"
+            ).eq("user_id", user_id).execute()
+            
+            if response.data:
+                assignment = response.data[0]  # Get primary assignment
+                org_id = assignment.get("org_id")
+                role_id = assignment.get("role_id")
+                
+                # Get role name
+                role_response = self.client.table("roles").select("name").eq("id", role_id).execute()
+                role_name = role_response.data[0]["name"] if role_response.data else "viewer"
+                
+                # Enrich user data
+                user["organization_id"] = org_id
+                user["role_id"] = role_id
+                user["role_name"] = role_name
+                user["is_admin"] = role_name == "org_admin" or user.get("is_master_admin", False)
+                
+                return user
+            
+            return user
+        except Exception as e:
+            return None
+
     # ==================== ORGANIZATIONS (MULTI-TENANT) ====================
     
     def create_organization(self, nombre: str, admin_user_id: str, description: str = "") -> Dict[str, Any]:

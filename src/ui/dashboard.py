@@ -1092,19 +1092,20 @@ class Dashboard:
                     db = get_db()
                     result = db.login_user(email, password)
                     if result["success"]:
-                        # Obtener info completa del usuario (org_id, is_admin)
-                        user_info = db.get_user(result["user_id"])
+                        # Obtener info completa del usuario CON organización y rol (MULTI-TENANT)
+                        user_info = db.get_user_with_org(result["user_id"])
                         
                         st.session_state.authenticated = True
                         st.session_state.user_id = result["user_id"]
                         st.session_state.email = result["email"]
                         st.session_state.organization_id = user_info.get("organization_id") if user_info else None
                         st.session_state.is_admin = user_info.get("is_admin", False) if user_info else False
+                        st.session_state.role_name = user_info.get("role_name", "viewer") if user_info else "viewer"
                         
                         # Obtener nombre de organización
                         if st.session_state.organization_id:
                             org = db.get_organization(st.session_state.organization_id)
-                            st.session_state.organization_name = org.get("nombre") if org else "Unknown"
+                            st.session_state.organization_name = org.get("name") if org else "Unknown"
                         
                         # CLEAR CACHE para evitar conflictos multi-usuario
                         st.cache_data.clear()
