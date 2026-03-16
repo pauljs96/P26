@@ -637,8 +637,10 @@ class SupabaseDB:
             return []
 
     def assign_user_to_organization(self, user_id: str, org_id: str) -> Dict[str, Any]:
-        """
-        Asigna un usuario a una organización (reasigna si ya pertenecía a otra)
+        """Asigna un usuario a una organización (MULTI-TENANT)
+        
+        Si el usuario ya estaba en otra org, lo reasigna.
+        Nuevas asignaciones tienen rol_id=3 (viewer) por defecto.
         
         Args:
             user_id: ID del usuario
@@ -648,43 +650,67 @@ class SupabaseDB:
             {"success": bool, "error": str (si falla)}
         """
         try:
-            # Verificar que la org existe
+            # 1. Verificar que la org existe
             org = self.get_organization(org_id)
             if not org:
                 return {"success": False, "error": "Organización no encontrada"}
             
-            # Actualizar usuario
-            self.client.table("users").update({
-                "organization_id": org_id,
-                "is_admin": False  # Por defecto como viewer
-            }).eq("id", user_id).execute()
+            # 2. Verificar si usuario ya existe en otra org
+            existing = self.client.table("user_org_assignments").select(
+                "*"
+            ).eq("user_id", user_id).execute()
             
+            if existing.data:
+                # Usuario ya tiene asignación, eliminar la anterior
+                self.client.table("user_org_assignments").delete().eq(
+                    "user_id", user_id
+                ).execute()
+                print(f"[REASSIGN_USER] Removido de org anterior")
+            
+            # 3. Crear nueva asignación con rol_id=3 (viewer) por defecto
+            self.client.table("user_org_assignments").insert({
+                "user_id": user_id,
+                "org_id": org_id,
+                "role_id": 3  # viewer por defecto
+            }).execute()
+            
+            print(f"[ASSIGN_USER] Usuario {user_id} asignado a org {org_id} como viewer")
             return {"success": True}
         except Exception as e:
+            print(f"[ERROR ASSIGN_USER] {str(e)}")
             return {"success": False, "error": str(e)}
 
     def update_user_role(self, user_id: str, is_admin: bool) -> Dict[str, Any]:
-        """
-        Actualiza rol del usuario (admin/viewer)
+        """Actualiza rol del usuario (MULTI-TENANT)
         
         Args:
             user_id: ID del usuario
-            is_admin: True para admin, False para viewer
+            is_admin: True para org_admin (role_id=2), False para viewer (role_id=3)
         
         Returns:
             {"success": bool, "error": str (si falla)}
         """
         try:
-            self.client.table("users").update({
-                "is_admin": is_admin
-            }).eq("id", user_id).execute()
+            # Determinar role_id basado en is_admin
+            # 2 = org_admin, 3 = viewer
+            role_id = 2 if is_admin else 3
+            
+            # Actualizar role_id en user_org_assignments
+            # Nota: Usuarios pueden tener múltiples asignaciones, pero actualizamos la actual
+            self.client.table("user_org_assignments").update({
+                "role_id": role_id
+            }).eq("user_id", user_id).execute()
+            
+            print(f"[UPDATE_ROLE] Usuario {user_id} actualizado a role_id={role_id}")
             return {"success": True}
         except Exception as e:
+            print(f"[ERROR UPDATE_ROLE] {str(e)}")
             return {"success": False, "error": str(e)}
 
     def delete_user_from_organization(self, user_id: str, org_id: str) -> Dict[str, Any]:
-        """
-        Elimina a un usuario de una organización (mantiene el usuario en el sistema)
+        """Elimina a un usuario de una organización (MULTI-TENANT)
+        
+        Elimina entrada de user_org_assignments. Usuario se mantiene en el sistema.
         
         Args:
             user_id: ID del usuario
@@ -694,14 +720,16 @@ class SupabaseDB:
             {"success": bool, "error": str (si falta)}
         """
         try:
-            # Cambiar organization_id a NULL (usuario sin org)
-            self.client.table("users").update({
-                "organization_id": None,
-                "is_admin": False
-            }).eq("id", user_id).execute()
+            # Eliminar entrada en user_org_assignments
+            self.client.table("user_org_assignments").delete().match({
+                "user_id": user_id,
+                "org_id": org_id
+            }).execute()
             
+            print(f"[DELETE_USER_FROM_ORG] Usuario {user_id} removido de org {org_id}")
             return {"success": True}
         except Exception as e:
+            print(f"[ERROR DELETE_USER_FROM_ORG] {str(e)}")
             return {"success": False, "error": str(e)}
 
     def delete_user_completely(self, user_id: str) -> Dict[str, Any]:
