@@ -195,7 +195,8 @@ class SuperAdminPanel:
                 # Expandir para detalles
                 with st.expander("🔍 Detalles de Organizaciones", expanded=False):
                     for org in orgs:
-                        with st.expander(f"📍 {org['nombre']}", expanded=False):
+                        org_name = org.get("name", org.get("nombre", "N/A"))
+                        with st.expander(f"📍 {org_name}", expanded=False):
                             col1, col2, col3 = st.columns(3)
                             with col1:
                                 st.metric("ID", org["id"][:12] + "...")

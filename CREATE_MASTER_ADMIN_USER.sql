@@ -10,7 +10,7 @@ SELECT id FROM auth.users WHERE email = 'paulmaste@gmail.com';
 INSERT INTO users (id, email, full_name, is_master_admin, created_at, updated_at) 
 VALUES (
     'REEMPLAZA_CON_UUID_DE_ARRIBA',  -- Reemplaza con el ID real de auth.users
-    'paulmaste@gmail.com',
+    'paulmaster@gmail.com',
     'Paul Master Admin',
     TRUE,
     NOW(),
