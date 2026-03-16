@@ -120,39 +120,34 @@ class SupabaseDB:
 
     # ==================== ORGANIZATIONS (MULTI-TENANT) ====================
     
-    def create_organization(self, nombre: str, admin_user_id: str, description: str = "") -> Dict[str, Any]:
-        """Crea nueva organización (MULTI-TENANT) - solo admin system
+    def create_organization(self, nombre: str, description: str = "") -> Dict[str, Any]:
+        """Crea nueva organización (MULTI-TENANT) - sin requerir admin inicial
+        
+        La organización se crea vacía. Los usuarios (incluyendo admins) 
+        se asignan DESPUÉS a través de create_user_in_organization().
         
         Args:
             nombre: Nombre de la organización
-            admin_user_id: ID del usuario que será org_admin
             description: Descripción opcional
         
         Returns:
             {"success": bool, "organization_id": str or None, "error": str (si falla)}
         """
         try:
-            # 1. Crear organización en tabla organizations
-            # Nota: en multi-tenant usa "name", no "nombre"
+            if not nombre or nombre.strip() == "":
+                return {"success": False, "error": "El nombre de la organización es requerido"}
+            
+            # Crear organización vacía en tabla organizations
+            # Los usuarios se asignan después con create_user_in_organization()
             response = self.client.table("organizations").insert({
-                "name": nombre,
-                "description": description,
+                "name": nombre.strip(),
+                "description": description.strip() if description else "",
                 "data_loaded": False,
                 "is_active": True
             }).execute()
             
             org_id = response.data[0]["id"]
-            print(f"[CREATE_ORG] Organización creada: {org_id}")
-            
-            # 2. Asignar admin_user_id como org_admin en user_org_assignments
-            # role_id 2 = org_admin
-            self.client.table("user_org_assignments").insert({
-                "user_id": admin_user_id,
-                "org_id": org_id,
-                "role_id": 2  # org_admin
-            }).execute()
-            
-            print(f"[CREATE_ORG] Usuario {admin_user_id} asignado como org_admin")
+            print(f"[CREATE_ORG] Organización creada (vacía): {org_id} - {nombre}")
             
             return {"success": True, "organization_id": org_id}
         except Exception as e:

@@ -103,60 +103,42 @@ class SuperAdminPanel:
             st.markdown("""
             <div style='background: #e3f2fd; padding: 14px; border-left: 4px solid #1976d2; border-radius: 8px; margin-bottom: 1.5em;'>
                 <p style='margin: 0; color: #333; font-size: 0.9em;'>
-                    <strong>📝 Crear nueva organización:</strong> Ingresa los detalles y asigna un administrador inicial.
+                    <strong>📝 Crear nueva organización:</strong> Ingresa nombre y descripción. Los usuarios se asignan después.
                 </p>
             </div>
             """, unsafe_allow_html=True)
             
             with st.form("crear_org_form"):
-                col1, col2 = st.columns(2)
+                org_nombre = st.text_input(
+                    "Nombre de la Organización *",
+                    placeholder="Ej: Tech Solutions Inc.",
+                    help="Nombre único de la organización"
+                )
                 
-                with col1:
-                    org_nombre = st.text_input(
-                        "Nombre de la Organización",
-                        placeholder="Ej: Tech Solutions Inc."
-                    )
+                org_description = st.text_area(
+                    "Descripción (opcional)",
+                    placeholder="Ej: Empresa de soluciones tecnológicas",
+                    height=80
+                )
                 
-                with col2:
-                    org_description = st.text_input(
-                        "Descripción (opcional)",
-                        placeholder="Ej: Empresa de soluciones tecnológicas"
-                    )
-                
-                # Obtener usuarios existentes para asignar admin
-                all_users = self.db.get_all_users()
-                users_without_org = [u for u in all_users if not u.get("organization_id")]
-                
-                if users_without_org:
-                    admin_emails = [u["email"] for u in users_without_org]
-                    selected_admin_email = st.selectbox(
-                        "Admin de la Organización",
-                        options=admin_emails,
-                        help="Usuario que será administrador de esta org"
-                    )
-                    admin_user_id = next(u["id"] for u in users_without_org if u["email"] == selected_admin_email)
-                else:
-                    st.warning("⚠️ No hay usuarios disponibles sin organización. Crea usuarios primero.")
-                    admin_user_id = None
+                st.info("💡 Los administradores se asignarán cuando se crean usuarios para esta organización.")
                 
                 st.divider()
                 
                 submit = st.form_submit_button("✅ Crear Organización", type="primary", use_container_width=True)
                 
                 if submit:
-                    if not org_nombre:
+                    if not org_nombre or org_nombre.strip() == "":
                         st.error("❌ El nombre de la organización es requerido")
-                    elif not admin_user_id:
-                        st.error("❌ Selecciona un administrador")
                     else:
                         result = self.db.create_organization(
                             nombre=org_nombre,
-                            admin_user_id=admin_user_id,
                             description=org_description
                         )
                         
                         if result["success"]:
                             st.success(f"✅ Organización '{org_nombre}' creada exitosamente")
+                            st.info("📌 Ahora puedes crear usuarios y asignarlos a esta organización.")
                             st.balloons()
                         else:
                             st.error(f"❌ Error al crear organización: {result.get('error')}")
