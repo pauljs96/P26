@@ -1632,21 +1632,15 @@ class Dashboard:
             st.sidebar.info(f"📅 Actualizado: {cached_data.get('updated_at', 'N/A')[:10]}")
             st.sidebar.write(f"📄 CSVs: {cached_data.get('csv_files_count', 0)}")
             
-            # Si el cache es válido pero no fue deserializado (no cambió), usar session_state
-            if cached_data.get("cache_valid", False):
-                res_movements = st.session_state.get("pipeline_movements")
-                res_demand = st.session_state.get("pipeline_demand")
-                res_stock = st.session_state.get("pipeline_stock")
-            else:
-                # Usar datos recién deserializados del cache
-                res_movements = cached_data.get("movements")
-                res_demand = cached_data.get("demand_monthly")
-                res_stock = cached_data.get("stock_monthly")
-                
-                # Guardar en session_state para que las tabs puedan acceder
-                st.session_state.pipeline_movements = res_movements
-                st.session_state.pipeline_demand = res_demand
-                st.session_state.pipeline_stock = res_stock
+            # Usar datos deserializados del cache
+            res_movements = cached_data.get("movements")
+            res_demand = cached_data.get("demand_monthly")
+            res_stock = cached_data.get("stock_monthly")
+            
+            # Guardar en session_state para que las tabs puedan acceder
+            st.session_state.pipeline_movements = res_movements
+            st.session_state.pipeline_demand = res_demand
+            st.session_state.pipeline_stock = res_stock
             
             st.sidebar.write("✨ Los datos están listos para análisis")
             

@@ -46,20 +46,8 @@ def check_and_load_org_cache(
         
         current_timestamp = cache_data.get("updated_at")
         
-        # Si hay timestamp anterior: verificar si BD cambió
-        if last_cache_timestamp and current_timestamp:
-            if str(current_timestamp) == str(last_cache_timestamp):
-                # Data no cambió, caché es válido
-                return True, {
-                    "movements": None,  # No descargar si no cambió
-                    "demand_monthly": None,
-                    "stock_monthly": None,
-                    "csv_files_count": cache_data.get("csv_files_count", 0),
-                    "updated_at": current_timestamp,
-                    "cache_valid": True  # Flag: no re-deserializar
-                }
-        
-        # Deserializar DataFrames
+        # Siempre deserializar - es más seguro que depender de session_state
+        # (session_state puede estar vacío si la página se refresca)
         try:
             movements_json = cache_data.get("movements")
             demand_json = cache_data.get("demand_monthly")
@@ -77,8 +65,7 @@ def check_and_load_org_cache(
                 "updated_at": current_timestamp,
                 "demand_json": demand_json,
                 "stock_json": stock_json,
-                "movements_json": movements_json,
-                "cache_valid": False  # Flag: data fue deserializada
+                "movements_json": movements_json
             }
         
         except Exception as e:
