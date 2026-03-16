@@ -245,8 +245,8 @@ class SuperAdminPanel:
                     selected_org = next(o for o in orgs if o.get("name", o.get("nombre")) == selected_org_name)
                     org_id = selected_org["id"]
                 else:
-                    st.warning("⚠️ No hay organizaciones. Crea una primero.")
                     org_id = None
+                    st.info("⚠️ No hay organizaciones. Crea una primero.")
                 
                 # Rol
                 is_admin = st.checkbox("¿Es administrador de esta org?", value=False)
@@ -256,7 +256,9 @@ class SuperAdminPanel:
                 submit = st.form_submit_button("✅ Crear Usuario", type="primary", use_container_width=True)
                 
                 if submit:
-                    if not user_email or not user_password or not org_id:
+                    if not org_id:
+                        st.error("❌ Debes crear una organización primero")
+                    elif not user_email or not user_password:
                         st.error("❌ Todos los campos son requeridos")
                     elif len(user_password) < 8:
                         st.error("❌ La contraseña debe tener al menos 8 caracteres")
