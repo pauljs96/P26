@@ -1,7 +1,8 @@
-from src.ui.dashboard_v2 import main as dashboard_main
+from src.ui.dashboard import Dashboard
 
 def main():
-    dashboard_main()
+    dashboard = Dashboard()
+    dashboard.render()
 
 if __name__ == "__main__":
     main()
