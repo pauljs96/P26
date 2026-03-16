@@ -240,9 +240,9 @@ class SuperAdminPanel:
                 # Seleccionar organización
                 orgs = self.db.list_all_organizations()
                 if orgs:
-                    org_names = [o["nombre"] for o in orgs]
+                    org_names = [o.get("name", o.get("nombre", "N/A")) for o in orgs]
                     selected_org_name = st.selectbox("Asignar a Organización", options=org_names)
-                    selected_org = next(o for o in orgs if o["nombre"] == selected_org_name)
+                    selected_org = next(o for o in orgs if o.get("name", o.get("nombre")) == selected_org_name)
                     org_id = selected_org["id"]
                 else:
                     st.warning("⚠️ No hay organizaciones. Crea una primero.")
@@ -298,7 +298,7 @@ class SuperAdminPanel:
             else:
                 # Filtro por organización
                 orgs = self.db.list_all_organizations()
-                org_options = ["Todas"] + [o["nombre"] for o in orgs]
+                org_options = ["Todas"] + [o.get("name", o.get("nombre", "N/A")) for o in orgs]
                 selected_org_filter = st.selectbox("Filtrar por Organización", options=org_options)
                 
                 # Preparar dataframe
@@ -384,7 +384,7 @@ class SuperAdminPanel:
                     st.subheader("🏢 Cambiar Org")
                     orgs = self.db.list_all_organizations()
                     if orgs:
-                        org_names = ["Sin Org"] + [o["nombre"] for o in orgs]
+                        org_names = ["Sin Org"] + [o.get("name", o.get("nombre", "N/A")) for o in orgs]
                         selected_new_org = st.selectbox("Nueva Organización", options=org_names, key="new_org_select")
                         
                         if st.button("💾 Guardar Organización", key="save_org"):
@@ -395,7 +395,7 @@ class SuperAdminPanel:
                                     selected_user.get("organization_id")
                                 )
                             else:
-                                new_org_id = next(o["id"] for o in orgs if o["nombre"] == selected_new_org)
+                                new_org_id = next(o["id"] for o in orgs if o.get("name", o.get("nombre")) == selected_new_org)
                                 result = self.db.assign_user_to_organization(selected_user["id"], new_org_id)
                             
                             if result["success"]:
