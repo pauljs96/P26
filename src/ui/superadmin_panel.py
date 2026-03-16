@@ -182,7 +182,7 @@ class SuperAdminPanel:
                     org_users = self.db.get_organization_users(org["id"])
                     orgs_df.append({
                         "ID": org["id"][:8] + "...",
-                        "Nombre": org["nombre"],
+                        "Nombre": org.get("name", org.get("nombre", "N/A")),
                         "Descripción": org.get("description", "N/A"),
                         "Usuarios": len(org_users),
                         "Data Cargada": "✅" if org.get("data_loaded") else "❌",
@@ -308,7 +308,7 @@ class SuperAdminPanel:
                     
                     if org_id:
                         org = self.db.get_organization(org_id)
-                        org_name = org["nombre"] if org else "Desconocida"
+                        org_name = org.get("name", org.get("nombre", "Desconocida")) if org else "Desconocida"
                     
                     # Aplicar filtro
                     if selected_org_filter != "Todas" and org_name != selected_org_filter:
@@ -359,7 +359,7 @@ class SuperAdminPanel:
                     org_id = selected_user.get("organization_id")
                     if org_id:
                         org = self.db.get_organization(org_id)
-                        org_name = org["nombre"] if org else "N/A"
+                        org_name = org.get("name", org.get("nombre", "N/A")) if org else "N/A"
                     else:
                         org_name = "Sin Org"
                     st.metric("Organización", org_name)
