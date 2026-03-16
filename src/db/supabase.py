@@ -197,11 +197,36 @@ class SupabaseDB:
             return {"success": False, "error": str(e)}
 
     def get_organization_users(self, org_id: str) -> List[Dict]:
-        """Lista usuarios de una organización"""
+        """Lista usuarios de una organización (MULTI-TENANT) - obtiene desde user_org_assignments"""
         try:
-            response = self.client.table("users").select("*").eq("organization_id", org_id).execute()
-            return response.data or []
-        except Exception:
+            # Obtener asignaciones de usuarios para esta org
+            response = self.client.table("user_org_assignments").select(
+                "*, users(*), roles(name)"
+            ).eq("org_id", org_id).execute()
+            
+            if not response.data:
+                return []
+            
+            # Mapear resultados
+            users = []
+            for assignment in response.data:
+                user_data = assignment.get("users", {})
+                role_data = assignment.get("roles", {})
+                
+                user_info = {
+                    "id": user_data.get("id"),
+                    "email": user_data.get("email"),
+                    "full_name": user_data.get("full_name"),
+                    "organization_id": org_id,
+                    "role_id": assignment.get("role_id"),
+                    "role_name": role_data.get("name", "viewer"),
+                    "is_admin": role_data.get("name") == "org_admin"
+                }
+                users.append(user_info)
+            
+            return users
+        except Exception as e:
+            print(f"[ERROR get_organization_users] {str(e)}")
             return []
 
     # ==================== ORG CACHE (RESULTADOS PROCESADOS) ====================
@@ -516,15 +541,56 @@ class SupabaseDB:
             return []
 
     def get_all_users(self) -> List[Dict]:
-        """Lista TODOS los usuarios en el sistema (solo para superadmin)"""
+        """Lista TODOS los usuarios en el sistema (solo para superadmin) - CON ORGANIZACIONES"""
         try:
-            # Intentar con RLS habilitado
+            # Obtener todos los usuarios
             response = self.client.table("users").select("*").execute()
             users = response.data or []
             print(f"[DEBUG get_all_users] Usuarios encontrados: {len(users)}")
+            
+            # Para cada usuario, obtener su organización desde user_org_assignments
+            enriched_users = []
             for user in users:
-                print(f"  - {user.get('email')} | {user.get('company_name')} | {user.get('organization_id')}")
-            return users
+                user_id = user.get("id")
+                try:
+                    # Obtener asignación a org
+                    org_result = self.client.table("user_org_assignments").select(
+                        "*"
+                    ).eq("user_id", user_id).execute()
+                    
+                    if org_result.data:
+                        assignment = org_result.data[0]
+                        org_id = assignment.get("org_id")
+                        role_id = assignment.get("role_id")
+                        
+                        # Obtener nombre de la org
+                        org = self.get_organization(org_id) if org_id else None
+                        org_name = org.get("name") if org else "Sin Org"
+                        
+                        # Obtener nombre del rol
+                        role_response = self.client.table("roles").select("name").eq("id", role_id).execute()
+                        role_name = role_response.data[0]["name"] if role_response.data else "viewer"
+                        
+                        user["organization_id"] = org_id
+                        user["organization_name"] = org_name
+                        user["role_id"] = role_id
+                        user["role_name"] = role_name
+                        user["is_admin"] = role_name == "org_admin"
+                    else:
+                        user["organization_id"] = None
+                        user["organization_name"] = "Sin Org"
+                        user["role_id"] = None
+                        user["role_name"] = "viewer"
+                        user["is_admin"] = user.get("is_master_admin", False)
+                except Exception as e:
+                    print(f"[DEBUG] Error enriqueciendo usuario {user_id}: {str(e)}")
+                    user["organization_id"] = None
+                    user["organization_name"] = "Sin Org"
+                
+                enriched_users.append(user)
+                print(f"  - {user.get('email')} | {user.get('organization_name')} | {user.get('role_name')}")
+            
+            return enriched_users
         except Exception as e:
             print(f"[ERROR get_all_users] {str(e)}")
             import traceback
