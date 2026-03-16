@@ -206,7 +206,15 @@ class SuperAdminPanel:
                                 st.metric("Data Cargada", "Sí" if org.get("data_loaded") else "No")
                             
                             st.write(f"**Descripción:** {org.get('description', 'N/A')}")
-                            st.write(f"**Admin ID:** {org.get('admin_user_id')}")
+                            
+                            # Obtener admin de la org desde user_org_assignments
+                            try:
+                                org_users = self.db.get_organization_users(org["id"])
+                                admins = [u for u in org_users if u.get("role_name") == "org_admin"]
+                                admin_info = f"{admins[0]['email']}" if admins else "Sin admin"
+                                st.write(f"**Admin:** {admin_info}")
+                            except:
+                                st.write(f"**Admin:** N/A")
     
     def _render_users_tab(self):
         """Tab para gestionar usuarios"""

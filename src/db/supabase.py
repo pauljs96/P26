@@ -121,22 +121,42 @@ class SupabaseDB:
     # ==================== ORGANIZATIONS (MULTI-TENANT) ====================
     
     def create_organization(self, nombre: str, admin_user_id: str, description: str = "") -> Dict[str, Any]:
-        """Crea nueva organización (solo admin system)"""
+        """Crea nueva organización (MULTI-TENANT) - solo admin system
+        
+        Args:
+            nombre: Nombre de la organización
+            admin_user_id: ID del usuario que será org_admin
+            description: Descripción opcional
+        
+        Returns:
+            {"success": bool, "organization_id": str or None, "error": str (si falla)}
+        """
         try:
+            # 1. Crear organización en tabla organizations
+            # Nota: en multi-tenant usa "name", no "nombre"
             response = self.client.table("organizations").insert({
-                "nombre": nombre,
-                "admin_user_id": admin_user_id,
+                "name": nombre,
                 "description": description,
-                "data_loaded": False
+                "data_loaded": False,
+                "is_active": True
             }).execute()
+            
             org_id = response.data[0]["id"]
-            # Actualizar admin_user_id para que pertenezca a la org
-            self.client.table("users").update({
-                "organization_id": org_id,
-                "is_admin": True
-            }).eq("id", admin_user_id).execute()
+            print(f"[CREATE_ORG] Organización creada: {org_id}")
+            
+            # 2. Asignar admin_user_id como org_admin en user_org_assignments
+            # role_id 2 = org_admin
+            self.client.table("user_org_assignments").insert({
+                "user_id": admin_user_id,
+                "org_id": org_id,
+                "role_id": 2  # org_admin
+            }).execute()
+            
+            print(f"[CREATE_ORG] Usuario {admin_user_id} asignado como org_admin")
+            
             return {"success": True, "organization_id": org_id}
         except Exception as e:
+            print(f"[ERROR CREATE_ORG] {str(e)}")
             return {"success": False, "error": str(e)}
 
     def get_organization(self, org_id: str) -> Optional[Dict]:
