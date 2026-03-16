@@ -185,13 +185,23 @@ class SupabaseDB:
         is_admin: bool = False,
         created_by: str = None
     ) -> Dict[str, Any]:
-        """Admin crea usuario nuevo en su org"""
+        """Admin crea usuario nuevo en su org (MULTI-TENANT)
+        
+        Args:
+            org_id: ID de la organización
+            email: Email del usuario
+            password: Contraseña inicial
+            is_admin: True si es org_admin, False si es viewer
+            created_by: ID del usuario que creó
+        
+        Returns:
+            {"success": bool, "user_id": str, "email": str, "error": str (si falla)}
+        """
         try:
-            # 0. Obtener nombre de la organización
+            # 0. Verificar que org existe
             org = self.get_organization(org_id)
             if not org:
                 return {"success": False, "error": "Organización no encontrada"}
-            company_name = org.get("nombre", "Unknown")
             
             # 1. Crear auth user en Supabase Auth
             response = self.client.auth.sign_up({
@@ -199,21 +209,35 @@ class SupabaseDB:
                 "password": password,
             })
             user_id = response.user.id
+            print(f"[CREATE_USER] Usuario creado en Auth: {user_id}")
             
-            # 2. Insertar en tabla users con org_id y company_name
+            # 2. Insertar en tabla users con mínimos campos (MULTI-TENANT compatible)
             self.client.table("users").insert({
                 "id": user_id,
                 "email": email,
-                "company_name": company_name,
-                "organization_id": org_id,
-                "is_admin": is_admin,
-                "created_by": created_by,
-                "status": "invited",
-                "created_at": "now()"
+                "full_name": email.split("@")[0],  # Extraer nombre de email como default
+                "is_master_admin": False,
+                "created_at": "now()",
+                "updated_at": "now()"
             }).execute()
+            print(f"[CREATE_USER] Usuario registrado en tabla users")
+            
+            # 3. Asignar a organización con rol apropiado
+            # role_id: 1=master_admin, 2=org_admin, 3=viewer
+            role_id = 2 if is_admin else 3
+            self.client.table("user_org_assignments").insert({
+                "user_id": user_id,
+                "org_id": org_id,
+                "role_id": role_id,
+                "assigned_at": "now()"
+            }).execute()
+            print(f"[CREATE_USER] Usuario asignado a org {org_id} con rol_id={role_id}")
             
             return {"success": True, "user_id": user_id, "email": email}
         except Exception as e:
+            print(f"[ERROR CREATE_USER] {str(e)}")
+            import traceback
+            traceback.print_exc()
             return {"success": False, "error": str(e)}
 
     def get_organization_users(self, org_id: str) -> List[Dict]:
