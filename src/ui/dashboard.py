@@ -1039,20 +1039,26 @@ class EmptyTab:
 
 class Dashboard:
     def _ensure_project_created(self):
-        """Auto-crear proyecto 'Default' si el usuario no tiene ninguno"""
+        """Auto-crear proyecto 'Default' si la organización no tiene ninguno"""
         user_id = st.session_state.get("user_id")
+        org_id = st.session_state.get("organization_id")
+        
         if not user_id or user_id == "demo-user-id":
             st.session_state.current_project_id = "demo-project"
             return
         
+        if not org_id:
+            st.session_state.current_project_id = "default"
+            return
+        
         try:
             db = get_db()
-            # Obtener proyectos del usuario
-            projects = db.get_projects(user_id)
+            # Obtener proyectos de la organización
+            projects = db.get_projects(org_id)
             
             if not projects:
                 # Crear proyecto Default automáticamente
-                result = db.create_project(user_id, "Default", "Proyecto de planificación por defecto")
+                result = db.create_project(org_id, user_id, "Default", "Proyecto de planificación por defecto")
                 if result["success"]:
                     st.session_state.current_project_id = result["project_id"]
                 else:

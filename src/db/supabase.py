@@ -363,11 +363,12 @@ class SupabaseDB:
 
     # ==================== PROYECTOS ====================
     
-    def create_project(self, user_id: str, project_name: str, description: str = "") -> Dict[str, Any]:
-        """Crea nuevo proyecto para usuario"""
+    def create_project(self, org_id: str, created_by: str, project_name: str, description: str = "") -> Dict[str, Any]:
+        """Crea nuevo proyecto para organización (MULTI-TENANT)"""
         try:
             response = self.client.table("projects").insert({
-                "user_id": user_id,
+                "org_id": org_id,
+                "created_by": created_by,
                 "name": project_name,
                 "description": description,
                 "created_at": "now()"
@@ -376,10 +377,10 @@ class SupabaseDB:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def get_projects(self, user_id: str) -> List[Dict]:
-        """Lista proyectos del usuario"""
+    def get_projects(self, org_id: str) -> List[Dict]:
+        """Lista proyectos de la organización (MULTI-TENANT)"""
         try:
-            response = self.client.table("projects").select("*").eq("user_id", user_id).execute()
+            response = self.client.table("projects").select("*").eq("org_id", org_id).execute()
             return response.data or []
         except Exception:
             return []
