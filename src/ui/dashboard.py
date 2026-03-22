@@ -183,6 +183,34 @@ def normalize_movements_to_legacy(movements_df: pd.DataFrame, is_v4: bool) -> pd
     return d
 
 
+def normalize_stock_to_legacy(stock_df: pd.DataFrame, is_v4: bool) -> pd.DataFrame:
+    """Convierte dataframe de stock v4 a pseudo-formato legacy.
+    
+    v4 columns: Producto_id, Año, Mes, Stock_posterior
+    Legacy-like columns: Codigo, Mes (datetime), Saldo_unid
+    """
+    if not is_v4:
+        # Ya está en formato legacy
+        return stock_df.copy()
+    
+    d = stock_df.copy()
+    
+    # Renombrar columnas principales
+    d = d.rename(columns={
+        'Producto_id': 'Codigo',
+        'Stock_posterior': 'Saldo_unid'
+    })
+    
+    # Convertir Año+Mes a formato Mes (datetime) como espera el legacy
+    if 'Año' in d.columns and 'Mes' in d.columns:
+        d['Mes'] = pd.to_datetime(d['Año'].astype(str) + '-' + d['Mes'].astype(str).str.zfill(2) + '-01')
+    
+    # Normalizar Codigo como string
+    d['Codigo'] = d['Codigo'].astype(str).str.strip()
+    
+    return d
+
+
 # ==================== FUNCIONES DE PRESENTACIÓN VISUAL ====================
 
 def display_prominent_chart(fig, title: str = "", description: str = ""):
@@ -2048,6 +2076,7 @@ class Dashboard:
         # === NORMALIZAR COLUMNAS: v4 → legacy para compatibilidad ===
         res_movements = normalize_movements_to_legacy(res_movements, is_v4=dataset_info['is_v4'])
         res_demand = normalize_demand_to_legacy(res_demand, is_v4=dataset_info['is_v4'])
+        res_stock = normalize_stock_to_legacy(res_stock, is_v4=dataset_info['is_v4'])
         
         # --- ABC (una vez) ---
         dm_abc = res_demand.copy()
