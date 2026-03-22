@@ -1,71 +1,64 @@
-"""Construcción de demanda mensual real (empresa).
+"""Construcción de demanda mensual para Dataset v4.
 
-Demanda mensual por producto se construye como la suma de 3 componentes:
+Demanda mensual se calcula como la suma de unidades vendidas (Tipo_movimiento='Venta')
+agrupadas por (Producto_id, Año-Mes).
 
-1) Venta Tienda Sin Doc  -> sum(Salida_unid)
-2) Salida por Consumo    -> sum(Salida_unid)
-3) Guía de remisión - R  -> solo la "salida externa neta" por guía-producto:
-      externa = max(0, sum(Salida_unid) - sum(Entrada_unid))
-   calculada por grupo (Documento, Numero, Codigo). Esto evita el doble conteo
-   cuando la guía tiene múltiples filas.
+Columnas de entrada requeridas:
+- Fecha, Producto_id, Tipo_movimiento, Cantidad
 
-Nota:
-- La demanda se agrega a nivel empresa (NO por bodega) para evitar duplicación
-  por transferencias internas entre almacenes.
+Columnas de salida:
+- Producto_id, Año, Mes, Cantidad_total (demanda)
 """
 
 from __future__ import annotations
 import pandas as pd
-from src.utils import config
+import logging
+
+logger = logging.getLogger(__name__)
+
+from src.utils.config import MOVEMENT_SALE
 
 
 class DemandBuilder:
     def build_monthly(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Construye tabla de demanda mensual desde transacciones diarias.
+        
+        Entrada: DataFrame v4 con Fecha, Producto_id, Tipo_movimiento, Cantidad
+        Salida: DataFrame con (Producto_id, Año, Mes, Cantidad_total)
+        """
         if df is None or df.empty:
-            return pd.DataFrame(columns=["Codigo", "Mes", "Demanda_Unid"])
+            logger.warning("DemandBuilder: DataFrame vacío")
+            return pd.DataFrame(columns=["Producto_id", "Año", "Mes", "Cantidad_total"])
 
         d = df.copy()
 
-        # Normalizar textos para comparación robusta
-        for col in ["Documento", "Codigo", "Numero"]:
-            if col in d.columns:
-                d[col] = d[col].astype(str).str.strip()
+        # Filtrar solo ventas (demanda)
+        d = d[d["Tipo_movimiento"] == MOVEMENT_SALE].copy()
+        
+        if d.empty:
+            logger.warning("DemandBuilder: No hay movimientos de tipo 'Venta'")
+            return pd.DataFrame(columns=["Producto_id", "Año", "Mes", "Cantidad_total"])
 
-        d["Mes"] = d["Fecha"].dt.to_period("M").dt.to_timestamp()
+        # Extraer año y mes
+        d["Año"] = d["Fecha"].dt.year
+        d["Mes"] = d["Fecha"].dt.month
 
-        # ------------------------------
-        # 1) Demanda directa (ventas + consumo)
-        # ------------------------------
-        direct = d[d["Documento"].isin(config.DEMAND_DIRECT_DOCS)].copy()
-        direct_monthly = (
-            direct.groupby(["Codigo", "Mes"], as_index=False)["Salida_unid"]
-                  .sum()
-                  .rename(columns={"Salida_unid": "Demanda_Unid"})
-        )
+        # Normalizar columnas de texto
+        d["Producto_id"] = d["Producto_id"].astype(str).str.strip()
 
-        # ------------------------------
-        # 2) Demanda por guías (YA reconciliadas)
-        #    Usamos el output de guide_reconciliation.py:
-        #    - Tipo_Guia == "VENTA_EXTERNA"
-        #    - Guia_Salida_Externa_Unid (prorrateada y reconciliada por MES)
-        # ------------------------------
-        if "Tipo_Guia" in d.columns and "Guia_Salida_Externa_Unid" in d.columns:
-            guia_ext = d[d["Tipo_Guia"] == "VENTA_EXTERNA"].copy()
-
-            guia_monthly = (
-                guia_ext.groupby(["Codigo", "Mes"], as_index=False)["Guia_Salida_Externa_Unid"]
-                        .sum()
-                        .rename(columns={"Guia_Salida_Externa_Unid": "Demanda_Unid"})
-            )
-        else:
-            guia_monthly = pd.DataFrame(columns=["Codigo", "Mes", "Demanda_Unid"])
-
-        # Unir demanda directa + demanda guías externas
-        monthly = pd.concat([direct_monthly, guia_monthly], ignore_index=True)
+        # Agregar por (Producto_id, Año, Mes)
         monthly = (
-            monthly.groupby(["Codigo", "Mes"], as_index=False)["Demanda_Unid"]
-                .sum()
+            d.groupby(["Producto_id", "Año", "Mes"], as_index=False)["Cantidad"]
+             .sum()
+             .rename(columns={"Cantidad": "Cantidad_total"})
         )
 
+        # Asegurar que Cantidad_total sea siempre positivo (es demanda)
+        monthly["Cantidad_total"] = monthly["Cantidad_total"].abs()
 
-        return monthly.sort_values(["Codigo", "Mes"]).reset_index(drop=True)
+        logger.info(
+            f"DemandBuilder: {len(monthly)} filas mensuales generadas "
+            f"({monthly['Producto_id'].nunique()} productos)"
+        )
+
+        return monthly.sort_values(["Producto_id", "Año", "Mes"]).reset_index(drop=True)

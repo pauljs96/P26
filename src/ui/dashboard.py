@@ -37,6 +37,70 @@ from src.db import get_db
 from src.storage import get_storage_manager
 
 
+# ==================== DETECCIÓN DE DATASET v4 ====================
+
+def detect_dataset_version(df: pd.DataFrame) -> dict:
+    """Detecta si el dataset es v4 o legacy basado en columnas.
+    
+    Retorna:
+    {
+        'is_v4': bool,
+        'version': 'v4' | 'legacy',
+        'confidence': float (0-1),
+        'missing_columns': list,
+        'extra_columns': list,
+    }
+    """
+    if df is None or df.empty:
+        return {'is_v4': False, 'version': 'unknown', 'confidence': 0.0, 'missing_columns': [], 'extra_columns': []}
+    
+    v4_required = {'Fecha', 'Producto_id', 'Tipo_movimiento', 'Cantidad', 'Stock_anterior', 'Stock_posterior'}
+    v4_optional = {'Año', 'Mes', 'Dia', 'Producto_nombre', 'Empresa_cliente', 'Departamento_cliente',
+                   'Canal_venta', 'Punto_venta', 'Precio_unitario', 'Descuento_pct', 'Valor_total',
+                   'Costo_unitario', 'Campana'}
+    
+    legacy_required = {'Codigo', 'Fecha', 'Documento', 'Entrada_unid', 'Salida_unid', 'Saldo_unid'}
+    
+    df_cols = set(df.columns)
+    
+    # Verificar v4
+    missing_v4 = v4_required - df_cols
+    has_v4_required = len(missing_v4) == 0
+    v4_optional_found = len((v4_optional & df_cols)) / len(v4_optional)
+    
+    # Verificar legacy
+    missing_legacy = legacy_required - df_cols
+    has_legacy_required = len(missing_legacy) == 0
+    
+    # Decisión
+    if has_v4_required and v4_optional_found > 0.3:
+        return {
+            'is_v4': True,
+            'version': 'v4',
+            'confidence': 0.95,
+            'missing_columns': list(missing_v4),
+            'extra_columns': list(df_cols - v4_required - v4_optional)
+        }
+    elif has_legacy_required:
+        return {
+            'is_v4': False,
+            'version': 'legacy',
+            'confidence': 0.95,
+            'missing_columns': list(missing_legacy),
+            'extra_columns': []
+        }
+    else:
+        # Incertidumbre
+        guess_v4 = v4_optional_found > 0.2
+        return {
+            'is_v4': guess_v4,
+            'version': 'v4' if guess_v4 else 'legacy',
+            'confidence': 0.5,
+            'missing_columns': list(missing_v4 if guess_v4 else missing_legacy),
+            'extra_columns': list(df_cols - v4_required - v4_optional if guess_v4 else df_cols - legacy_required)
+        }
+
+
 # ==================== FUNCIONES DE PRESENTACIÓN VISUAL ====================
 
 def display_prominent_chart(fig, title: str = "", description: str = ""):
@@ -1644,32 +1708,84 @@ class Dashboard:
             
             st.sidebar.write("✨ Los datos están listos para análisis")
             
+            # === DETECCIÓN DE VERSIÓN (v4 vs legacy) ===
+            dataset_info = detect_dataset_version(res_movements)
+            
             # === MOSTRAR KPIs COMPACTOS EN SIDEBAR ===
             st.sidebar.divider()
             if res_demand is not None and res_movements is not None:
-                with st.sidebar.expander("📊 Resumen de Datos", expanded=False):
+                with st.sidebar.expander("📊 Resumen de Datos", expanded=True):
                     try:
-                        dm_kpi = res_demand.copy()
-                        dm_kpi["Codigo"] = dm_kpi["Codigo"].astype(str).str.strip()
-                        abc_kpi = build_abc_from_demand(dm_kpi)
+                        # Mostrar versión del dataset
+                        if dataset_info['is_v4']:
+                            st.success(f"✅ Dataset v4 (Confianza: {dataset_info['confidence']:.0%})")
+                        else:
+                            st.info(f"ℹ️ Dataset Legacy (Confianza: {dataset_info['confidence']:.0%})")
                         
+                        # Columnas de ID dependiendo de versión
+                        col_id = "Producto_id" if dataset_info['is_v4'] else "Codigo"
+                        col_periodo = "Mes" if dataset_info['is_v4'] else "Mes"
+                        
+                        # KPIs básicos
                         col1, col2 = st.columns(2)
                         with col1:
-                            st.metric("📦 Productos", res_demand["Codigo"].nunique())
-                            st.metric("🔴 Clase A", len(abc_kpi[abc_kpi["ABC"] == "A"]))
+                            st.metric("📦 Productos", res_demand[col_id].nunique())
+                            if dataset_info['is_v4']:
+                                # Para v4: mostrar tipos de movimiento
+                                ventas = (res_movements['Tipo_movimiento'] == 'Venta').sum()
+                                st.metric("🛒 Ventas", f"{ventas:,}")
+                            else:
+                                # Para legacy: mostrar clases ABC
+                                dm_kpi = res_demand.copy()
+                                dm_kpi[col_id] = dm_kpi[col_id].astype(str).str.strip()
+                                abc_kpi = build_abc_from_demand(dm_kpi)
+                                st.metric("🔴 Clase A", len(abc_kpi[abc_kpi["ABC"] == "A"]))
+                        
                         with col2:
-                            st.metric("📅 Meses", len(res_demand["Mes"].unique()))
-                            st.metric("🟡 Clase B", len(abc_kpi[abc_kpi["ABC"] == "B"]))
+                            st.metric(f"📅 Períodos", len(res_demand[col_periodo].unique()))
+                            if dataset_info['is_v4']:
+                                # Para v4: mostrar producciones
+                                producciones = (res_movements['Tipo_movimiento'] == 'Producción').sum()
+                                st.metric("🏭 Producciones", f"{producciones:,}")
+                            else:
+                                dm_kpi = res_demand.copy()
+                                dm_kpi[col_id] = dm_kpi[col_id].astype(str).str.strip()
+                                abc_kpi = build_abc_from_demand(dm_kpi)
+                                st.metric("🟡 Clase B", len(abc_kpi[abc_kpi["ABC"] == "B"]))
                         
                         col3, col4 = st.columns(2)
                         with col3:
-                            st.metric("📋 Movimientos", len(res_movements))
-                            st.metric("🟢 Clase C", len(abc_kpi[abc_kpi["ABC"] == "C"]))
+                            st.metric("📋 Movimientos", f"{len(res_movements):,}")
+                            if not dataset_info['is_v4']:
+                                dm_kpi = res_demand.copy()
+                                dm_kpi[col_id] = dm_kpi[col_id].astype(str).str.strip()
+                                abc_kpi = build_abc_from_demand(dm_kpi)
+                                st.metric("🟢 Clase C", len(abc_kpi[abc_kpi["ABC"] == "C"]))
+                        
                         with col4:
-                            min_mes = res_demand["Mes"].min()
-                            max_mes = res_demand["Mes"].max()
-                            period_str = f"{min_mes.strftime('%Y-%m')}\n{max_mes.strftime('%Y-%m')}"
-                            st.caption(f"Período:\n{period_str}")
+                            if col_periodo in res_demand.columns:
+                                min_mes = res_demand[col_periodo].min()
+                                max_mes = res_demand[col_periodo].max()
+                                if isinstance(min_mes, pd.Timestamp):
+                                    period_str = f"{min_mes.strftime('%Y-%m')}\na {max_mes.strftime('%Y-%m')}"
+                                else:
+                                    period_str = f"{str(min_mes)}\na {str(max_mes)}"
+                                st.caption(f"Período:\n{period_str}")
+                        
+                        # Información adicional para v4
+                        if dataset_info['is_v4']:
+                            st.divider()
+                            st.caption("**Dataset v4 - Características:**")
+                            if 'Canal_venta' in res_movements.columns:
+                                canales = res_movements['Canal_venta'].nunique()
+                                st.caption(f"📍 Canales: {canales}")
+                            if 'Empresa_cliente' in res_movements.columns:
+                                clientes = res_movements['Empresa_cliente'].nunique()
+                                st.caption(f"🏢 Clientes: {clientes}")
+                            if 'Campana' in res_movements.columns:
+                                campanas = res_movements['Campana'].nunique()
+                                st.caption(f"📢 Campañas: {campanas}")
+                    
                     except Exception as e:
                         st.warning(f"⚠️ Error mostrando KPIs: {str(e)[:100]}")
             else:
@@ -1809,11 +1925,22 @@ class Dashboard:
         if res_movements is None or res_demand is None or res_stock is None:
             st.error("❌ No hay data disponible para análisis")
             return
+        
+        # === DETECTAR VERSIÓN DEL DATASET ===
+        dataset_info = detect_dataset_version(res_movements)
+        st.session_state.dataset_version = dataset_info  # Guardar en sesión para acceso global
+        
+        # Mostrar banner de versión (visible)
+        if dataset_info['is_v4']:
+            st.info(f"📊 **Dataset v4 (Inventario ML Completo)** - Datos procesados por pipeline v4 optimizado")
+        else:
+            st.info(f"📊 **Dataset Legacy (ERP Mayor-Auxiliar)** - Datos procesados por pipeline compatibility")
 
         # --- ABC (una vez) ---
         dm_abc = res_demand.copy()
-        dm_abc["Codigo"] = dm_abc["Codigo"].astype(str).str.strip()
-        abc_df = build_abc_from_demand(dm_abc)  # columnas: Codigo, Demanda_Total, Share, CumShare, ABC
+        col_id = "Producto_id" if dataset_info['is_v4'] else "Codigo"
+        dm_abc[col_id] = dm_abc[col_id].astype(str).str.strip()
+        abc_df = build_abc_from_demand(dm_abc)  # columnas: Codigo/Producto_id, Demanda_Total, Share, CumShare, ABC
 
         # === FILTROS EN SIDEBAR (compacto) ===
         st.sidebar.divider()
@@ -1830,7 +1957,7 @@ class Dashboard:
             with col_prod:
                 # 2) Productos filtrados por ABC
                 if abc_sel == "Todos":
-                    productos = sorted(res_movements["Codigo"].dropna().astype(str).str.strip().unique().tolist())
+                    productos = sorted(res_movements[col_id].dropna().astype(str).str.strip().unique().tolist())
                 else:
                     productos = (
                         abc_df[abc_df["ABC"] == abc_sel]["Codigo"]

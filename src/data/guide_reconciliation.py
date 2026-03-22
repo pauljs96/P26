@@ -1,53 +1,34 @@
 """
-Reconciliación de guías de remisión (por MES).
+Reconciliación de datos v4 (pass-through).
 
-Objetivo:
-- Distinguir 'movimiento interno' vs 'venta externa' dentro de 'Guía de remisión - R'
-- Evitar mezclar operaciones cuando el mismo (Documento, Numero, Codigo) se repite en meses distintos.
+En Dataset v4:
+- Tipo_movimiento ya está definido ('Venta' o 'Producción')
+- No hay guías de remisión ni distinción interna/externa
+- Stock ya es coherente
 
-Regla de negocio (BINARIA, sin tolerancias):
-Para cada grupo (Documento, Numero, Codigo, Mes):
-- Si existe al menos una Entrada_unid > 0  -> TRANSFERENCIA_INTERNA y externa = 0
-- Si NO existe ninguna entrada (Entrada_total == 0) y hay salida -> VENTA_EXTERNA y externa = Salida_total
-- Si no hay salida -> externa = 0 (no aporta demanda)
-
-Importante:
-- El valor "externa" NO debe duplicarse por fila al sumar por mes.
-  Por eso se prorratea SOLO en filas con Salida_unid > 0:
-      Guia_Salida_Externa_Unid_fila = Salida_Externa_Unid_grupo * (Salida_unid_fila / Salida_total_grupo)
-
-Columnas esperadas en df de entrada:
-- Documento, Numero, Codigo, Fecha, Entrada_unid, Salida_unid
+Por lo tanto, esta clase simplemente retorna el df sin cambios.
+No se realiza ninguna transformación.
 """
 
 from __future__ import annotations
 import pandas as pd
-import numpy as np
+import logging
 
-from src.utils import config
+logger = logging.getLogger(__name__)
 
 
 class GuideReconciler:
     def reconcile(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Pass-through: retorna el dataframe sin cambios.
+        
+        Para v4, la reconciliación no es necesaria.
+        """
         if df is None or df.empty:
+            logger.warning("GuideReconciler: DataFrame vacío recibido")
             return pd.DataFrame()
 
-        out = df.copy()
-
-        # Normalizar Documento para evitar problemas por espacios
-        out["Documento"] = out["Documento"].astype(str).str.strip()
-
-        # Crear columnas por defecto
-        out["Tipo_Guia"] = "NO_GUIA"
-        out["Guia_Salida_Externa_Unid"] = 0.0
-
-        # Máscara de guías
-        guia_mask = out["Documento"] == config.GUIDE_DOC
-        if not guia_mask.any():
-            return out
-
-        # Asegurar datetime
-        # Parsear fechas con múltiples formatos soportados
+        logger.info(f"GuideReconciler (pass-through): {len(df)} filas, sin transformaciones")
+        return df
         out["Fecha"] = pd.to_datetime(out["Fecha"], format='%Y-%m-%d', errors='coerce')
         
         # Si hay NaNs, intentar con formato europeo DD/MM/YYYY
