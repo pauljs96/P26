@@ -3141,104 +3141,116 @@ class Dashboard:
                 else:
                     # ==================== RESUMEN EJECUTIVO STOCK ====================
                     if not splot.empty:
-                        stock_promedio = float(splot["Saldo_unid"].mean())
-                        stock_max = float(splot["Saldo_unid"].max())
-                        stock_min = float(splot["Saldo_unid"].min())
-                        stock_reciente = float(splot.iloc[-1]["Saldo_unid"])
-                        stock_anterior = float(splot.iloc[-2]["Saldo_unid"]) if len(splot) > 1 else stock_reciente
-                        cambio_stock = stock_reciente - stock_anterior
-                        ocupacion_actual = (stock_reciente / stock_max * 100) if stock_max != 0 else 0
+                        # Detectar el nombre de la columna de stock (puede ser Saldo_unid, Stock_Unid o Stock_posterior)
+                        stock_col = None
+                        if "Saldo_unid" in splot.columns:
+                            stock_col = "Saldo_unid"
+                        elif "Stock_Unid" in splot.columns:
+                            stock_col = "Stock_Unid"
+                        elif "Stock_posterior" in splot.columns:
+                            stock_col = "Stock_posterior"
                         
-                        # Calcular cobertura (días)
-                        dm = res_demand.copy()
-                        dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
-                        demanda_diaria = dm[dm["Codigo"] == str(prod_sel)]["Demanda_Unid"].sum() / len(dm) if not dm[dm["Codigo"] == str(prod_sel)].empty else 1
-                        cobertura_dias = (stock_reciente / demanda_diaria) if demanda_diaria > 0 else 0
-                        
-                        # Mostrar KPIs
-                        col_s1, col_s2, col_s3, col_s4 = st.columns(4)
-                        
-                        with col_s1:
-                            st.metric(
-                                "📈 Promedio",
-                                f"{stock_promedio:,.0f} unid",
-                                f"Rango: {stock_min:,.0f} a {stock_max:,.0f}"
-                            )
-                        
-                        with col_s2:
-                            cambio_emoji = "📈" if cambio_stock > 0 else "📉" if cambio_stock < 0 else "➡️"
-                            st.metric(
-                                f"{cambio_emoji} Stock Actual",
-                                f"{stock_reciente:,.0f} unid",
-                                f"{cambio_stock:+.0f} respecto mes anterior"
-                            )
-                        
-                        with col_s3:
-                            ocupacion_status = "🟢 Óptimo" if 30 <= ocupacion_actual <= 80 else "🟡 Revisar" if ocupacion_actual > 80 else "🔴 Bajo"
-                            st.metric(
-                                "🎯 Ocupación",
-                                f"{ocupacion_actual:.1f}%",
-                                ocupacion_status
-                            )
-                        
-                        with col_s4:
-                            cobertura_status = "🟢 Bien" if cobertura_dias >= 7 else "🟡 Justo" if cobertura_dias >= 3 else "🔴 Crítico"
-                            st.metric(
-                                "⏱️ Cobertura",
-                                f"{cobertura_dias:.1f} días",
-                                cobertura_status
-                            )
-                        
-                        # Explicación visual
-                        st.markdown("""
-                        <div style='background: linear-gradient(135deg, #f3e5f5 0%, #f5f5f5 100%); padding: 14px; border-left: 4px solid #9c27b0; border-radius: 8px; margin-bottom: 1em;'>
-                            <p style='margin: 0; color: #333; font-size: 0.9em;'>
-                                <strong>💡 Qué observar:</strong><br>
-                                • <strong>Stock Actual:</strong> Cantidad disponible ahora. Si baja mucho = riesgo de quiebre.<br>
-                                • <strong>Ocupación:</strong> % del máximo histórico. 30-80% es ideal para no exceso ni falta.<br>
-                                • <strong>Cobertura (días):</strong> Cuántos días de demanda cubre el stock actual. Mínimo recomendado: 7-10 días.<br>
-                                • <strong>Tendencia:</strong> Si stock crece = producción > demanda. Si baja = demanda > producción.
-                            </p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    
-                    # Gráfico con línea de referencia
-                    fig_stock = px.line(
-                        splot, x="Mes", y="Saldo_unid", markers=True,
-                        title=f"Stock mensual histórico - Producto {prod_sel}",
-                        height=400
-                    )
-                    fig_stock.add_hline(y=stock_promedio, line_dash="dash", line_color="orange", 
-                                       annotation_text=f"Promedio: {stock_promedio:,.0f}", annotation_position="right")
-                    st.plotly_chart(fig_stock, use_container_width=True)
-                    
-                    # Análisis de volatilidad
-                    with st.expander("📊 Análisis Detallado de Stock", expanded=False):
-                        col_a1, col_a2 = st.columns(2)
-                        
-                        with col_a1:
-                            volatilidad_stock = float(splot["Saldo_unid"].std())
-                            coeficiente_var = (volatilidad_stock / stock_promedio * 100) if stock_promedio > 0 else 0
+                        if stock_col is None:
+                            st.warning(f"⚠️ No se encontró columna de stock. Columnas disponibles: {list(splot.columns)}")
+                        else:
+                            stock_promedio = float(splot[stock_col].mean())
+                            stock_max = float(splot[stock_col].max())
+                            stock_min = float(splot[stock_col].min())
+                            stock_reciente = float(splot.iloc[-1][stock_col])
+                            stock_anterior = float(splot.iloc[-2][stock_col]) if len(splot) > 1 else stock_reciente
+                            cambio_stock = stock_reciente - stock_anterior
+                            ocupacion_actual = (stock_reciente / stock_max * 100) if stock_max != 0 else 0
                             
-                            st.markdown(f"""
-                            **📉 Volatilidad:**
-                            - Desv. Estándar: {volatilidad_stock:,.0f} unid
-                            - Coef. Variación: {coeficiente_var:.1f}%
+                            # Calcular cobertura (días)
+                            dm = res_demand.copy()
+                            dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
+                            demanda_diaria = dm[dm["Codigo"] == str(prod_sel)]["Demanda_Unid"].sum() / len(dm) if not dm[dm["Codigo"] == str(prod_sel)].empty else 1
+                            cobertura_dias = (stock_reciente / demanda_diaria) if demanda_diaria > 0 else 0
                             
-                            **Status:** {'🔴 Alta variabilidad' if coeficiente_var > 50 else '🟡 Moderada' if coeficiente_var > 25 else '🟢 Estable'}
-                            """)
-                        
-                        with col_a2:
-                            meses_bajo_promedio = len(splot[splot["Saldo_unid"] < stock_promedio])
-                            pct_bajo = (meses_bajo_promedio / len(splot) * 100) if len(splot) > 0 else 0
+                            # Mostrar KPIs
+                            col_s1, col_s2, col_s3, col_s4 = st.columns(4)
                             
-                            st.markdown(f"""
-                            **📈 Distribución:**
-                            - Meses bajo promedio: {meses_bajo_promedio} ({pct_bajo:.1f}%)
-                            - Stock máximo: {stock_max:,.0f} unid
-                            - Stock mínimo: {stock_min:,.0f} unid
-                            - Rango total: {stock_max - stock_min:,.0f} unid
-                            """)
+                            with col_s1:
+                                st.metric(
+                                    "📈 Promedio",
+                                    f"{stock_promedio:,.0f} unid",
+                                    f"Rango: {stock_min:,.0f} a {stock_max:,.0f}"
+                                )
+                            
+                            with col_s2:
+                                cambio_emoji = "📈" if cambio_stock > 0 else "📉" if cambio_stock < 0 else "➡️"
+                                st.metric(
+                                    f"{cambio_emoji} Stock Actual",
+                                    f"{stock_reciente:,.0f} unid",
+                                    f"{cambio_stock:+.0f} respecto mes anterior"
+                                )
+                            
+                            with col_s3:
+                                ocupacion_status = "🟢 Óptimo" if 30 <= ocupacion_actual <= 80 else "🟡 Revisar" if ocupacion_actual > 80 else "🔴 Bajo"
+                                st.metric(
+                                    "🎯 Ocupación",
+                                    f"{ocupacion_actual:.1f}%",
+                                    ocupacion_status
+                                )
+                            
+                            with col_s4:
+                                cobertura_status = "🟢 Bien" if cobertura_dias >= 7 else "🟡 Justo" if cobertura_dias >= 3 else "🔴 Crítico"
+                                st.metric(
+                                    "⏱️ Cobertura",
+                                    f"{cobertura_dias:.1f} días",
+                                    cobertura_status
+                                )
+                            
+                            # Explicación visual
+                            st.markdown("""
+                            <div style='background: linear-gradient(135deg, #f3e5f5 0%, #f5f5f5 100%); padding: 14px; border-left: 4px solid #9c27b0; border-radius: 8px; margin-bottom: 1em;'>
+                                <p style='margin: 0; color: #333; font-size: 0.9em;'>
+                                    <strong>💡 Qué observar:</strong><br>
+                                    • <strong>Stock Actual:</strong> Cantidad disponible ahora. Si baja mucho = riesgo de quiebre.<br>
+                                    • <strong>Ocupación:</strong> % del máximo histórico. 30-80% es ideal para no exceso ni falta.<br>
+                                    • <strong>Cobertura (días):</strong> Cuántos días de demanda cubre el stock actual. Mínimo recomendado: 7-10 días.<br>
+                                    • <strong>Tendencia:</strong> Si stock crece = producción > demanda. Si baja = demanda > producción.
+                                </p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Gráfico con línea de referencia
+                            fig_stock = px.line(
+                                splot, x="Mes", y=stock_col, markers=True,
+                                title=f"Stock mensual histórico - Producto {prod_sel}",
+                                height=400
+                            )
+                            fig_stock.add_hline(y=stock_promedio, line_dash="dash", line_color="orange", 
+                                               annotation_text=f"Promedio: {stock_promedio:,.0f}", annotation_position="right")
+                            st.plotly_chart(fig_stock, use_container_width=True)
+                            
+                            # Análisis de volatilidad
+                            with st.expander("📊 Análisis Detallado de Stock", expanded=False):
+                                col_a1, col_a2 = st.columns(2)
+                                
+                                with col_a1:
+                                    volatilidad_stock = float(splot[stock_col].std())
+                                    coeficiente_var = (volatilidad_stock / stock_promedio * 100) if stock_promedio > 0 else 0
+                                    
+                                    st.markdown(f"""
+                                    **📉 Volatilidad:**
+                                    - Desv. Estándar: {volatilidad_stock:,.0f} unid
+                                    - Coef. Variación: {coeficiente_var:.1f}%
+                                    
+                                    **Status:** {'🔴 Alta variabilidad' if coeficiente_var > 50 else '🟡 Moderada' if coeficiente_var > 25 else '🟢 Estable'}
+                                    """)
+                                
+                                with col_a2:
+                                    meses_bajo_promedio = len(splot[splot[stock_col] < stock_promedio])
+                                    pct_bajo = (meses_bajo_promedio / len(splot) * 100) if len(splot) > 0 else 0
+                                    
+                                    st.markdown(f"""
+                                    **📈 Distribución:**
+                                    - Meses bajo promedio: {meses_bajo_promedio} ({pct_bajo:.1f}%)
+                                    - Stock máximo: {stock_max:,.0f} unid
+                                    - Stock mínimo: {stock_min:,.0f} unid
+                                    - Rango total: {stock_max - stock_min:,.0f} unid
+                                    """)
 
             st.divider()
 
