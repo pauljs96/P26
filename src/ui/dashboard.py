@@ -146,6 +146,43 @@ def normalize_demand_to_legacy(demand_df: pd.DataFrame, is_v4: bool) -> pd.DataF
     return d
 
 
+def normalize_movements_to_legacy(movements_df: pd.DataFrame, is_v4: bool) -> pd.DataFrame:
+    """Convierte dataframe de movimientos v4 a pseudo-formato legacy.
+    
+    v4 columns: Producto_id, Tipo_movimiento, Cantidad, etc.
+    Legacy-like columns: Codigo, Documento, Salida_unid
+    """
+    if not is_v4:
+        # Ya está en formato legacy
+        return movements_df.copy()
+    
+    d = movements_df.copy()
+    
+    # Renombrar columnas principales
+    d = d.rename(columns={
+        'Producto_id': 'Codigo',
+        'Tipo_movimiento': 'Documento',
+        'Cantidad': 'Cantidad_reg',
+    })
+    
+    # Para v4, Salida_unid es Cantidad solo si es Venta
+    d['Salida_unid'] = d.apply(
+        lambda row: abs(row['Cantidad_reg']) if row['Documento'] == 'Venta' else 0.0,
+        axis=1
+    )
+    
+    # Normalizar Codigo como string
+    d['Codigo'] = d['Codigo'].astype(str).str.strip()
+    
+    # Agregar columnas dummy para compatibilidad
+    if 'Numero' not in d.columns:
+        d['Numero'] = ''
+    if 'Bodega' not in d.columns:
+        d['Bodega'] = ''
+    
+    return d
+
+
 # ==================== FUNCIONES DE PRESENTACIÓN VISUAL ====================
 
 def display_prominent_chart(fig, title: str = "", description: str = ""):
@@ -232,58 +269,87 @@ def _normalize_text(s: pd.Series) -> pd.Series:
 
 def build_monthly_components(movements: pd.DataFrame, codigo: str) -> pd.DataFrame:
     """Construye la tabla mensual de componentes de demanda para un producto.
-
-    Componentes:
+    
+    Funciona con ambos formatos:
+    - v4: Producto_id, Tipo_movimiento, Cantidad
+    - Legacy: Codigo, Documento, Salida_unid
+    
+    Componentes (legacy):
     - Venta Tienda Sin Doc: sum(Salida_unid)
     - Salida por Consumo:   sum(Salida_unid)
     - Guía externa (YA reconciliada): sum(Guia_Salida_Externa_Unid) solo cuando Tipo_Guia == VENTA_EXTERNA
+    
+    Componentes (v4):
+    - Solo Venta: sum(Cantidad)
     """
     if movements is None or movements.empty:
         return pd.DataFrame(columns=["Mes", "Venta_Tienda", "Consumo", "Guia_Externa", "Demanda_Total"])
 
-    df = movements[movements["Codigo"] == str(codigo)].copy()
-    if df.empty:
-        return pd.DataFrame(columns=["Mes", "Venta_Tienda", "Consumo", "Guia_Externa", "Demanda_Total"])
-
-    # Normalizar texto (evita problemas por espacios)
-    df["Documento"] = _normalize_text(df["Documento"])
-    df["Numero"] = _normalize_text(df["Numero"])
-
-    df["Mes"] = df["Fecha"].dt.to_period("M").dt.to_timestamp()
-
-    # 1) Ventas
-    venta = (
-        df[df["Documento"] == config.DOC_VENTA_TIENDA]
-        .groupby("Mes", as_index=False)["Salida_unid"]
-        .sum()
-        .rename(columns={"Salida_unid": "Venta_Tienda"})
-    )
-
-    # 2) Consumo
-    consumo = (
-        df[df["Documento"] == config.DOC_SALIDA_CONSUMO]
-        .groupby("Mes", as_index=False)["Salida_unid"]
-        .sum()
-        .rename(columns={"Salida_unid": "Consumo"})
-    )
-
-    # 3) Guía externa (YA reconciliada por guide_reconciliation.py)
-    if "Tipo_Guia" not in df.columns or "Guia_Salida_Externa_Unid" not in df.columns:
+    # auto-detectar formato
+    is_v4 = "Producto_id" in movements.columns
+    
+    if is_v4:
+        # ========== FORMATO V4 (SIMPLE) ==========
+        df = movements[movements["Producto_id"].astype(str).str.strip() == str(codigo)].copy()
+        if df.empty:
+            return pd.DataFrame(columns=["Mes", "Venta_Tienda", "Consumo", "Guia_Externa", "Demanda_Total"])
+        
+        df["Mes"] = df["Fecha"].dt.to_period("M").dt.to_timestamp()
+        
+        # v4: Solo suma de ventas (Tipo_movimiento == 'Venta')
+        venta = (
+            df[df["Tipo_movimiento"] == "Venta"]
+            .groupby("Mes", as_index=False)["Cantidad"]
+            .sum()
+            .rename(columns={"Cantidad": "Venta_Tienda"})
+        )
+        
+        # v4 no tiene consumo ni guías externas
+        consumo = pd.DataFrame(columns=["Mes", "Consumo"])
         guia_m = pd.DataFrame(columns=["Mes", "Guia_Externa"])
     else:
-        guia_ext = df[df["Tipo_Guia"] == "VENTA_EXTERNA"].copy()
-        if guia_ext.empty:
+        # ========== FORMATO LEGACY ==========
+        df = movements[movements["Codigo"] == str(codigo)].copy()
+        if df.empty:
+            return pd.DataFrame(columns=["Mes", "Venta_Tienda", "Consumo", "Guia_Externa", "Demanda_Total"])
+
+        # Normalizar texto (evita problemas por espacios)
+        df["Documento"] = _normalize_text(df["Documento"])
+        df["Numero"] = _normalize_text(df["Numero"])
+
+        df["Mes"] = df["Fecha"].dt.to_period("M").dt.to_timestamp()
+
+        # 1) Ventas
+        venta = (
+            df[df["Documento"] == config.DOC_VENTA_TIENDA]
+            .groupby("Mes", as_index=False)["Salida_unid"]
+            .sum()
+            .rename(columns={"Salida_unid": "Venta_Tienda"})
+        )
+
+        # 2) Consumo
+        consumo = (
+            df[df["Documento"] == config.DOC_SALIDA_CONSUMO]
+            .groupby("Mes", as_index=False)["Salida_unid"]
+            .sum()
+            .rename(columns={"Salida_unid": "Consumo"})
+        )
+
+        # 3) Guía externa (YA reconciliada por guide_reconciliation.py)
+        if "Tipo_Guia" not in df.columns or "Guia_Salida_Externa_Unid" not in df.columns:
             guia_m = pd.DataFrame(columns=["Mes", "Guia_Externa"])
         else:
-            guia_m = (
-                guia_ext.groupby("Mes", as_index=False)["Guia_Salida_Externa_Unid"]
-                .sum()
-                .rename(columns={"Guia_Salida_Externa_Unid": "Guia_Externa"})
-            )
+            guia_ext = df[df["Tipo_Guia"] == "VENTA_EXTERNA"].copy()
+            if guia_ext.empty:
+                guia_m = pd.DataFrame(columns=["Mes", "Guia_Externa"])
+            else:
+                guia_m = (
+                    guia_ext.groupby("Mes", as_index=False)["Guia_Salida_Externa_Unid"]
+                    .sum()
+                    .rename(columns={"Guia_Salida_Externa_Unid": "Guia_Externa"})
+                )
 
-    # Debug (solo dentro del tab de demanda, se controla desde el caller)
     # Unir y completar meses faltantes (base completa)
- 
     min_mes = df["Mes"].min()
     max_mes = df["Mes"].max()
     months = pd.DataFrame({"Mes": pd.date_range(min_mes, max_mes, freq="MS")})
@@ -1982,6 +2048,7 @@ class Dashboard:
             st.info(f"📊 **Dataset Legacy (ERP Mayor-Auxiliar)** - Datos procesados por pipeline compatibility")
 
         # === NORMALIZAR COLUMNAS: v4 → legacy para compatibilidad ===
+        res_movements = normalize_movements_to_legacy(res_movements, is_v4=dataset_info['is_v4'])
         res_demand = normalize_demand_to_legacy(res_demand, is_v4=dataset_info['is_v4'])
         
         # --- ABC (una vez) ---
@@ -2003,7 +2070,7 @@ class Dashboard:
             with col_prod:
                 # 2) Productos filtrados por ABC
                 if abc_sel == "Todos":
-                    productos = sorted(res_movements[col_id].dropna().astype(str).str.strip().unique().tolist())
+                    productos = sorted(res_movements["Codigo"].dropna().astype(str).str.strip().unique().tolist())
                 else:
                     productos = (
                         abc_df[abc_df["ABC"] == abc_sel]["Codigo"]
@@ -2469,17 +2536,19 @@ class Dashboard:
 
             st.divider()
 
-            st.subheader("🧾 Diagnóstico: Guías de remisión")
-            guia = res_movements[res_movements["Documento"].astype(str).str.strip() == config.GUIDE_DOC].copy()
-            if guia.empty:
-                st.info("No se encontraron guías de remisión en los archivos cargados.")
-            else:
-                with st.expander("🔎 Muestra de guías (filas)", expanded=False):
-                    cols = [
-                        "Fecha", "Codigo", "Bodega", "Documento", "Numero",
-                        "Entrada_unid", "Salida_unid", "Tipo_Guia", "Guia_Salida_Externa_Unid"
-                    ]
-                    st.dataframe(guia[cols].sort_values("Fecha").head(300), use_container_width=True)
+            # Solo mostrar análisis de guías para dataset legacy
+            if not dataset_info['is_v4']:
+                st.subheader("🧾 Diagnóstico: Guías de remisión")
+                guia = res_movements[res_movements["Documento"].astype(str).str.strip() == config.GUIDE_DOC].copy()
+                if guia.empty:
+                    st.info("No se encontraron guías de remisión en los archivos cargados.")
+                else:
+                    with st.expander("🔎 Muestra de guías (filas)", expanded=False):
+                        cols = [
+                            "Fecha", "Codigo", "Bodega", "Documento", "Numero",
+                            "Entrada_unid", "Salida_unid", "Tipo_Guia", "Guia_Salida_Externa_Unid"
+                        ]
+                        st.dataframe(guia[cols].sort_values("Fecha").head(300), use_container_width=True)
 
         # ==========================================================
         # TAB: COMPARADOR DE MODELOS (CONSOLIDADO)
