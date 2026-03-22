@@ -98,7 +98,8 @@ def json_to_dataframe(json_str: str) -> pd.DataFrame:
     
     try:
         # read_json con orient='split' restaura preserva índices y tipos automáticamente
-        df = pd.read_json(json_str, orient='split')
+        from io import StringIO
+        df = pd.read_json(StringIO(json_str), orient='split')
         
         # Asegurar que columnas con 'Fecha' sean datetime (por si acaso)
         for col in df.columns:
