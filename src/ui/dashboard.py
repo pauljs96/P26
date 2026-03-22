@@ -3279,7 +3279,7 @@ class Dashboard:
                     stock["Codigo"] = stock["Codigo"].astype(str).str.strip()
                     splot = stock[stock["Codigo"] == str(prod_sel)].copy().sort_values("Mes")
                     if not splot.empty:
-stock_actual = float(splot.iloc[-1]["Saldo_unid"])
+                        stock_actual = float(splot.iloc[-1]["Saldo_unid"])
 
                 # ABC (calculado por demanda total)
                 abc_df = build_abc_from_demand(dm)
