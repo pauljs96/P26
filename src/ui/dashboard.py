@@ -116,6 +116,36 @@ def get_column_names(is_v4: bool) -> dict:
     }
 
 
+def normalize_demand_to_legacy(demand_df: pd.DataFrame, is_v4: bool) -> pd.DataFrame:
+    """Convierte dataframe de demanda v4 a formato legacy para compatibilidad.
+    
+    v4 columns: Producto_id, Año, Mes, Cantidad_total
+    Legacy columns: Codigo, Mes (datetime), Demanda_Unid
+    
+    Esto permite que funciones legacy del dashboard trabajen con datos v4 sin cambios.
+    """
+    if not is_v4:
+        # Ya está en formato legacy
+        return demand_df.copy()
+    
+    d = demand_df.copy()
+    
+    # Renombrar columnas: v4 → legacy
+    d = d.rename(columns={
+        'Producto_id': 'Codigo',
+        'Cantidad_total': 'Demanda_Unid'
+    })
+    
+    # Convertir Año+Mes a formato Mes (datetime) como espera el legacy
+    if 'Año' in d.columns and 'Mes' in d.columns:
+        d['Mes'] = pd.to_datetime(d['Año'].astype(str) + '-' + d['Mes'].astype(str).str.zfill(2) + '-01')
+    
+    # Normalizar Codigo como string
+    d['Codigo'] = d['Codigo'].astype(str).str.strip()
+    
+    return d
+
+
 # ==================== FUNCIONES DE PRESENTACIÓN VISUAL ====================
 
 def display_prominent_chart(fig, title: str = "", description: str = ""):
@@ -1951,10 +1981,11 @@ class Dashboard:
         else:
             st.info(f"📊 **Dataset Legacy (ERP Mayor-Auxiliar)** - Datos procesados por pipeline compatibility")
 
+        # === NORMALIZAR COLUMNAS: v4 → legacy para compatibilidad ===
+        res_demand = normalize_demand_to_legacy(res_demand, is_v4=dataset_info['is_v4'])
+        
         # --- ABC (una vez) ---
         dm_abc = res_demand.copy()
-        col_id = "Producto_id" if dataset_info['is_v4'] else "Codigo"
-        dm_abc[col_id] = dm_abc[col_id].astype(str).str.strip()
         abc_df = build_abc_from_demand(dm_abc)  # columnas: Codigo/Producto_id, Demanda_Total, Share, CumShare, ABC
 
         # === FILTROS EN SIDEBAR (compacto) ===
