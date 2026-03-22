@@ -420,13 +420,37 @@ def build_monthly_components(movements: pd.DataFrame, codigo: str) -> pd.DataFra
         # Salida_unid ya está calculado (positivo para Venta, 0 para Producción)
         df["Mes"] = df["Fecha"].dt.to_period("M").dt.to_timestamp()
         
-        # v4: Solo suma de ventas
-        venta = (
-            df[df["Documento"] == "Venta"]
-            .groupby("Mes", as_index=False)["Salida_unid"]
-            .sum()
-            .rename(columns={"Salida_unid": "Venta_Tienda"})
-        )
+        # Detectar cual columna de cantidad usar
+        cantidad_col = None
+        for col in ["Salida_unid", "Cantidad_reg", "Cantidad"]:
+            if col in df.columns:
+                cantidad_col = col
+                break
+        
+        if cantidad_col is None:
+            # Fallback: crear Salida_unid desde Cantidad si existe
+            if "Cantidad" in df.columns:
+                df["Salida_unid"] = df.apply(
+                    lambda row: abs(row["Cantidad"]) if row.get("Documento") == "Venta" else 0.0,
+                    axis=1
+                )
+                cantidad_col = "Salida_unid"
+            else:
+                venta = pd.DataFrame(columns=["Mes", "Venta_Tienda"])
+                consumo = pd.DataFrame(columns=["Mes", "Consumo"])
+                guia_m = pd.DataFrame(columns=["Mes", "Guia_Externa"])
+                cantidad_col = None
+        
+        if cantidad_col:
+            # v4: Solo suma de ventas
+            venta = (
+                df[df["Documento"] == "Venta"]
+                .groupby("Mes", as_index=False)[cantidad_col]
+                .sum()
+                .rename(columns={cantidad_col: "Venta_Tienda"})
+            )
+        else:
+            venta = pd.DataFrame(columns=["Mes", "Venta_Tienda"])
         
         # v4 no tiene consumo ni guías externas (después de normalizar)
         consumo = pd.DataFrame(columns=["Mes", "Consumo"])
