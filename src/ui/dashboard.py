@@ -2440,17 +2440,19 @@ class Dashboard:
                     )
                 
                 with col2:
+                    max_pct = ((demanda_max - demanda_promedio)/demanda_promedio*100) if demanda_promedio != 0 else 0
                     st.metric(
                         "🔴 Máximo",
                         f"{demanda_max:,.0f} unid",
-                        f"+{((demanda_max - demanda_promedio)/demanda_promedio*100):.1f}%"
+                        f"+{max_pct:.1f}%"
                     )
                 
                 with col3:
+                    min_pct = ((demanda_min - demanda_promedio)/demanda_promedio*100) if demanda_promedio != 0 else 0
                     st.metric(
                         "🟢 Mínimo",
                         f"{demanda_min:,.0f} unid",
-                        f"{((demanda_min - demanda_promedio)/demanda_promedio*100):.1f}%"
+                        f"{min_pct:.1f}%"
                     )
                 
                 with col4:
