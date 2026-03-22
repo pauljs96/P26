@@ -652,7 +652,7 @@ def simulate_policy_backtest_1step(
 
     Parámetros:
     - hist: DataFrame con columnas ["Mes","Demanda_Unid"] ordenado mensual y completo (con ceros).
-    - stock_series: opcional, DataFrame con stock mensual real ["Mes","Stock_Unid"] para inicializar Stock_0.
+    - stock_series: opcional, DataFrame con stock mensual real ["Mes","Saldo_unid"] para inicializar Stock_0.
       Si None o vacío, inicializa Stock_0 = 0.
     - winner: modelo a usar para forecast t+1 (Naive / Seasonal12 / MA3 / MA6 / ETS(Holt-Winters) / RandomForest)
     - abc_class: A/B/C para determinar Z (por política)
@@ -690,7 +690,7 @@ def simulate_policy_backtest_1step(
         mes_t = h.loc[start_idx, "Mes"]
         srow = s[s["Mes"] == mes_t]
         if not srow.empty:
-            stock0 = float(srow.iloc[-1]["Stock_Unid"])
+            stock0 = float(srow.iloc[-1]["Saldo_unid"])
 
     service_level = policy_service_level_by_abc(abc_class)
     z = z_from_service_level(service_level)
@@ -831,7 +831,7 @@ def simulate_compare_policy_vs_baseline(
         mes0 = h.loc[start_idx - 1, "Mes"]
         srow = s[s["Mes"] == mes0]
         if not srow.empty:
-            stock0 = float(srow.iloc[-1]["Stock_Unid"])
+            stock0 = float(srow.iloc[-1]["Saldo_unid"])
 
     # Z por ABC
     service_level = policy_service_level_by_abc(abc_class)
@@ -1069,7 +1069,7 @@ def run_portfolio_cost_comparison_abcA(
         # stock serie producto (opcional)
         stock_p = pd.DataFrame()
         if not stkm.empty:
-            stock_p = stkm[stkm["Codigo"] == str(cod)][["Mes", "Stock_Unid"]].copy().sort_values("Mes")
+            stock_p = stkm[stkm["Codigo"] == str(cod)][["Mes", "Saldo_unid"]].copy().sort_values("Mes")
 
         # ABC class (aquí siempre será A, pero lo dejamos formal)
         abc_class = "A"
@@ -3141,11 +3141,11 @@ class Dashboard:
                 else:
                     # ==================== RESUMEN EJECUTIVO STOCK ====================
                     if not splot.empty:
-                        stock_promedio = float(splot["Stock_Unid"].mean())
-                        stock_max = float(splot["Stock_Unid"].max())
-                        stock_min = float(splot["Stock_Unid"].min())
-                        stock_reciente = float(splot.iloc[-1]["Stock_Unid"])
-                        stock_anterior = float(splot.iloc[-2]["Stock_Unid"]) if len(splot) > 1 else stock_reciente
+                        stock_promedio = float(splot["Saldo_unid"].mean())
+                        stock_max = float(splot["Saldo_unid"].max())
+                        stock_min = float(splot["Saldo_unid"].min())
+                        stock_reciente = float(splot.iloc[-1]["Saldo_unid"])
+                        stock_anterior = float(splot.iloc[-2]["Saldo_unid"]) if len(splot) > 1 else stock_reciente
                         cambio_stock = stock_reciente - stock_anterior
                         ocupacion_actual = (stock_reciente / stock_max * 100) if stock_max != 0 else 0
                         
@@ -3204,7 +3204,7 @@ class Dashboard:
                     
                     # Gráfico con línea de referencia
                     fig_stock = px.line(
-                        splot, x="Mes", y="Stock_Unid", markers=True,
+                        splot, x="Mes", y="Saldo_unid", markers=True,
                         title=f"Stock mensual histórico - Producto {prod_sel}",
                         height=400
                     )
@@ -3217,7 +3217,7 @@ class Dashboard:
                         col_a1, col_a2 = st.columns(2)
                         
                         with col_a1:
-                            volatilidad_stock = float(splot["Stock_Unid"].std())
+                            volatilidad_stock = float(splot["Saldo_unid"].std())
                             coeficiente_var = (volatilidad_stock / stock_promedio * 100) if stock_promedio > 0 else 0
                             
                             st.markdown(f"""
@@ -3229,7 +3229,7 @@ class Dashboard:
                             """)
                         
                         with col_a2:
-                            meses_bajo_promedio = len(splot[splot["Stock_Unid"] < stock_promedio])
+                            meses_bajo_promedio = len(splot[splot["Saldo_unid"] < stock_promedio])
                             pct_bajo = (meses_bajo_promedio / len(splot) * 100) if len(splot) > 0 else 0
                             
                             st.markdown(f"""
@@ -3279,7 +3279,7 @@ class Dashboard:
                     stock["Codigo"] = stock["Codigo"].astype(str).str.strip()
                     splot = stock[stock["Codigo"] == str(prod_sel)].copy().sort_values("Mes")
                     if not splot.empty:
-                        stock_actual = float(splot.iloc[-1]["Stock_Unid"])
+stock_actual = float(splot.iloc[-1]["Saldo_unid"])
 
                 # ABC (calculado por demanda total)
                 abc_df = build_abc_from_demand(dm)
@@ -3634,7 +3634,7 @@ class Dashboard:
                             if not stock.empty:
                                 splot = stock[stock["Codigo"] == str(cod)]
                                 if not splot.empty:
-                                    stock_actual = float(splot.iloc[-1]["Stock_Unid"])
+                                    stock_actual = float(splot.iloc[-1]["Saldo_unid"])
 
                                 # ABC + política Z (CRÍTICO: calcular z para cada producto como en Análisis Individual)
                             row_abc = abc_work[abc_work["Codigo"] == str(cod)]
@@ -3964,7 +3964,7 @@ class Dashboard:
                 if res_stock is not None and not res_stock.empty:
                     stock_p = res_stock.copy()
                     stock_p["Codigo"] = stock_p["Codigo"].astype(str).str.strip()
-                    stock_p = stock_p[stock_p["Codigo"] == str(prod_sel)][["Mes", "Stock_Unid"]].copy().sort_values("Mes")
+                    stock_p = stock_p[stock_p["Codigo"] == str(prod_sel)][["Mes", "Saldo_unid"]].copy().sort_values("Mes")
 
                 row = abc_df[abc_df["Codigo"] == str(prod_sel)]
                 abc_class = str(row.iloc[0]["ABC"]) if not row.empty else "C"
