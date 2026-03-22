@@ -1,9 +1,3 @@
-[client]
-maxUploadSize = 2000  # 2000 MB = 2GB (permite subir Inventario_v4 completo)
-showErrorDetails = true
-toolbarMode = "developer"
-initialSidebarState = "collapsed"
-
 [logger]
 level = "info"
 
