@@ -101,6 +101,21 @@ def detect_dataset_version(df: pd.DataFrame) -> dict:
         }
 
 
+def get_column_names(is_v4: bool) -> dict:
+    """Retorna nombres de columnas normalizados según versión.
+    
+    Permite código limpio que funcione con ambas versiones.
+    """
+    return {
+        'col_id': 'Producto_id' if is_v4 else 'Codigo',
+        'col_fecha': 'Fecha',
+        'col_cantidad': 'Cantidad',
+        'col_periodo': 'Mes',
+        'col_ano': 'Año',
+        'col_stock': 'Stock_posterior' if is_v4 else 'Saldo_unid',
+    }
+
+
 # ==================== FUNCIONES DE PRESENTACIÓN VISUAL ====================
 
 def display_prominent_chart(fig, title: str = "", description: str = ""):
