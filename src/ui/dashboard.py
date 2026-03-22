@@ -130,6 +130,15 @@ def normalize_demand_to_legacy(demand_df: pd.DataFrame, is_v4: bool) -> pd.DataF
     
     d = demand_df.copy()
     
+    # Detectar si ya fue normalizado (si Mes es datetime, probablemente ya está normalizado)
+    if 'Mes' in d.columns and pd.api.types.is_datetime64_any_dtype(d['Mes']):
+        # Ya está en formato legacy (Mes es datetime)
+        if 'Codigo' not in d.columns and 'Producto_id' in d.columns:
+            d = d.rename(columns={'Producto_id': 'Codigo'})
+        if 'Demanda_Unid' not in d.columns and 'Cantidad_total' in d.columns:
+            d = d.rename(columns={'Cantidad_total': 'Demanda_Unid'})
+        return d
+    
     # Renombrar columnas: v4 → legacy
     d = d.rename(columns={
         'Producto_id': 'Codigo',
@@ -138,7 +147,17 @@ def normalize_demand_to_legacy(demand_df: pd.DataFrame, is_v4: bool) -> pd.DataF
     
     # Convertir Año+Mes a formato Mes (datetime) como espera el legacy
     if 'Año' in d.columns and 'Mes' in d.columns:
-        d['Mes'] = pd.to_datetime(d['Año'].astype(str) + '-' + d['Mes'].astype(str).str.zfill(2) + '-01')
+        try:
+            # Convertir de forma segura: Año (int) + Mes (int) → datetime
+            d['Año'] = d['Año'].astype(int, errors='ignore')
+            d['Mes'] = d['Mes'].astype(int, errors='ignore')
+            d['Mes'] = pd.to_datetime(
+                d['Año'].astype(str) + '-' + d['Mes'].astype(str).str.zfill(2) + '-01',
+                errors='coerce'
+            )
+        except Exception as e:
+            # Si falla, dejar Mes como está (probablemente ya es datetime)
+            pass
     
     # Normalizar Codigo como string
     d['Codigo'] = d['Codigo'].astype(str).str.strip()
@@ -151,6 +170,8 @@ def normalize_movements_to_legacy(movements_df: pd.DataFrame, is_v4: bool) -> pd
     
     v4 columns: Producto_id, Tipo_movimiento, Cantidad, etc.
     Legacy-like columns: Codigo, Documento, Salida_unid
+    
+    Si ya está normalizado (desde cache), detecta automáticamente.
     """
     if not is_v4:
         # Ya está en formato legacy
@@ -158,23 +179,40 @@ def normalize_movements_to_legacy(movements_df: pd.DataFrame, is_v4: bool) -> pd
     
     d = movements_df.copy()
     
-    # Renombrar columnas principales
-    d = d.rename(columns={
-        'Producto_id': 'Codigo',
-        'Tipo_movimiento': 'Documento',
-        'Cantidad': 'Cantidad_reg',
-    })
+    # Detectar si ya fue normalizado
+    has_codigo = 'Codigo' in d.columns
+    has_documento = 'Documento' in d.columns
+    has_salida = 'Salida_unid' in d.columns
     
-    # Para v4, Salida_unid es Cantidad solo si es Venta
-    d['Salida_unid'] = d.apply(
-        lambda row: abs(row['Cantidad_reg']) if row['Documento'] == 'Venta' else 0.0,
-        axis=1
-    )
+    if has_codigo and has_documento and has_salida:
+        # Ya está normalizado
+        return d
+    
+    # Renombrar columnas principales si existen en formato v4
+    rename_map = {}
+    if 'Producto_id' in d.columns and 'Codigo' not in d.columns:
+        rename_map['Producto_id'] = 'Codigo'
+    if 'Tipo_movimiento' in d.columns and 'Documento' not in d.columns:
+        rename_map['Tipo_movimiento'] = 'Documento'
+    if 'Cantidad' in d.columns and 'Cantidad_reg' not in d.columns:
+        rename_map['Cantidad'] = 'Cantidad_reg'
+    
+    if rename_map:
+        d = d.rename(columns=rename_map)
+    
+    # Para v4, Salida_unid es Cantidad solo si es Venta (si aún no existe)
+    if 'Salida_unid' not in d.columns:
+        if 'Cantidad_reg' in d.columns and 'Documento' in d.columns:
+            d['Salida_unid'] = d.apply(
+                lambda row: abs(row['Cantidad_reg']) if row['Documento'] == 'Venta' else 0.0,
+                axis=1
+            )
     
     # Normalizar Codigo como string
-    d['Codigo'] = d['Codigo'].astype(str).str.strip()
+    if 'Codigo' in d.columns:
+        d['Codigo'] = d['Codigo'].astype(str).str.strip()
     
-    # Agregar columnas dummy para compatibilidad
+    # Agregar columnas dummy para compatibilidad si faltan
     if 'Numero' not in d.columns:
         d['Numero'] = ''
     if 'Bodega' not in d.columns:
@@ -195,6 +233,15 @@ def normalize_stock_to_legacy(stock_df: pd.DataFrame, is_v4: bool) -> pd.DataFra
     
     d = stock_df.copy()
     
+    # Detectar si ya fue normalizado (si Mes es datetime, probablemente ya está normalizado)
+    if 'Mes' in d.columns and pd.api.types.is_datetime64_any_dtype(d['Mes']):
+        # Ya está en formato legacy (Mes es datetime)
+        if 'Codigo' not in d.columns and 'Producto_id' in d.columns:
+            d = d.rename(columns={'Producto_id': 'Codigo'})
+        if 'Saldo_unid' not in d.columns and 'Stock_posterior' in d.columns:
+            d = d.rename(columns={'Stock_posterior': 'Saldo_unid'})
+        return d
+    
     # Renombrar columnas principales
     d = d.rename(columns={
         'Producto_id': 'Codigo',
@@ -203,7 +250,17 @@ def normalize_stock_to_legacy(stock_df: pd.DataFrame, is_v4: bool) -> pd.DataFra
     
     # Convertir Año+Mes a formato Mes (datetime) como espera el legacy
     if 'Año' in d.columns and 'Mes' in d.columns:
-        d['Mes'] = pd.to_datetime(d['Año'].astype(str) + '-' + d['Mes'].astype(str).str.zfill(2) + '-01')
+        try:
+            # Convertir de forma segura: Año (int) + Mes (int) → datetime
+            d['Año'] = d['Año'].astype(int, errors='ignore')
+            d['Mes'] = d['Mes'].astype(int, errors='ignore')
+            d['Mes'] = pd.to_datetime(
+                d['Año'].astype(str) + '-' + d['Mes'].astype(str).str.zfill(2) + '-01',
+                errors='coerce'
+            )
+        except Exception as e:
+            # Si falla, dejar Mes como está (probablemente ya es datetime)
+            pass
     
     # Normalizar Codigo como string
     d['Codigo'] = d['Codigo'].astype(str).str.strip()
