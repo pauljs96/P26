@@ -685,12 +685,20 @@ def simulate_policy_backtest_1step(
         s = stock_series.copy()
         s["Mes"] = pd.to_datetime(s["Mes"]).dt.to_period("M").dt.to_timestamp()
         s = s.sort_values("Mes")
+        # Detectar columna de stock
+        stock_col = None
+        for col in ["Saldo_unid", "Stock_Unid", "Stock_posterior"]:
+            if col in s.columns:
+                stock_col = col
+                break
+        if stock_col is None:
+            stock_col = "Saldo_unid"  # fallback
         # Tomamos stock del mes start_idx (mes t) como stock disponible al cierre de ese mes
         # y asumimos que al inicio de t+1 ese stock está disponible.
         mes_t = h.loc[start_idx, "Mes"]
         srow = s[s["Mes"] == mes_t]
         if not srow.empty:
-            stock0 = float(srow.iloc[-1]["Saldo_unid"])
+            stock0 = float(srow.iloc[-1][stock_col])
 
     service_level = policy_service_level_by_abc(abc_class)
     z = z_from_service_level(service_level)
@@ -828,10 +836,18 @@ def simulate_compare_policy_vs_baseline(
         s = stock_series.copy()
         s["Mes"] = pd.to_datetime(s["Mes"]).dt.to_period("M").dt.to_timestamp()
         s = s.sort_values("Mes")
+        # Detectar columna de stock
+        stock_col = None
+        for col in ["Saldo_unid", "Stock_Unid", "Stock_posterior"]:
+            if col in s.columns:
+                stock_col = col
+                break
+        if stock_col is None:
+            stock_col = "Saldo_unid"  # fallback
         mes0 = h.loc[start_idx - 1, "Mes"]
         srow = s[s["Mes"] == mes0]
         if not srow.empty:
-            stock0 = float(srow.iloc[-1]["Saldo_unid"])
+            stock0 = float(srow.iloc[-1][stock_col])
 
     # Z por ABC
     service_level = policy_service_level_by_abc(abc_class)
@@ -1069,7 +1085,17 @@ def run_portfolio_cost_comparison_abcA(
         # stock serie producto (opcional)
         stock_p = pd.DataFrame()
         if not stkm.empty:
-            stock_p = stkm[stkm["Codigo"] == str(cod)][["Mes", "Saldo_unid"]].copy().sort_values("Mes")
+            # Detectar columna de stock
+            stock_col = None
+            for col in ["Saldo_unid", "Stock_Unid", "Stock_posterior"]:
+                if col in stkm.columns:
+                    stock_col = col
+                    break
+            if stock_col is None:
+                stock_col = "Saldo_unid"  # fallback
+            stock_p = stkm[stkm["Codigo"] == str(cod)][["Mes", stock_col]].copy().sort_values("Mes")
+            # Renombrar para consistencia
+            stock_p = stock_p.rename(columns={stock_col: "Saldo_unid"})
 
         # ABC class (aquí siempre será A, pero lo dejamos formal)
         abc_class = "A"
