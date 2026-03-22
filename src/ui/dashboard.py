@@ -271,7 +271,7 @@ def build_monthly_components(movements: pd.DataFrame, codigo: str) -> pd.DataFra
     """Construye la tabla mensual de componentes de demanda para un producto.
     
     Funciona con ambos formatos:
-    - v4: Producto_id, Tipo_movimiento, Cantidad
+    - v4 (pre-normalizado): Codigo, Documento (renombrado de Tipo_movimiento), Cantidad
     - Legacy: Codigo, Documento, Salida_unid
     
     Componentes (legacy):
@@ -285,34 +285,15 @@ def build_monthly_components(movements: pd.DataFrame, codigo: str) -> pd.DataFra
     if movements is None or movements.empty:
         return pd.DataFrame(columns=["Mes", "Venta_Tienda", "Consumo", "Guia_Externa", "Demanda_Total"])
 
-    # auto-detectar formato
-    is_v4 = "Producto_id" in movements.columns
+    df = movements[movements["Codigo"].astype(str).str.strip() == str(codigo)].copy()
+    if df.empty:
+        return pd.DataFrame(columns=["Mes", "Venta_Tienda", "Consumo", "Guia_Externa", "Demanda_Total"])
     
-    if is_v4:
-        # ========== FORMATO V4 (SIMPLE) ==========
-        df = movements[movements["Producto_id"].astype(str).str.strip() == str(codigo)].copy()
-        if df.empty:
-            return pd.DataFrame(columns=["Mes", "Venta_Tienda", "Consumo", "Guia_Externa", "Demanda_Total"])
-        
-        df["Mes"] = df["Fecha"].dt.to_period("M").dt.to_timestamp()
-        
-        # v4: Solo suma de ventas (Tipo_movimiento == 'Venta')
-        venta = (
-            df[df["Tipo_movimiento"] == "Venta"]
-            .groupby("Mes", as_index=False)["Cantidad"]
-            .sum()
-            .rename(columns={"Cantidad": "Venta_Tienda"})
-        )
-        
-        # v4 no tiene consumo ni guías externas
-        consumo = pd.DataFrame(columns=["Mes", "Consumo"])
-        guia_m = pd.DataFrame(columns=["Mes", "Guia_Externa"])
-    else:
+    # Detectar formato por presencia de "Salida_unid" (legacy) vs "Cantidad_reg" (v4 normalizado)
+    is_legacy = "Salida_unid" in movements.columns
+    
+    if is_legacy:
         # ========== FORMATO LEGACY ==========
-        df = movements[movements["Codigo"] == str(codigo)].copy()
-        if df.empty:
-            return pd.DataFrame(columns=["Mes", "Venta_Tienda", "Consumo", "Guia_Externa", "Demanda_Total"])
-
         # Normalizar texto (evita problemas por espacios)
         df["Documento"] = _normalize_text(df["Documento"])
         df["Numero"] = _normalize_text(df["Numero"])
@@ -348,6 +329,23 @@ def build_monthly_components(movements: pd.DataFrame, codigo: str) -> pd.DataFra
                     .sum()
                     .rename(columns={"Guia_Salida_Externa_Unid": "Guia_Externa"})
                 )
+    else:
+        # ========== FORMATO V4 (NORMALIZADO) ==========
+        # En v4, después de normalizar: Documento tiene "Venta", "Producción"
+        # Salida_unid ya está calculado (positivo para Venta, 0 para Producción)
+        df["Mes"] = df["Fecha"].dt.to_period("M").dt.to_timestamp()
+        
+        # v4: Solo suma de ventas
+        venta = (
+            df[df["Documento"] == "Venta"]
+            .groupby("Mes", as_index=False)["Salida_unid"]
+            .sum()
+            .rename(columns={"Salida_unid": "Venta_Tienda"})
+        )
+        
+        # v4 no tiene consumo ni guías externas (después de normalizar)
+        consumo = pd.DataFrame(columns=["Mes", "Consumo"])
+        guia_m = pd.DataFrame(columns=["Mes", "Guia_Externa"])
 
     # Unir y completar meses faltantes (base completa)
     min_mes = df["Mes"].min()

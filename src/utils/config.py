@@ -56,3 +56,13 @@ OPTIONAL_COLUMNS = [
 
 # Tolerancia para validación de stock
 STOCK_TOLERANCE = 0.01  # 1% tolerancia
+
+# ============================================
+# DATASET LEGACY - Compatibilidad
+# ============================================
+# Constantes para datasets legacy (ERP Mayor-Auxiliar)
+# Solo se usan si dataset es legacy
+
+DOC_VENTA_TIENDA = "VO"  # Venta tienda sin documento
+DOC_SALIDA_CONSUMO = "CO"  # Salida por consumo
+GUIDE_DOC = "GU"  # Guía de remisión
