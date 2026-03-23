@@ -3341,7 +3341,15 @@ class Dashboard:
                     stock["Codigo"] = stock["Codigo"].astype(str).str.strip()
                     splot = stock[stock["Codigo"] == str(prod_sel)].copy().sort_values("Mes")
                     if not splot.empty:
-                        stock_actual = float(splot.iloc[-1]["Saldo_unid"])
+                        # Detectar el nombre de la columna de stock
+                        stock_col = None
+                        for col in ["Saldo_unid", "Stock_Unid", "Stock_posterior"]:
+                            if col in splot.columns:
+                                stock_col = col
+                                break
+                        if stock_col is None:
+                            stock_col = "Saldo_unid"  # fallback
+                        stock_actual = float(splot.iloc[-1][stock_col])
 
                 # ABC (calculado por demanda total)
                 abc_df = build_abc_from_demand(dm)
@@ -3696,7 +3704,15 @@ class Dashboard:
                             if not stock.empty:
                                 splot = stock[stock["Codigo"] == str(cod)]
                                 if not splot.empty:
-                                    stock_actual = float(splot.iloc[-1]["Saldo_unid"])
+                                    # Detectar columna de stock
+                                    stock_col = None
+                                    for col in ["Saldo_unid", "Stock_Unid", "Stock_posterior"]:
+                                        if col in splot.columns:
+                                            stock_col = col
+                                            break
+                                    if stock_col is None:
+                                        stock_col = "Saldo_unid"  # fallback
+                                    stock_actual = float(splot.iloc[-1][stock_col])
 
                                 # ABC + política Z (CRÍTICO: calcular z para cada producto como en Análisis Individual)
                             row_abc = abc_work[abc_work["Codigo"] == str(cod)]
@@ -4026,7 +4042,17 @@ class Dashboard:
                 if res_stock is not None and not res_stock.empty:
                     stock_p = res_stock.copy()
                     stock_p["Codigo"] = stock_p["Codigo"].astype(str).str.strip()
-                    stock_p = stock_p[stock_p["Codigo"] == str(prod_sel)][["Mes", "Saldo_unid"]].copy().sort_values("Mes")
+                    # Detectar columna de stock
+                    stock_col = None
+                    for col in ["Saldo_unid", "Stock_Unid", "Stock_posterior"]:
+                        if col in stock_p.columns:
+                            stock_col = col
+                            break
+                    if stock_col is None:
+                        stock_col = "Saldo_unid"  # fallback
+                    stock_p = stock_p[stock_p["Codigo"] == str(prod_sel)][["Mes", stock_col]].copy().sort_values("Mes")
+                    # Renombrar para consistencia
+                    stock_p = stock_p.rename(columns={stock_col: "Saldo_unid"})
 
                 row = abc_df[abc_df["Codigo"] == str(prod_sel)]
                 abc_class = str(row.iloc[0]["ABC"]) if not row.empty else "C"
