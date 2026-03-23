@@ -413,8 +413,11 @@ def build_monthly_components(movements: pd.DataFrame, codigo: str) -> pd.DataFra
     if df.empty:
         return pd.DataFrame(columns=["Mes", "Venta_Tienda", "Consumo", "Guia_Externa", "Demanda_Total"])
     
-    # Detectar formato por presencia de "Salida_unid" (legacy) vs "Cantidad_reg" (v4 normalizado)
-    is_legacy = "Salida_unid" in movements.columns
+    # Detectar formato por el tipo de valores en "Documento":
+    # - v4: Documento contiene "Venta" o "Producción" 
+    # - Legacy: Documento contiene "VO", "CO", "GU", etc. (codigos)
+    unique_docs = df["Documento"].unique() if "Documento" in df.columns else []
+    is_legacy = not any(doc in ["Venta", "Producción"] for doc in unique_docs)
     
     if is_legacy:
         # ========== FORMATO LEGACY ==========
@@ -500,15 +503,28 @@ def build_monthly_components(movements: pd.DataFrame, codigo: str) -> pd.DataFra
     max_mes = df["Mes"].max()
     months = pd.DataFrame({"Mes": pd.date_range(min_mes, max_mes, freq="MS")})
 
+    # Asegurar tipos float en los dataframes antes de merger para evitar downcast warning
+    if not venta.empty:
+        venta["Venta_Tienda"] = venta["Venta_Tienda"].astype(float)
+    if not consumo.empty:
+        consumo["Consumo"] = consumo["Consumo"].astype(float)
+    if not guia_m.empty:
+        guia_m["Guia_Externa"] = guia_m["Guia_Externa"].astype(float)
+
     out = (
         months.merge(venta, on="Mes", how="left")
         .merge(consumo, on="Mes", how="left")
         .merge(guia_m, on="Mes", how="left")
     )
 
-    out["Venta_Tienda"] = out["Venta_Tienda"].fillna(0.0)
-    out["Consumo"] = out["Consumo"].fillna(0.0)
-    out["Guia_Externa"] = out["Guia_Externa"].fillna(0.0)
+    # Rellenar NaN - usar astype en lugar de fillna para evitar downcasting warning
+    out["Venta_Tienda"] = (out["Venta_Tienda"] if "Venta_Tienda" in out.columns else 0.0)
+    out["Consumo"] = (out["Consumo"] if "Consumo" in out.columns else 0.0)
+    out["Guia_Externa"] = (out["Guia_Externa"] if "Guia_Externa" in out.columns else 0.0)
+    
+    # Llenar NaN con 0.0 y forzar tipo float
+    for col in ["Venta_Tienda", "Consumo", "Guia_Externa"]:
+        out[col] = pd.to_numeric(out[col], errors='coerce').fillna(0.0).astype(float)
 
     out["Demanda_Total"] = out["Venta_Tienda"] + out["Consumo"] + out["Guia_Externa"]
 
