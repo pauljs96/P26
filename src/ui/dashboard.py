@@ -171,6 +171,14 @@ def normalize_demand_to_legacy(demand_df: pd.DataFrame, is_v4: bool) -> pd.DataF
         except Exception as e:
             # Si falla, dejar Mes como está (probablemente ya es datetime)
             pass
+    
+    # Normalizar Codigo como string
+    d['Codigo'] = d['Codigo'].astype(str).str.strip()
+    
+    return d
+
+
+def normalize_movements_to_legacy(movements_df: pd.DataFrame, is_v4: bool) -> pd.DataFrame:
     """Convierte dataframe de movimientos v4 a pseudo-formato legacy.
     
     v4 columns: Producto_id, Tipo_movimiento, Cantidad, etc.
