@@ -238,15 +238,28 @@ def normalize_stock_to_legacy(stock_df: pd.DataFrame, is_v4: bool) -> pd.DataFra
         # Ya está en formato legacy (Mes es datetime)
         if 'Codigo' not in d.columns and 'Producto_id' in d.columns:
             d = d.rename(columns={'Producto_id': 'Codigo'})
-        if 'Saldo_unid' not in d.columns and 'Stock_posterior' in d.columns:
-            d = d.rename(columns={'Stock_posterior': 'Saldo_unid'})
+        if 'Saldo_unid' not in d.columns:
+            # Detectar cuál columna de stock existe
+            for stock_col in ['Stock_posterior', 'Stock_Unid']:
+                if stock_col in d.columns:
+                    d = d.rename(columns={stock_col: 'Saldo_unid'})
+                    break
         return d
     
-    # Renombrar columnas principales
-    d = d.rename(columns={
-        'Producto_id': 'Codigo',
-        'Stock_posterior': 'Saldo_unid'
-    })
+    # Renombrar columnas principales - hacerlo de forma segura
+    rename_map = {}
+    if 'Producto_id' in d.columns and 'Codigo' not in d.columns:
+        rename_map['Producto_id'] = 'Codigo'
+    
+    # Detectar y renombrar columna de stock
+    if 'Saldo_unid' not in d.columns:
+        for stock_col in ['Stock_posterior', 'Stock_Unid']:
+            if stock_col in d.columns:
+                rename_map[stock_col] = 'Saldo_unid'
+                break
+    
+    if rename_map:
+        d = d.rename(columns=rename_map)
     
     # Convertir Año+Mes a formato Mes (datetime) como espera el legacy
     if 'Año' in d.columns and 'Mes' in d.columns:
@@ -715,14 +728,14 @@ def simulate_policy_backtest_1step(
             if col in s.columns:
                 stock_col = col
                 break
-        if stock_col is None:
-            stock_col = "Saldo_unid"  # fallback
-        # Tomamos stock del mes start_idx (mes t) como stock disponible al cierre de ese mes
-        # y asumimos que al inicio de t+1 ese stock está disponible.
-        mes_t = h.loc[start_idx, "Mes"]
-        srow = s[s["Mes"] == mes_t]
-        if not srow.empty:
-            stock0 = float(srow.iloc[-1][stock_col])
+        # Si encontramos columna de stock, usarla; si no, usar 0.0
+        if stock_col is not None:
+            # Tomamos stock del mes start_idx (mes t) como stock disponible al cierre de ese mes
+            # y asumimos que al inicio de t+1 ese stock está disponible.
+            mes_t = h.loc[start_idx, "Mes"]
+            srow = s[s["Mes"] == mes_t]
+            if not srow.empty:
+                stock0 = float(srow.iloc[-1][stock_col])
 
     service_level = policy_service_level_by_abc(abc_class)
     z = z_from_service_level(service_level)
@@ -866,12 +879,12 @@ def simulate_compare_policy_vs_baseline(
             if col in s.columns:
                 stock_col = col
                 break
-        if stock_col is None:
-            stock_col = "Saldo_unid"  # fallback
-        mes0 = h.loc[start_idx - 1, "Mes"]
-        srow = s[s["Mes"] == mes0]
-        if not srow.empty:
-            stock0 = float(srow.iloc[-1][stock_col])
+        # Si encontramos columna de stock, usarla; si no, usar 0.0
+        if stock_col is not None:
+            mes0 = h.loc[start_idx - 1, "Mes"]
+            srow = s[s["Mes"] == mes0]
+            if not srow.empty:
+                stock0 = float(srow.iloc[-1][stock_col])
 
     # Z por ABC
     service_level = policy_service_level_by_abc(abc_class)
@@ -3347,8 +3360,12 @@ class Dashboard:
                             if col in splot.columns:
                                 stock_col = col
                                 break
+                        
                         if stock_col is None:
-                            stock_col = "Saldo_unid"  # fallback
+                            # Si no encontramos ninguna columna conocida, mostrar error informativo
+                            st.error(f"❌ No se encontró columna de stock. Columnas disponibles: {list(splot.columns)}")
+                            st.stop()
+                        
                         stock_actual = float(splot.iloc[-1][stock_col])
 
                 # ABC (calculado por demanda total)
@@ -3710,9 +3727,12 @@ class Dashboard:
                                         if col in splot.columns:
                                             stock_col = col
                                             break
-                                    if stock_col is None:
-                                        stock_col = "Saldo_unid"  # fallback
-                                    stock_actual = float(splot.iloc[-1][stock_col])
+                                    if stock_col is not None:
+                                        stock_actual = float(splot.iloc[-1][stock_col])
+                                    else:
+                                        # Mostrar error y usar fallback seguro
+                                        print(f"[WARN] No stock column found for {cod}. Available: {list(splot.columns)}")
+                                        stock_actual = 0.0
 
                                 # ABC + política Z (CRÍTICO: calcular z para cada producto como en Análisis Individual)
                             row_abc = abc_work[abc_work["Codigo"] == str(cod)]
@@ -4048,11 +4068,16 @@ class Dashboard:
                         if col in stock_p.columns:
                             stock_col = col
                             break
-                    if stock_col is None:
-                        stock_col = "Saldo_unid"  # fallback
-                    stock_p = stock_p[stock_p["Codigo"] == str(prod_sel)][["Mes", stock_col]].copy().sort_values("Mes")
-                    # Renombrar para consistencia
-                    stock_p = stock_p.rename(columns={stock_col: "Saldo_unid"})
+                    
+                    if stock_col is not None:
+                        # Usar la columna detectada
+                        stock_p = stock_p[stock_p["Codigo"] == str(prod_sel)][["Mes", stock_col]].copy().sort_values("Mes")
+                        # Renombrar para consistencia
+                        stock_p = stock_p.rename(columns={stock_col: "Saldo_unid"})
+                    else:
+                        # No se encontró columna de stock, dejar vacío
+                        print(f"[WARN] No stock column found in res_stock. Available: {list(res_stock.columns)}")
+                        stock_p = pd.DataFrame()
 
                 row = abc_df[abc_df["Codigo"] == str(prod_sel)]
                 abc_class = str(row.iloc[0]["ABC"]) if not row.empty else "C"
