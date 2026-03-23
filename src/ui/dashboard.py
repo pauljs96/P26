@@ -149,23 +149,28 @@ def normalize_demand_to_legacy(demand_df: pd.DataFrame, is_v4: bool) -> pd.DataF
     if 'Año' in d.columns and 'Mes' in d.columns:
         try:
             # Convertir de forma segura: Año (int) + Mes (int) → datetime
-            d['Año'] = d['Año'].astype(int, errors='ignore')
-            d['Mes'] = d['Mes'].astype(int, errors='ignore')
+            d['Año'] = pd.to_numeric(d['Año'], errors='coerce').fillna(2024).astype(int)
+            d['Mes'] = pd.to_numeric(d['Mes'], errors='coerce').fillna(1).astype(int)
+            # Asegurar que los meses estén en rango válido (1-12)
+            d['Mes'] = d['Mes'].clip(1, 12)
+            # Construir la fecha de forma explícita
             d['Mes'] = pd.to_datetime(
-                d['Año'].astype(str) + '-' + d['Mes'].astype(str).str.zfill(2) + '-01',
+                d['Año'].astype(str).str.zfill(4) + '-' + d['Mes'].astype(str).str.zfill(2) + '-01',
+                format='%Y-%m-%d',
                 errors='coerce'
             )
+            # Verificar si hay valores NaT después de la conversión
+            if d['Mes'].isna().any():
+                # Si hay NaT, reemplazar con fecha nula pero valid
+                valid_dates = d['Mes'].dropna()
+                if not valid_dates.empty:
+                    default_date = valid_dates.iloc[-1]
+                else:
+                    default_date = pd.Timestamp('2024-01-01')
+                d['Mes'] = d['Mes'].fillna(default_date)
         except Exception as e:
             # Si falla, dejar Mes como está (probablemente ya es datetime)
             pass
-    
-    # Normalizar Codigo como string
-    d['Codigo'] = d['Codigo'].astype(str).str.strip()
-    
-    return d
-
-
-def normalize_movements_to_legacy(movements_df: pd.DataFrame, is_v4: bool) -> pd.DataFrame:
     """Convierte dataframe de movimientos v4 a pseudo-formato legacy.
     
     v4 columns: Producto_id, Tipo_movimiento, Cantidad, etc.
@@ -224,7 +229,7 @@ def normalize_movements_to_legacy(movements_df: pd.DataFrame, is_v4: bool) -> pd
 def normalize_stock_to_legacy(stock_df: pd.DataFrame, is_v4: bool) -> pd.DataFrame:
     """Convierte dataframe de stock v4 a pseudo-formato legacy.
     
-    v4 columns: Producto_id, Año, Mes, Stock_posterior
+    v4 columns: Producto_id, Año, Mes, Stock_final (from ProductStockBuilder)
     Legacy-like columns: Codigo, Mes (datetime), Saldo_unid
     """
     if not is_v4:
@@ -239,8 +244,8 @@ def normalize_stock_to_legacy(stock_df: pd.DataFrame, is_v4: bool) -> pd.DataFra
         if 'Codigo' not in d.columns and 'Producto_id' in d.columns:
             d = d.rename(columns={'Producto_id': 'Codigo'})
         if 'Saldo_unid' not in d.columns:
-            # Detectar cuál columna de stock existe
-            for stock_col in ['Stock_posterior', 'Stock_Unid']:
+            # Detectar cuál columna de stock existe (incluye Stock_final del nuevo builder)
+            for stock_col in ['Stock_posterior', 'Stock_Unid', 'Stock_final']:
                 if stock_col in d.columns:
                     d = d.rename(columns={stock_col: 'Saldo_unid'})
                     break
@@ -251,9 +256,9 @@ def normalize_stock_to_legacy(stock_df: pd.DataFrame, is_v4: bool) -> pd.DataFra
     if 'Producto_id' in d.columns and 'Codigo' not in d.columns:
         rename_map['Producto_id'] = 'Codigo'
     
-    # Detectar y renombrar columna de stock
+    # Detectar y renombrar columna de stock (incluye Stock_final del nuevo builder)
     if 'Saldo_unid' not in d.columns:
-        for stock_col in ['Stock_posterior', 'Stock_Unid']:
+        for stock_col in ['Stock_posterior', 'Stock_Unid', 'Stock_final']:
             if stock_col in d.columns:
                 rename_map[stock_col] = 'Saldo_unid'
                 break
@@ -265,12 +270,25 @@ def normalize_stock_to_legacy(stock_df: pd.DataFrame, is_v4: bool) -> pd.DataFra
     if 'Año' in d.columns and 'Mes' in d.columns:
         try:
             # Convertir de forma segura: Año (int) + Mes (int) → datetime
-            d['Año'] = d['Año'].astype(int, errors='ignore')
-            d['Mes'] = d['Mes'].astype(int, errors='ignore')
+            d['Año'] = pd.to_numeric(d['Año'], errors='coerce').fillna(2024).astype(int)
+            d['Mes'] = pd.to_numeric(d['Mes'], errors='coerce').fillna(1).astype(int)
+            # Asegurar que los meses estén en rango válido (1-12)
+            d['Mes'] = d['Mes'].clip(1, 12)
+            # Construir la fecha de forma explícita
             d['Mes'] = pd.to_datetime(
-                d['Año'].astype(str) + '-' + d['Mes'].astype(str).str.zfill(2) + '-01',
+                d['Año'].astype(str).str.zfill(4) + '-' + d['Mes'].astype(str).str.zfill(2) + '-01',
+                format='%Y-%m-%d',
                 errors='coerce'
             )
+            # Verificar si hay valores NaT después de la conversión
+            if d['Mes'].isna().any():
+                # Si hay NaT, reemplazar con una fecha válida
+                valid_dates = d['Mes'].dropna()
+                if not valid_dates.empty:
+                    default_date = valid_dates.iloc[-1]
+                else:
+                    default_date = pd.Timestamp('2024-01-01')
+                d['Mes'] = d['Mes'].fillna(default_date)
         except Exception as e:
             # Si falla, dejar Mes como está (probablemente ya es datetime)
             pass
@@ -722,9 +740,9 @@ def simulate_policy_backtest_1step(
         s = stock_series.copy()
         s["Mes"] = pd.to_datetime(s["Mes"]).dt.to_period("M").dt.to_timestamp()
         s = s.sort_values("Mes")
-        # Detectar columna de stock
+        # Detectar columna de stock (incluye Stock_final del nuevo builder)
         stock_col = None
-        for col in ["Saldo_unid", "Stock_Unid", "Stock_posterior"]:
+        for col in ["Saldo_unid", "Stock_Unid", "Stock_posterior", "Stock_final"]:
             if col in s.columns:
                 stock_col = col
                 break
@@ -873,9 +891,9 @@ def simulate_compare_policy_vs_baseline(
         s = stock_series.copy()
         s["Mes"] = pd.to_datetime(s["Mes"]).dt.to_period("M").dt.to_timestamp()
         s = s.sort_values("Mes")
-        # Detectar columna de stock
+        # Detectar columna de stock (incluye Stock_final del nuevo builder)
         stock_col = None
-        for col in ["Saldo_unid", "Stock_Unid", "Stock_posterior"]:
+        for col in ["Saldo_unid", "Stock_Unid", "Stock_posterior", "Stock_final"]:
             if col in s.columns:
                 stock_col = col
                 break
@@ -1122,17 +1140,16 @@ def run_portfolio_cost_comparison_abcA(
         # stock serie producto (opcional)
         stock_p = pd.DataFrame()
         if not stkm.empty:
-            # Detectar columna de stock
+            # Detectar columna de stock (incluye Stock_final del nuevo builder)
             stock_col = None
-            for col in ["Saldo_unid", "Stock_Unid", "Stock_posterior"]:
+            for col in ["Saldo_unid", "Stock_Unid", "Stock_posterior", "Stock_final"]:
                 if col in stkm.columns:
                     stock_col = col
                     break
-            if stock_col is None:
-                stock_col = "Saldo_unid"  # fallback
-            stock_p = stkm[stkm["Codigo"] == str(cod)][["Mes", stock_col]].copy().sort_values("Mes")
-            # Renombrar para consistencia
-            stock_p = stock_p.rename(columns={stock_col: "Saldo_unid"})
+            if stock_col is not None:
+                stock_p = stkm[stkm["Codigo"] == str(cod)][["Mes", stock_col]].copy().sort_values("Mes")
+                # Renombrar para consistencia
+                stock_p = stock_p.rename(columns={stock_col: "Saldo_unid"})
 
         # ABC class (aquí siempre será A, pero lo dejamos formal)
         abc_class = "A"
@@ -3354,9 +3371,9 @@ class Dashboard:
                     stock["Codigo"] = stock["Codigo"].astype(str).str.strip()
                     splot = stock[stock["Codigo"] == str(prod_sel)].copy().sort_values("Mes")
                     if not splot.empty:
-                        # Detectar el nombre de la columna de stock
+                        # Detectar el nombre de la columna de stock (incluye Stock_final del nuevo builder)
                         stock_col = None
-                        for col in ["Saldo_unid", "Stock_Unid", "Stock_posterior"]:
+                        for col in ["Saldo_unid", "Stock_Unid", "Stock_posterior", "Stock_final"]:
                             if col in splot.columns:
                                 stock_col = col
                                 break
@@ -3721,9 +3738,9 @@ class Dashboard:
                             if not stock.empty:
                                 splot = stock[stock["Codigo"] == str(cod)]
                                 if not splot.empty:
-                                    # Detectar columna de stock
+                                    # Detectar columna de stock (incluye Stock_final del nuevo builder)
                                     stock_col = None
-                                    for col in ["Saldo_unid", "Stock_Unid", "Stock_posterior"]:
+                                    for col in ["Saldo_unid", "Stock_Unid", "Stock_posterior", "Stock_final"]:
                                         if col in splot.columns:
                                             stock_col = col
                                             break
@@ -4062,9 +4079,9 @@ class Dashboard:
                 if res_stock is not None and not res_stock.empty:
                     stock_p = res_stock.copy()
                     stock_p["Codigo"] = stock_p["Codigo"].astype(str).str.strip()
-                    # Detectar columna de stock
+                    # Detectar columna de stock (incluye Stock_final del nuevo builder)
                     stock_col = None
-                    for col in ["Saldo_unid", "Stock_Unid", "Stock_posterior"]:
+                    for col in ["Saldo_unid", "Stock_Unid", "Stock_posterior", "Stock_final"]:
                         if col in stock_p.columns:
                             stock_col = col
                             break
