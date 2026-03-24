@@ -1613,17 +1613,17 @@ class Dashboard:
         # FUNCIÓN CACHEADA: Componentes por producto
         # ========================================
         @st.cache_data(ttl=300)  # Reducido de 3600s a 300s (5 min)
-        def get_demanda_components(prod_sel):
+        def get_demanda_components(movements_df, prod_sel):
             """Cachea los componentes de demanda por producto"""
-            return build_monthly_components(res_movements, prod_sel)
+            return build_monthly_components(movements_df, prod_sel)
 
         # ========================================
         # FUNCIÓN CACHEADA: Backtests del comparador
         # ========================================
         @st.cache_data(ttl=300)  # Reducido de 3600s a 300s (5 min)
-        def get_comparador_backtests(prod_sel, test_months: int, sort_metric: str):
+        def get_comparador_backtests(demand_df, prod_sel, test_months: int, sort_metric: str):
             """Ejecuta y cachea todos los backtests (Baselines, ETS, RF) para un producto"""
-            dm = res_demand.copy()
+            dm = demand_df.copy()
             dm["Codigo"] = dm["Codigo"].astype(str).str.strip()
             hist_cmp = dm[dm["Codigo"] == str(prod_sel)][["Mes", "Demanda_Unid"]].copy().sort_values("Mes")
             
@@ -2604,7 +2604,7 @@ class Dashboard:
         # ==========================================================
         with tab_demanda:
          
-            comp = get_demanda_components(prod_sel)
+            comp = get_demanda_components(res_movements, prod_sel)
 
             # ==================== RESUMEN EJECUTIVO ====================
             st.markdown("### 📊 Resumen de Demanda")
@@ -2789,6 +2789,7 @@ class Dashboard:
                 with st.spinner("🔄 Cargando resultados de backtests cacheados..."):
                     # Usar función cacheada para backtests
                     bt_base_cmp, bt_ets_cmp, bt_rf_cmp, cmp, bt_info = get_comparador_backtests(
+                        res_demand,
                         prod_sel, 
                         test_months=int(test_months_cmp),
                         sort_metric=metric_to_sort
