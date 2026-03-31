@@ -1508,6 +1508,230 @@ class Dashboard:
         
         return False
 
+    # ======================== ANÁLISIS EXTENDIDO (PHASE 3) ========================
+    
+    def _render_campaign_analysis(self, pipeline_result):
+        """Renderiza análisis de campañas si Data.csv está disponible."""
+        if not hasattr(pipeline_result, 'demand_campaign') or pipeline_result.demand_campaign is None or pipeline_result.demand_campaign.empty:
+            st.info("📋 No hay datos de campañas disponibles. Asegúrate de subir Data.csv con columna 'Campana'")
+            return
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Top 10 campañas por valor
+            top_campaigns = pipeline_result.demand_campaign.groupby('Campana').agg({
+                'Cantidad_total': 'sum',
+                'Valor_total': 'sum'
+            }).reset_index().nlargest(10, 'Valor_total')
+            
+            if not top_campaigns.empty:
+                fig = px.bar(
+                    top_campaigns,
+                    x='Campana',
+                    y='Valor_total',
+                    color='Cantidad_total',
+                    title='Top 10 Campañas por Valor Total',
+                    labels={'Valor_total': 'Valor ($)', 'Cantidad_total': 'Cantidad'},
+                    color_continuous_scale='Viridis'
+                )
+                fig.update_xaxes(tickangle=-45)
+                st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            # Distribución mensual por campaña top
+            top_3_campaigns = pipeline_result.demand_campaign['Campana'].unique()[:3]
+            campaign_monthly = pipeline_result.demand_campaign[
+                pipeline_result.demand_campaign['Campana'].isin(top_3_campaigns)
+            ].copy()
+            campaign_monthly['Periodo'] = campaign_monthly['Año'].astype(str) + '-' + campaign_monthly['Mes'].astype(str).str.zfill(2)
+            
+            fig = px.line(
+                campaign_monthly,
+                x='Periodo',
+                y='Cantidad_total',
+                color='Campana',
+                title='Demanda Mensual - Top 3 Campañas',
+                labels={'Cantidad_total': 'Cantidad', 'Periodo': 'Mes'},
+                markers=True
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        st.divider()
+        
+        # Tabla detallada
+        st.subheader("📊 Resumen Detallado por Campaña")
+        summary_campaign = pipeline_result.demand_campaign.groupby('Campana').agg({
+            'Cantidad_total': 'sum',
+            'Valor_total': 'sum'
+        }).reset_index().sort_values('Valor_total', ascending=False)
+        
+        st.dataframe(summary_campaign, use_container_width=True)
+
+    def _render_channel_analysis(self, pipeline_result):
+        """Renderiza análisis de canales si Data.csv está disponible."""
+        if not hasattr(pipeline_result, 'demand_channel') or pipeline_result.demand_channel is None or pipeline_result.demand_channel.empty:
+            st.info("📋 No hay datos de canales disponibles. Asegúrate de subir Data.csv con columna 'Canal_venta'")
+            return
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Participación de canales
+            channel_total = pipeline_result.demand_channel.groupby('Canal_venta').agg({
+                'Cantidad_total': 'sum',
+                'Valor_total': 'sum'
+            }).reset_index()
+            
+            fig = px.pie(
+                channel_total,
+                values='Valor_total',
+                names='Canal_venta',
+                title='Participación de Canales por Valor',
+                color_discrete_sequence=px.colors.qualitative.Set2
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            # Cantidad por canal
+            fig = px.bar(
+                channel_total,
+                x='Canal_venta',
+                y='Cantidad_total',
+                color='Cantidad_total',
+                title='Unidades Vendidas por Canal',
+                labels={'Cantidad_total': 'Cantidad'},
+                color_continuous_scale='Blues'
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        st.divider()
+        
+        # Performance de canales
+        if hasattr(pipeline_result, 'channel_performance') and pipeline_result.channel_performance is not None and not pipeline_result.channel_performance.empty:
+            st.subheader("🎯 Performance de Canales")
+            perf_cols = ['Canal_venta', 'Cantidad_total', 'Num_transacciones', 'Ticket_promedio', 'Unidades_por_transaccion']
+            perf_show = [c for c in perf_cols if c in pipeline_result.channel_performance.columns]
+            st.dataframe(pipeline_result.channel_performance[perf_show], use_container_width=True)
+
+    def _render_client_analysis(self, pipeline_result):
+        """Renderiza análisis de clientes si Data.csv está disponible."""
+        if not hasattr(pipeline_result, 'demand_client') or pipeline_result.demand_client is None or pipeline_result.demand_client.empty:
+            st.info("📋 No hay datos de clientes disponibles. Asegúrate de subir Data.csv con columna 'Empresa_cliente'")
+            return
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Clientes top por valor
+            top_clients = pipeline_result.demand_client.groupby('Empresa_cliente').agg({
+                'Cantidad_total': 'sum',
+                'Valor_total': 'sum'
+            }).reset_index().nlargest(10, 'Valor_total')
+            
+            fig = px.barh(
+                top_clients,
+                x='Valor_total',
+                y='Empresa_cliente',
+                color='Cantidad_total',
+                title='Top 10 Clientes por Valor',
+                labels={'Valor_total': 'Valor ($)', 'Empresa_cliente': 'Cliente'},
+                color_continuous_scale='Reds'
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            # Segmentación de clientes
+            if hasattr(pipeline_result, 'client_segmentation') and pipeline_result.client_segmentation is not None and not pipeline_result.client_segmentation.empty:
+                seg_data = pipeline_result.client_segmentation['Categoria'].value_counts()
+                
+                fig = px.pie(
+                    values=seg_data.values,
+                    names=seg_data.index,
+                    title='Segmentación de Clientes',
+                    color_discrete_map={'Premium': '#FFD700', 'Regular': '#87CEEB', 'Casual': '#D3D3D3'}
+                )
+                st.plotly_chart(fig, use_container_width=True)
+        
+        st.divider()
+        
+        # Tabla segmentación
+        if hasattr(pipeline_result, 'client_segmentation') and pipeline_result.client_segmentation is not None and not pipeline_result.client_segmentation.empty:
+            st.subheader("👥 Segmentación Detallada de Clientes")
+            seg_cols = ['Empresa_cliente', 'Categoria', 'Cantidad_total', 'Valor_total', 'Pct_valor']
+            seg_show = [c for c in seg_cols if c in pipeline_result.client_segmentation.columns]
+            st.dataframe(pipeline_result.client_segmentation[seg_show], use_container_width=True)
+
+    def _render_profit_analysis(self, pipeline_result):
+        """Renderiza análisis de ganancias y márgenes si están disponibles."""
+        if not hasattr(pipeline_result, 'profit_monthly') or pipeline_result.profit_monthly is None or pipeline_result.profit_monthly.empty:
+            st.info("📋 No hay datos de ganancias disponibles. Asegúrate de contar con columnas 'Precio_unitario' y 'Costo_unitario'")
+            return
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Margen promedio por mes
+            margin_data = pipeline_result.profit_monthly.groupby(['Año', 'Mes']).agg({
+                'Margen_pct': 'mean',
+                'Ganancia': 'sum'
+            }).reset_index()
+            margin_data['Periodo'] = margin_data['Año'].astype(str) + '-' + margin_data['Mes'].astype(str).str.zfill(2)
+            
+            fig = px.line(
+                margin_data,
+                x='Periodo',
+                y='Margen_pct',
+                title='Margen Promedio Mensual (%)',
+                labels={'Margen_pct': 'Margen (%)', 'Periodo': 'Mes'},
+                markers=True,
+                color_discrete_sequence=['#2E86AB']
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            # Productos más rentables
+            top_profit = pipeline_result.profit_monthly.groupby('Producto_id').agg({
+                'Ganancia': 'sum',
+                'Margen_pct': 'mean'
+            }).reset_index().nlargest(10, 'Ganancia')
+            
+            fig = px.bar(
+                top_profit,
+                x='Producto_id',
+                y='Ganancia',
+                color='Margen_pct',
+                title='Top 10 Productos por Ganancia Total',
+                labels={'Ganancia': 'Ganancia ($)', 'Producto_id': 'Producto', 'Margen_pct': 'Margen (%)'},
+                color_continuous_scale='Greens'
+            )
+            fig.update_xaxes(tickangle=-45)
+            st.plotly_chart(fig, use_container_width=True)
+        
+        st.divider()
+        
+        # Análisis por canal si está disponible
+        if hasattr(pipeline_result, 'channel_performance') and pipeline_result.channel_performance is not None:
+            st.subheader("💰 Rentabilidad por Canal")
+            # Intentar crear análisis por canal si profit tiene columna Canal
+            if 'Canal_venta' in pipeline_result.profit_monthly.columns:
+                channel_profit = pipeline_result.profit_monthly.groupby('Canal_venta').agg({
+                    'Ganancia': 'sum',
+                    'Margen_pct': 'mean',
+                    'Valor_total': 'sum'
+                }).reset_index()
+                
+                fig = px.bar(
+                    channel_profit,
+                    x='Canal_venta',
+                    y='Ganancia',
+                    color='Margen_pct',
+                    title='Ganancia por Canal',
+                    labels={'Ganancia': 'Ganancia ($)', 'Canal_venta': 'Canal', 'Margen_pct': 'Margen (%)'},
+                    color_continuous_scale='YlOrRd'
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
     def render(self):
         
         # ==================== INICIALIZAR COSTOS EN SESSION_STATE ====================
@@ -2207,6 +2431,14 @@ class Dashboard:
                 st.session_state.pipeline_movements = res_movements
                 st.session_state.pipeline_demand = res_demand
                 st.session_state.pipeline_stock = res_stock
+                
+                # Guardar datos extendidos (Phase 3) si están disponibles
+                st.session_state.pipeline_demand_campaign = res.demand_campaign
+                st.session_state.pipeline_demand_channel = res.demand_channel
+                st.session_state.pipeline_demand_client = res.demand_client
+                st.session_state.pipeline_profit_monthly = res.profit_monthly
+                st.session_state.pipeline_channel_performance = res.channel_performance
+                st.session_state.pipeline_client_segmentation = res.client_segmentation
             
             else:
                 # Viewer esperando
@@ -2341,6 +2573,7 @@ class Dashboard:
             ("🏠 Dashboard", "dashboard"),
             ("📊 Análisis Individual", "individual"),
             ("📊 Análisis de Grupo", "grupal"),
+            ("📈 Análisis Extendido", "extended"),
         ]
         
         if is_admin:
@@ -2358,6 +2591,7 @@ class Dashboard:
         tab_dashboard = tabs_dict["dashboard"]
         tab_individual = tabs_dict["individual"]
         tab_grupal = tabs_dict["grupal"]
+        tab_extended = tabs_dict["extended"]
         tab_admin = tabs_dict.get("admin", EmptyTab())
         tab_superadmin = tabs_dict.get("superadmin", None)
         
@@ -2377,6 +2611,53 @@ class Dashboard:
                 "📉 Comparativa Retrospectiva",
                 "📑 Recomendación Masiva",
             ])
+        
+        # Crear subtabs dentro de Análisis Extendido (PHASE 3 - Data.csv)
+        with tab_extended:
+            tab_campaigns, tab_channels, tab_clients, tab_profits = st.tabs([
+                "📋 Análisis de Campañas",
+                "🌐 Performance de Canales",
+                "👥 Segmentación de Clientes",
+                "💰 Análisis de Ganancias",
+            ])
+            
+            # Crear pipeline result mock para las nuevas funciones
+            from dataclasses import dataclass
+            
+            @dataclass
+            class ExtendedPipelineResult:
+                demand_campaign: pd.DataFrame = None
+                demand_channel: pd.DataFrame = None
+                demand_client: pd.DataFrame = None
+                profit_monthly: pd.DataFrame = None
+                channel_performance: pd.DataFrame = None
+                client_segmentation: pd.DataFrame = None
+            
+            extended_result = ExtendedPipelineResult(
+                demand_campaign=st.session_state.get("pipeline_demand_campaign"),
+                demand_channel=st.session_state.get("pipeline_demand_channel"),
+                demand_client=st.session_state.get("pipeline_demand_client"),
+                profit_monthly=st.session_state.get("pipeline_profit_monthly"),
+                channel_performance=st.session_state.get("pipeline_channel_performance"),
+                client_segmentation=st.session_state.get("pipeline_client_segmentation"),
+            )
+            
+            # Renderizar cada análisis en su pestaña
+            with tab_campaigns:
+                st.header("📋 Análisis de Campañas")
+                self._render_campaign_analysis(extended_result)
+            
+            with tab_channels:
+                st.header("🌐 Performance de Canales")
+                self._render_channel_analysis(extended_result)
+            
+            with tab_clients:
+                st.header("👥 Segmentación de Clientes")
+                self._render_client_analysis(extended_result)
+            
+            with tab_profits:
+                st.header("💰 Análisis de Ganancias")
+                self._render_profit_analysis(extended_result)
         
         # Renderizar admin panel (solo si es admin)
         if is_admin:
