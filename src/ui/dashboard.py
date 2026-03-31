@@ -1525,37 +1525,53 @@ class Dashboard:
                 'Valor_total': 'sum'
             }).reset_index().nlargest(10, 'Valor_total')
             
-            if not top_campaigns.empty:
-                fig = px.bar(
-                    top_campaigns,
-                    x='Campana',
-                    y='Valor_total',
-                    color='Cantidad_total',
-                    title='Top 10 Campañas por Valor Total',
-                    labels={'Valor_total': 'Valor ($)', 'Cantidad_total': 'Cantidad'},
-                    color_continuous_scale='Viridis'
-                )
-                fig.update_xaxes(tickangle=-45)
-                st.plotly_chart(fig, use_container_width=True)
+            try:
+                # Filtrar valores válidos (no NaN, no infinito, no cero)
+                top_campaigns_filtered = top_campaigns[
+                    (top_campaigns['Valor_total'].notna()) & 
+                    (top_campaigns['Valor_total'] > 0)
+                ]
+                
+                if not top_campaigns_filtered.empty:
+                    fig = px.bar(
+                        top_campaigns_filtered,
+                        x='Campana',
+                        y='Valor_total',
+                        color='Cantidad_total',
+                        title='Top 10 Campañas por Valor Total',
+                        labels={'Valor_total': 'Valor ($)', 'Cantidad_total': 'Cantidad'},
+                        color_continuous_scale='Viridis'
+                    )
+                    fig.update_xaxes(tickangle=-45)
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.warning("⚠️ No hay campañas con datos válidos")
+            except Exception as e:
+                st.error(f"❌ Error en gráfico de campañas: {str(e)[:80]}")
         
         with col2:
             # Distribución mensual por campaña top
-            top_3_campaigns = pipeline_result.demand_campaign['Campana'].unique()[:3]
-            campaign_monthly = pipeline_result.demand_campaign[
-                pipeline_result.demand_campaign['Campana'].isin(top_3_campaigns)
-            ].copy()
-            campaign_monthly['Periodo'] = campaign_monthly['Año'].astype(str) + '-' + campaign_monthly['Mes'].astype(str).str.zfill(2)
-            
-            fig = px.line(
-                campaign_monthly,
-                x='Periodo',
-                y='Cantidad_total',
-                color='Campana',
-                title='Demanda Mensual - Top 3 Campañas',
-                labels={'Cantidad_total': 'Cantidad', 'Periodo': 'Mes'},
-                markers=True
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            try:
+                top_3_campaigns = pipeline_result.demand_campaign['Campana'].unique()[:3]
+                campaign_monthly = pipeline_result.demand_campaign[
+                    pipeline_result.demand_campaign['Campana'].isin(top_3_campaigns)
+                ].copy()
+                
+                if not campaign_monthly.empty:
+                    campaign_monthly['Periodo'] = campaign_monthly['Año'].astype(str) + '-' + campaign_monthly['Mes'].astype(str).str.zfill(2)
+                    
+                    fig = px.line(
+                        campaign_monthly,
+                        x='Periodo',
+                        y='Cantidad_total',
+                        color='Campana',
+                        title='Demanda Mensual - Top 3 Campañas',
+                        labels={'Cantidad_total': 'Cantidad', 'Periodo': 'Mes'},
+                        markers=True
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+            except Exception as e:
+                st.error(f"❌ Error en línea temporal: {str(e)[:80]}")
         
         st.divider()
         
@@ -1574,36 +1590,56 @@ class Dashboard:
             st.info("📋 No hay datos de canales disponibles. Asegúrate de subir Data.csv con columna 'Canal_venta'")
             return
         
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Participación de canales
-            channel_total = pipeline_result.demand_channel.groupby('Canal_venta').agg({
-                'Cantidad_total': 'sum',
-                'Valor_total': 'sum'
-            }).reset_index()
+        try:
+            col1, col2 = st.columns(2)
             
-            fig = px.pie(
-                channel_total,
-                values='Valor_total',
-                names='Canal_venta',
-                title='Participación de Canales por Valor',
-                color_discrete_sequence=px.colors.qualitative.Set2
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        
-        with col2:
-            # Cantidad por canal
-            fig = px.bar(
-                channel_total,
-                x='Canal_venta',
-                y='Cantidad_total',
-                color='Cantidad_total',
-                title='Unidades Vendidas por Canal',
-                labels={'Cantidad_total': 'Cantidad'},
-                color_continuous_scale='Blues'
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            with col1:
+                # Participación de canales
+                channel_total = pipeline_result.demand_channel.groupby('Canal_venta').agg({
+                    'Cantidad_total': 'sum',
+                    'Valor_total': 'sum'
+                }).reset_index()
+                
+                # Filtrar valores válidos
+                channel_total = channel_total[
+                    (channel_total['Valor_total'].notna()) & 
+                    (channel_total['Valor_total'] > 0)
+                ]
+                
+                if not channel_total.empty:
+                    fig = px.pie(
+                        channel_total,
+                        values='Valor_total',
+                        names='Canal_venta',
+                        title='Participación de Canales por Valor',
+                        color_discrete_sequence=px.colors.qualitative.Set2
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.warning("⚠️ No hay canales con datos de valor válidos")
+            
+            with col2:
+                # Cantidad por canal (recalcular si fue filtrado)
+                if 'channel_total' not in locals() or channel_total.empty:
+                    channel_total_qty = pipeline_result.demand_channel.groupby('Canal_venta').agg({
+                        'Cantidad_total': 'sum'
+                    }).reset_index()
+                else:
+                    channel_total_qty = channel_total
+                
+                if not channel_total_qty.empty:
+                    fig = px.bar(
+                        channel_total_qty,
+                        x='Canal_venta',
+                        y='Cantidad_total',
+                        color='Cantidad_total',
+                        title='Unidades Vendidas por Canal',
+                        labels={'Cantidad_total': 'Cantidad'},
+                        color_continuous_scale='Blues'
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+        except Exception as e:
+            st.error(f"❌ Error al procesar canales: {str(e)[:100]}")
         
         st.divider()
         
@@ -1620,47 +1656,63 @@ class Dashboard:
             st.info("📋 No hay datos de clientes disponibles. Asegúrate de subir Data.csv con columna 'Empresa_cliente'")
             return
         
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Clientes top por valor
-            top_clients = pipeline_result.demand_client.groupby('Empresa_cliente').agg({
-                'Cantidad_total': 'sum',
-                'Valor_total': 'sum'
-            }).reset_index().nlargest(10, 'Valor_total')
+        try:
+            col1, col2 = st.columns(2)
             
-            fig = px.barh(
-                top_clients,
-                x='Valor_total',
-                y='Empresa_cliente',
-                color='Cantidad_total',
-                title='Top 10 Clientes por Valor',
-                labels={'Valor_total': 'Valor ($)', 'Empresa_cliente': 'Cliente'},
-                color_continuous_scale='Reds'
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        
-        with col2:
-            # Segmentación de clientes
-            if hasattr(pipeline_result, 'client_segmentation') and pipeline_result.client_segmentation is not None and not pipeline_result.client_segmentation.empty:
-                seg_data = pipeline_result.client_segmentation['Categoria'].value_counts()
+            with col1:
+                # Clientes top por valor
+                top_clients = pipeline_result.demand_client.groupby('Empresa_cliente').agg({
+                    'Cantidad_total': 'sum',
+                    'Valor_total': 'sum'
+                }).reset_index().nlargest(10, 'Valor_total')
                 
-                fig = px.pie(
-                    values=seg_data.values,
-                    names=seg_data.index,
-                    title='Segmentación de Clientes',
-                    color_discrete_map={'Premium': '#FFD700', 'Regular': '#87CEEB', 'Casual': '#D3D3D3'}
-                )
-                st.plotly_chart(fig, use_container_width=True)
-        
-        st.divider()
-        
-        # Tabla segmentación
-        if hasattr(pipeline_result, 'client_segmentation') and pipeline_result.client_segmentation is not None and not pipeline_result.client_segmentation.empty:
-            st.subheader("👥 Segmentación Detallada de Clientes")
-            seg_cols = ['Empresa_cliente', 'Categoria', 'Cantidad_total', 'Valor_total', 'Pct_valor']
-            seg_show = [c for c in seg_cols if c in pipeline_result.client_segmentation.columns]
-            st.dataframe(pipeline_result.client_segmentation[seg_show], use_container_width=True)
+                # Filtrar valores válidos
+                top_clients = top_clients[
+                    (top_clients['Valor_total'].notna()) & 
+                    (top_clients['Valor_total'] > 0)
+                ]
+                
+                if not top_clients.empty:
+                    fig = px.barh(
+                        top_clients,
+                        x='Valor_total',
+                        y='Empresa_cliente',
+                        color='Cantidad_total',
+                        title='Top 10 Clientes por Valor',
+                        labels={'Valor_total': 'Valor ($)', 'Empresa_cliente': 'Cliente'},
+                        color_continuous_scale='Reds'
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.warning("⚠️ No hay clientes con datos de valor válidos")
+            
+            with col2:
+                # Segmentación de clientes
+                if hasattr(pipeline_result, 'client_segmentation') and pipeline_result.client_segmentation is not None and not pipeline_result.client_segmentation.empty:
+                    try:
+                        seg_data = pipeline_result.client_segmentation['Categoria'].value_counts()
+                        
+                        if not seg_data.empty:
+                            fig = px.pie(
+                                values=seg_data.values,
+                                names=seg_data.index,
+                                title='Segmentación de Clientes',
+                                color_discrete_map={'Premium': '#FFD700', 'Regular': '#87CEEB', 'Casual': '#D3D3D3'}
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+                    except Exception as e:
+                        st.warning(f"⚠️ No se pudo mostrar segmentación: {str(e)[:50]}")
+            
+            st.divider()
+            
+            # Tabla segmentación
+            if hasattr(pipeline_result, 'client_segmentation') and pipeline_result.client_segmentation is not None and not pipeline_result.client_segmentation.empty:
+                st.subheader("👥 Segmentación Detallada de Clientes")
+                seg_cols = ['Empresa_cliente', 'Categoria', 'Cantidad_total', 'Valor_total', 'Pct_valor']
+                seg_show = [c for c in seg_cols if c in pipeline_result.client_segmentation.columns]
+                st.dataframe(pipeline_result.client_segmentation[seg_show], use_container_width=True)
+        except Exception as e:
+            st.error(f"❌ Error al procesar clientes: {str(e)[:100]}")
 
     def _render_profit_analysis(self, pipeline_result):
         """Renderiza análisis de ganancias y márgenes si están disponibles."""
@@ -1668,69 +1720,106 @@ class Dashboard:
             st.info("📋 No hay datos de ganancias disponibles. Asegúrate de contar con columnas 'Precio_unitario' y 'Costo_unitario'")
             return
         
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Margen promedio por mes
-            margin_data = pipeline_result.profit_monthly.groupby(['Año', 'Mes']).agg({
-                'Margen_pct': 'mean',
-                'Ganancia': 'sum'
-            }).reset_index()
-            margin_data['Periodo'] = margin_data['Año'].astype(str) + '-' + margin_data['Mes'].astype(str).str.zfill(2)
+        try:
+            col1, col2 = st.columns(2)
             
-            fig = px.line(
-                margin_data,
-                x='Periodo',
-                y='Margen_pct',
-                title='Margen Promedio Mensual (%)',
-                labels={'Margen_pct': 'Margen (%)', 'Periodo': 'Mes'},
-                markers=True,
-                color_discrete_sequence=['#2E86AB']
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        
-        with col2:
-            # Productos más rentables
-            top_profit = pipeline_result.profit_monthly.groupby('Producto_id').agg({
-                'Ganancia': 'sum',
-                'Margen_pct': 'mean'
-            }).reset_index().nlargest(10, 'Ganancia')
+            with col1:
+                # Margen promedio por mes
+                try:
+                    margin_data = pipeline_result.profit_monthly.groupby(['Año', 'Mes']).agg({
+                        'Margen_pct': 'mean',
+                        'Ganancia': 'sum'
+                    }).reset_index()
+                    
+                    # Filtrar valores válidos
+                    margin_data = margin_data[
+                        (margin_data['Margen_pct'].notna()) & 
+                        (~margin_data['Margen_pct'].isin([float('inf'), float('-inf')]))
+                    ]
+                    
+                    if not margin_data.empty:
+                        margin_data['Periodo'] = margin_data['Año'].astype(str) + '-' + margin_data['Mes'].astype(str).str.zfill(2)
+                        
+                        fig = px.line(
+                            margin_data,
+                            x='Periodo',
+                            y='Margen_pct',
+                            title='Margen Promedio Mensual (%)',
+                            labels={'Margen_pct': 'Margen (%)', 'Periodo': 'Mes'},
+                            markers=True,
+                            color_discrete_sequence=['#2E86AB']
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.warning(f"⚠️ No se pudo mostrar margen mensual: {str(e)[:50]}")
             
-            fig = px.bar(
-                top_profit,
-                x='Producto_id',
-                y='Ganancia',
-                color='Margen_pct',
-                title='Top 10 Productos por Ganancia Total',
-                labels={'Ganancia': 'Ganancia ($)', 'Producto_id': 'Producto', 'Margen_pct': 'Margen (%)'},
-                color_continuous_scale='Greens'
-            )
-            fig.update_xaxes(tickangle=-45)
-            st.plotly_chart(fig, use_container_width=True)
-        
-        st.divider()
-        
-        # Análisis por canal si está disponible
-        if hasattr(pipeline_result, 'channel_performance') and pipeline_result.channel_performance is not None:
-            st.subheader("💰 Rentabilidad por Canal")
-            # Intentar crear análisis por canal si profit tiene columna Canal
-            if 'Canal_venta' in pipeline_result.profit_monthly.columns:
-                channel_profit = pipeline_result.profit_monthly.groupby('Canal_venta').agg({
-                    'Ganancia': 'sum',
-                    'Margen_pct': 'mean',
-                    'Valor_total': 'sum'
-                }).reset_index()
-                
-                fig = px.bar(
-                    channel_profit,
-                    x='Canal_venta',
-                    y='Ganancia',
-                    color='Margen_pct',
-                    title='Ganancia por Canal',
-                    labels={'Ganancia': 'Ganancia ($)', 'Canal_venta': 'Canal', 'Margen_pct': 'Margen (%)'},
-                    color_continuous_scale='YlOrRd'
-                )
-                st.plotly_chart(fig, use_container_width=True)
+            with col2:
+                # Productos más rentables
+                try:
+                    top_profit = pipeline_result.profit_monthly.groupby('Producto_id').agg({
+                        'Ganancia': 'sum',
+                        'Margen_pct': 'mean'
+                    }).reset_index().nlargest(10, 'Ganancia')
+                    
+                    # Filtrar valores válidos
+                    top_profit = top_profit[
+                        (top_profit['Ganancia'].notna()) & 
+                        (top_profit['Ganancia'] > 0) &
+                        (~top_profit['Ganancia'].isin([float('inf'), float('-inf')]))
+                    ]
+                    
+                    if not top_profit.empty:
+                        fig = px.bar(
+                            top_profit,
+                            x='Producto_id',
+                            y='Ganancia',
+                            color='Margen_pct',
+                            title='Top 10 Productos por Ganancia Total',
+                            labels={'Ganancia': 'Ganancia ($)', 'Producto_id': 'Producto', 'Margen_pct': 'Margen (%)'},
+                            color_continuous_scale='Greens'
+                        )
+                        fig.update_xaxes(tickangle=-45)
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.warning("⚠️ No hay productos con ganancias válidas")
+                except Exception as e:
+                    st.warning(f"⚠️ No se pudo mostrar rentabilidad: {str(e)[:50]}")
+            
+            st.divider()
+            
+            # Análisis por canal si está disponible
+            if hasattr(pipeline_result, 'channel_performance') and pipeline_result.channel_performance is not None:
+                st.subheader("💰 Rentabilidad por Canal")
+                try:
+                    # Intentar crear análisis por canal si profit tiene columna Canal
+                    if 'Canal_venta' in pipeline_result.profit_monthly.columns:
+                        channel_profit = pipeline_result.profit_monthly.groupby('Canal_venta').agg({
+                            'Ganancia': 'sum',
+                            'Margen_pct': 'mean',
+                            'Valor_total': 'sum'
+                        }).reset_index()
+                        
+                        # Filtrar válidos
+                        channel_profit = channel_profit[
+                            (channel_profit['Ganancia'].notna()) & 
+                            (channel_profit['Ganancia'].ge(0))
+                        ]
+                        
+                        if not channel_profit.empty:
+                            fig = px.bar(
+                                channel_profit,
+                                x='Canal_venta',
+                                y='Ganancia',
+                                color='Margen_pct',
+                                title='Ganancia por Canal',
+                                labels={'Ganancia': 'Ganancia ($)', 'Canal_venta': 'Canal', 'Margen_pct': 'Margen (%)'},
+                                color_continuous_scale='YlOrRd'
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.warning(f"⚠️ No se pudo analizar por canal: {str(e)[:50]}")
+        except Exception as e:
+            st.error(f"❌ Error en análisis de ganancias: {str(e)[:100]}")
 
     def render(self):
         
