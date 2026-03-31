@@ -33,6 +33,8 @@ from src.ml.ets_model import ETSForecaster
 from src.ml.backtest_ets import backtest_ets_1step
 from src.ml.rf_model import RFForecaster
 from src.ml.backtest_rf import backtest_rf_1step
+from src.ml.ml_service_wrapper import MLServiceWrapper
+from src.ml.ml_orchestrator import MLOrchestrator
 from src.db import get_db
 from src.storage import get_storage_manager
 
@@ -672,7 +674,10 @@ def policy_service_level_by_abc(abc: str) -> float:
 #D. Pronóstico y Stock de Seguridad
 
 def forecast_next_month_with_winner(hist: pd.DataFrame, winner: str, ma_window: int, ets_params: dict, rf_params: dict) -> float:
-    """Pronostica t+1 usando el modelo ganador."""
+    """Pronostica t+1 usando el modelo ganador.
+    
+    Ahora con soporte para modelos mejorados (contextual/ensemble).
+    """
     if hist.empty:
         return 0.0
 
@@ -687,6 +692,20 @@ def forecast_next_month_with_winner(hist: pd.DataFrame, winner: str, ma_window: 
         window = 3 if winner == "MA3" else 6
         yhat = moving_average(hist, window=window)
         return float(max(0.0, yhat))
+
+    # NUEVO: Si winner es "Enhanced ML", usa orchestrador contextual
+    if winner == "Enhanced ML" or winner == "Ensemble":
+        try:
+            orchestrator = MLOrchestrator(
+                use_rf_contextual=True,
+                use_rf_univariante=True,
+                use_ets=True,
+            )
+            yhat, _ = orchestrator.forecast_1step(hist, y_col="Demanda_Unid", method="auto")
+            return float(max(0.0, yhat))
+        except Exception as e:
+            print(f"⚠️ Enhanced ML falló: {e}. Fallback a RF...")
+            winner = "RandomForest"
 
     # ETS
     if winner == "ETS(Holt-Winters)":
@@ -703,6 +722,33 @@ def forecast_next_month_with_winner(hist: pd.DataFrame, winner: str, ma_window: 
 
     # fallback
     return float(max(0.0, naive_last(hist)))
+
+
+def forecast_with_orchestrator(
+    hist: pd.DataFrame,
+    method: str = "auto",
+    y_col: str = "Demanda_Unid",
+) -> tuple[float, dict]:
+    """
+    Pronostica usando el nuevo orchestrador ML (contextual/ensemble).
+    
+    Este es el método recomendado para aprovechar features de negocio.
+    
+    Args:
+        hist: DataFrame con histórico (puede tener contexto)
+        method: "auto", "contextual", "univariante", "ensemble"
+        y_col: Columna de demanda
+    
+    Returns:
+        (predicción, información del modelo usado)
+    """
+    orchestrator = MLOrchestrator(
+        use_rf_contextual=True,
+        use_rf_univariante=True,
+        use_ets=True,
+    )
+    yhat, info = orchestrator.forecast_1step(hist, y_col=y_col, method=method)
+    return float(max(0.0, yhat)), info
 
 #--------------------------------------
 
