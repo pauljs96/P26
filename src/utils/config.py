@@ -40,9 +40,11 @@ REQUIRED_COLUMNS = [
 
 # Columnas opcionales (si existen, se usan para análisis)
 OPTIONAL_COLUMNS = [
+    # Columnas v4 legacy
     "Año",
     "Mes",
     "Dia",
+    # Nuevas columnas en Data.csv
     "Empresa_cliente",
     "Departamento_cliente",
     "Canal_venta",

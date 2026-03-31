@@ -1,9 +1,10 @@
-"""Limpieza y normalización para Dataset v4.
+"""Limpieza y normalización para Dataset v4 y Data.csv.
 
-Convierte el DataFrame v4 a esquema estable:
+Convierte ambos formatos a esquema estable:
 - Validación de columnas requeridas
-- Conversión de tipos (Fecha, cantidad, stock)
+- Conversión de tipos (Fecha, cantidad, stock, precios)
 - Validación de coherencia de stock
+- Limpieza de columnas opcionales (nuevas dimensiones: Cliente, Departamento, Canal, Campaña)
 - Filtrado de registros inválidos
 """
 
@@ -67,6 +68,15 @@ class DataCleaner:
             if col in df.columns:
                 df[col] = _to_numeric(df[col])
         
+        # Columnas de texto opcionales (nuevas dimensiones)
+        text_optional_cols = [
+            "Empresa_cliente", "Departamento_cliente", 
+            "Canal_venta", "Punto_venta", "Campana"
+        ]
+        for col in text_optional_cols:
+            if col in df.columns:
+                df[col] = df[col].astype(str).str.strip()
+        
         # 3. Validar coherencia de stock
         # Para Venta: Stock_anterior - Cantidad = Stock_posterior
         # Para Producción: Stock_anterior + Cantidad = Stock_posterior
@@ -101,6 +111,20 @@ class DataCleaner:
                 df = df[~invalid_prod]
         
         # 4. Filtrar registros inválidos
+        
+        # 6. Información de columnas disponibles
+        available_dims = []
+        if "Campana" in df.columns:
+            available_dims.append(f"Campañas: {df['Campana'].nunique()}")
+        if "Canal_venta" in df.columns:
+            available_dims.append(f"Canales: {df['Canal_venta'].nunique()}")
+        if "Empresa_cliente" in df.columns:
+            available_dims.append(f"Clientes: {df['Empresa_cliente'].nunique()}")
+        if "Departamento_cliente" in df.columns:
+            available_dims.append(f"Departamentos: {df['Departamento_cliente'].nunique()}")
+        
+        if available_dims:
+            logger.info(f"  Dimensiones: {', '.join(available_dims)}")
         df = df.dropna(subset=["Fecha", "Producto_id", "Tipo_movimiento", "Cantidad"])
         df = df[df["Producto_id"].astype(str).str.strip() != ""]
         df = df[df["Cantidad"].notna()]
